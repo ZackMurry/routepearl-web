@@ -44,6 +44,7 @@ export default function MapWithWaypoints() {
   const [waypoints, setWaypoints] = useState<Point[]>([])
   const [truckRoute, setTruckRoute] = useState<Point[]>([])
   const [droneRoutes, setDroneRoutes] = useState<Point[][]>([])
+  const [isLoading, setLoading] = useState(false)
 
   function ClickHandler() {
     useMapEvents({
@@ -68,6 +69,7 @@ export default function MapWithWaypoints() {
     const customers = waypoints.slice(1)
     const stations: Point[] = []
 
+    setLoading(true)
     try {
       const res = await fetch('http://localhost:8000/api/routes/generate', {
         method: 'POST',
@@ -114,6 +116,8 @@ export default function MapWithWaypoints() {
       }
     } catch (err) {
       console.error(err)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -180,9 +184,11 @@ export default function MapWithWaypoints() {
                 />
               )
             })}
-            {truckRoute.map((pt, i) => (
-              <TextMarker key={i} position={[pt.lat, pt.lng]} text={`${i + 1}`} />
-            ))}
+            {truckRoute
+              .filter((val, i, a) => i === 0 || (val.lat !== a[i - 1].lat && val.lng !== a[i - 1].lng))
+              .map((pt, i) => (
+                <TextMarker key={i} position={[pt.lat, pt.lng]} text={`${i + 1}`} />
+              ))}
           </>
         )}
 
@@ -210,6 +216,7 @@ export default function MapWithWaypoints() {
 
         {droneRoutes
           .reduce((acc, sortie) => [...acc, ...sortie], [])
+          .filter((val, i, a) => i === 0 || (val.lat !== a[i - 1].lat && val.lng !== a[i - 1].lng))
           .map((pt, idx) => (
             <TextMarker key={idx} position={[pt.lat, pt.lng]} text={`${idx + 1}`} />
           ))}
@@ -218,6 +225,7 @@ export default function MapWithWaypoints() {
       <Button
         className='absolute bottom-5 right-5 p-2 bg-blue-500 text-white !z-[100000] cursor-pointer rounded-md'
         onClick={generateRoute}
+        loading={isLoading}
       >
         Generate Route
       </Button>
