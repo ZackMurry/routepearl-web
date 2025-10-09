@@ -2,9 +2,9 @@
 
 import { Marker } from 'react-leaflet'
 import L, { LatLngExpression, PointTuple } from 'leaflet'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { FlagTriangleRight } from 'lucide-react'
+import { FlagTriangleRight, LucideProps } from 'lucide-react'
 
 type Align = 'center' | 'bottom' | 'bottom-left' | 'bottom-right' | 'top' | 'top-left' | 'top-right' | 'left' | 'right'
 
@@ -15,14 +15,23 @@ type Props = {
   align?: Align
   anchor?: PointTuple
   onRightClick?: () => void
+  LucideIcon?: React.ForwardRefExoticComponent<Omit<LucideProps, 'ref'> & React.RefAttributes<SVGSVGElement>>
 }
 
-export default function LucideMarker({ position, size = 24, color = 'red', align = 'center', anchor, onRightClick }: Props) {
+export default function LucideMarker({
+  position,
+  size = 24,
+  color = 'red',
+  align = 'center',
+  anchor,
+  onRightClick,
+  LucideIcon = FlagTriangleRight,
+}: Props) {
   const [icon, setIcon] = useState<L.DivIcon | null>(null)
 
   useEffect(() => {
     // Convert React icon to HTML for Leaflet
-    const html = renderToStaticMarkup(<FlagTriangleRight size={size} color={color} />)
+    const html = renderToStaticMarkup(<LucideIcon size={size} color={color} />)
 
     // Map alignment strings to iconAnchor coordinates
     const anchors: Record<Align, [number, number]> = {
