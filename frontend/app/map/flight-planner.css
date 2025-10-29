@@ -1,0 +1,51 @@
+/* Flight Planner UI Styles */
+
+/* Ensure map doesn't block UI panels */
+.leaflet-container {
+  z-index: 0;
+}
+
+/* Ensure sidebar is above map */
+.flight-planner-sidebar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  width: 384px; /* w-96 */
+  background-color: white;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+.flight-planner-sidebar * {
+  pointer-events: auto;
+}
+
+/* Ensure bottom panel is above map */
+.flight-planner-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+.flight-planner-bottom * {
+  pointer-events: auto;
+}
+
+/* Leaflet controls should be above panels */
+.leaflet-control-container {
+  z-index: 1001;
+}
+
+/* Floating button */
+.flight-planner-generate-btn {
+  position: absolute;
+  bottom: 5rem;
+  right: 1.25rem;
+  z-index: 1001;
+  pointer-events: auto;
+}

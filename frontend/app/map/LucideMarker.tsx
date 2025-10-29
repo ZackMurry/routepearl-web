@@ -15,7 +15,7 @@ type Props = {
   align?: Align
   anchor?: PointTuple
   onRightClick?: () => void
-  LucideIcon?: React.ForwardRefExoticComponent<Omit<LucideProps, 'ref'> & React.RefAttributes<SVGSVGElement>>
+  LucideIcon?: React.FC<LucideProps>
 }
 
 export default function LucideMarker({

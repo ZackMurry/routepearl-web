@@ -30,116 +30,140 @@ function permute<T>(arr: T[]): T[][] {
   return result
 }
 
-import React, { useState } from 'react'
-import { MapContainer, TileLayer, Polyline, Marker, useMapEvents } from 'react-leaflet'
+import React from 'react'
+import { MapContainer, TileLayer, Polyline, useMapEvents, Circle } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
+import './flight-planner.css'
 import LucideMarker from './LucideMarker'
-import { Button } from '@radix-ui/themes'
-import { Point } from '@/lib/types'
-import { Heading1, Heading2 } from 'lucide-react'
+import { Point, FlightNode } from '@/lib/types'
 import TextMarker from '@/components/TextMarker'
 import chroma from 'chroma-js'
+import { FlightPlannerProvider, useFlightPlanner } from './FlightPlannerContext'
+import { FlightPlannerSidebar } from './FlightPlannerSidebar'
+import { BottomPanel } from './BottomPanel'
 
-export default function MapWithWaypoints() {
-  const [waypoints, setWaypoints] = useState<Point[]>([])
-  const [truckRoute, setTruckRoute] = useState<Point[]>([])
-  const [droneRoutes, setDroneRoutes] = useState<Point[][]>([])
-  const [isLoading, setLoading] = useState(false)
+function MapContent() {
+  const {
+    missionConfig,
+    addNode,
+    removeNode,
+    truckRoute,
+    droneRoutes,
+    isFlightPlannerMode,
+  } = useFlightPlanner()
+
+  // Get color based on node type
+  const getNodeColor = (type: string): string => {
+    switch (type) {
+      case 'depot':
+        return '#3b82f6' // blue
+      case 'customer':
+        return '#10b981' // green
+      case 'station':
+        return '#f97316' // orange
+      case 'waypoint':
+        return '#8b5cf6' // purple
+      case 'hazard':
+        return '#ef4444' // red
+      default:
+        return '#6b7280' // gray
+    }
+  }
+
+  // Get color based on hazard severity
+  const getHazardColor = (severity?: 'low' | 'medium' | 'high'): string => {
+    switch (severity) {
+      case 'low':
+        return '#eab308' // yellow
+      case 'medium':
+        return '#f97316' // orange
+      case 'high':
+        return '#ef4444' // red
+      default:
+        return '#f97316' // orange (default)
+    }
+  }
 
   function ClickHandler() {
     useMapEvents({
       click(e) {
-        setWaypoints(prev => [...prev, { lat: e.latlng.lat, lng: e.latlng.lng }])
+        // In flight planner mode, add customer nodes; otherwise add waypoints
+        const newNode: FlightNode = {
+          id: `node-${Date.now()}`,
+          type: isFlightPlannerMode ? 'customer' : 'waypoint',
+          lat: e.latlng.lat,
+          lng: e.latlng.lng,
+          label: isFlightPlannerMode
+            ? `Customer ${missionConfig.nodes.filter((n) => n.type === 'customer').length + 1}`
+            : `Node ${missionConfig.nodes.length + 1}`,
+        }
+        addNode(newNode)
       },
     })
     return null
   }
 
-  const removeWaypoint = (index: number) => setWaypoints(prev => prev.filter((_, i) => i !== index))
-
-  const generateRoute = async () => {
-    // your API call code stays the same
-    if (waypoints.length < 2) {
-      setTruckRoute([])
-      setDroneRoutes([])
-      return
-    }
-
-    const depots = [waypoints[0]]
-    const customers = waypoints.slice(1)
-    const stations: Point[] = []
-
-    setLoading(true)
-    try {
-      const res = await fetch('http://localhost:8000/api/routes/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          depots: depots.map((p, i) => ({ id: `Depot ${i}`, lat: p.lat, lon: p.lng })),
-          customers: customers.map((p, i) => ({ id: `Customer ${i + 1}`, lat: p.lat, lon: p.lng })),
-          stations: stations.map((p, i) => ({ id: `Station ${i + 1}`, lat: p.lat, lon: p.lng })),
-        }),
-      })
-
-      if (!res.ok) {
-        console.error('Backend error', await res.text())
-        return
-      }
-
-      const data = await res.json()
-
-      // --- Truck route ---
-      if (data.routes.truck_route) {
-        // Flatten all inner paths into a single sequence of points
-        const truckPoints: Point[] = data.routes.truck_route.flatMap((segment: number[][]) =>
-          segment.map(([lat, lon]) => ({ lat, lng: lon })),
-        )
-        setTruckRoute(truckPoints)
-        console.log('Truck route:', truckPoints)
-      } else {
-        setTruckRoute([])
-      }
-
-      // --- Drone route ---
-      if (data.routes.drone_route) {
-        // data.routes.drone_route is now [[lat, lon], ...]
-        // For consistency, store as an array of one array of points
-        const dronePaths = []
-        const toLatLon = (coord: number[]): Point => ({ lat: coord[0], lng: coord[1] })
-        for (const dp of data.routes.drone_route) {
-          dronePaths.push([toLatLon(dp[0]), toLatLon(dp[1]), toLatLon(dp[2])])
-        }
-        setDroneRoutes(dronePaths)
-        console.log('Drone route:', dronePaths)
-      } else {
-        setDroneRoutes([])
-      }
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const removeWaypoint = (id: string) => removeNode(id)
 
   return (
-    <div style={{ height: '100vh', width: '100%' }}>
-      <MapContainer
-        style={{ height: '100%', width: '100%' }}
-        center={[38.9452, -92.3288]}
-        zoom={17}
-        attributionControl={false}
-      >
-        <TileLayer
-          attribution='&copy; OpenStreetMap contributors &copy; CARTO'
-          url='https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-          subdomains='abcd'
-        />
+    <>
+      <div style={{ height: '100vh', width: '100%', position: 'relative' }}>
+        <MapContainer
+          style={{ height: '100%', width: '100%' }}
+          center={[26.4619, -81.7726]}
+          zoom={15}
+          attributionControl={false}
+        >
+          <TileLayer
+            attribution='&copy; OpenStreetMap contributors &copy; CARTO'
+            url='https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+            subdomains='abcd'
+          />
 
-        <ClickHandler />
+          <ClickHandler />
 
-        {waypoints.map((pos, i) => (
-          <LucideMarker key={i} position={[pos.lat, pos.lng]} anchor={[0.25, 1]} onRightClick={() => removeWaypoint(i)} />
-        ))}
+          {/* Render flight nodes */}
+          {missionConfig.nodes.map((node) => {
+            const hazardColor = getHazardColor(node.severity)
+            return (
+              <React.Fragment key={node.id}>
+                {/* Render circle for hazard nodes */}
+                {node.type === 'hazard' && (
+                  <Circle
+                    center={[node.lat, node.lng]}
+                    radius={node.radius || 100} // Default 100m radius
+                    pathOptions={{
+                      color: hazardColor,
+                      fillColor: hazardColor,
+                      fillOpacity: 0.15,
+                      weight: 2,
+                    }}
+                  />
+                )}
+                <LucideMarker
+                  position={[node.lat, node.lng]}
+                  anchor={[0.25, 1]}
+                  color={getNodeColor(node.type)}
+                  onRightClick={() => removeWaypoint(node.id)}
+                />
+              </React.Fragment>
+            )
+          })}
+
+          {/* Render hazard zones */}
+          {missionConfig.hazardZones.map((zone) => (
+            <Circle
+              key={zone.id}
+              center={[zone.center.lat, zone.center.lng]}
+              radius={zone.radius}
+              pathOptions={{
+                color: zone.severity === 'high' ? 'red' : zone.severity === 'medium' ? 'orange' : 'yellow',
+                fillColor:
+                  zone.severity === 'high' ? 'red' : zone.severity === 'medium' ? 'orange' : 'yellow',
+                fillOpacity: 0.2,
+              }}
+            />
+          ))}
 
         {/* Truck route */}
         {/* {truckRoute.length > 1 && (
@@ -220,15 +244,21 @@ export default function MapWithWaypoints() {
           .map((pt, idx) => (
             <TextMarker key={idx} position={[pt.lat, pt.lng]} text={`${idx + 1}`} />
           ))}
-      </MapContainer>
+        </MapContainer>
 
-      <Button
-        className='absolute bottom-5 right-5 p-2 bg-blue-500 text-white !z-[100000] cursor-pointer rounded-md'
-        onClick={generateRoute}
-        loading={isLoading}
-      >
-        Generate Route
-      </Button>
-    </div>
+        {/* Sidebar and Bottom Panel */}
+        <FlightPlannerSidebar />
+        <BottomPanel />
+      </div>
+    </>
+  )
+}
+
+// Main component wrapped with provider
+export default function MapWithWaypoints() {
+  return (
+    <FlightPlannerProvider>
+      <MapContent />
+    </FlightPlannerProvider>
   )
 }
