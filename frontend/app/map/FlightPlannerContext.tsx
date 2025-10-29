@@ -37,6 +37,12 @@ interface FlightPlannerContextType {
   setBottomPanelExpanded: (expanded: boolean) => void
   isFlightPlannerMode: boolean
   setIsFlightPlannerMode: (mode: boolean) => void
+  plotModeCustomer: boolean
+  setPlotModeCustomer: (mode: boolean) => void
+  plotModeNodes: boolean
+  setPlotModeNodes: (mode: boolean) => void
+  selectedNodeId: string | null
+  setSelectedNodeId: (id: string | null) => void
 
   // Mission actions
   createNewMission: () => void
@@ -75,6 +81,24 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [bottomPanelExpanded, setBottomPanelExpanded] = useState(false)
   const [isFlightPlannerMode, setIsFlightPlannerMode] = useState(true) // Default to flight planner mode
   const [isGeneratingRoute, setIsGeneratingRoute] = useState(false)
+  const [plotModeCustomer, setPlotModeCustomerInternal] = useState(false)
+  const [plotModeNodes, setPlotModeNodesInternal] = useState(false)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+
+  // Wrapper functions to ensure mutual exclusivity
+  const setPlotModeCustomer = (mode: boolean) => {
+    if (mode) {
+      setPlotModeNodesInternal(false) // Turn off nodes mode
+    }
+    setPlotModeCustomerInternal(mode)
+  }
+
+  const setPlotModeNodes = (mode: boolean) => {
+    if (mode) {
+      setPlotModeCustomerInternal(false) // Turn off customer mode
+    }
+    setPlotModeNodesInternal(mode)
+  }
 
   // Update mission config
   const updateMissionConfig = (updates: Partial<MissionConfig>) => {
@@ -308,6 +332,12 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setBottomPanelExpanded,
     isFlightPlannerMode,
     setIsFlightPlannerMode,
+    plotModeCustomer,
+    setPlotModeCustomer,
+    plotModeNodes,
+    setPlotModeNodes,
+    selectedNodeId,
+    setSelectedNodeId,
     createNewMission,
     saveMission,
     loadMission,

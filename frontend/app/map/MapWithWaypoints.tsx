@@ -47,9 +47,14 @@ function MapContent() {
     missionConfig,
     addNode,
     removeNode,
+    updateNode,
     truckRoute,
     droneRoutes,
     isFlightPlannerMode,
+    plotModeCustomer,
+    plotModeNodes,
+    selectedNodeId,
+    setSelectedNodeId,
   } = useFlightPlanner()
 
   // Get color based on node type
@@ -87,16 +92,31 @@ function MapContent() {
   function ClickHandler() {
     useMapEvents({
       click(e) {
-        // In flight planner mode, add customer nodes; otherwise add waypoints
-        const newNode: FlightNode = {
-          id: `node-${Date.now()}`,
-          type: isFlightPlannerMode ? 'customer' : 'waypoint',
-          lat: e.latlng.lat,
-          lng: e.latlng.lng,
-          label: isFlightPlannerMode
-            ? `Customer ${missionConfig.nodes.filter((n) => n.type === 'customer').length + 1}`
-            : `Node ${missionConfig.nodes.length + 1}`,
+        // Only create nodes if one of the plot modes is enabled
+        if (!plotModeCustomer && !plotModeNodes) return
+
+        let newNode: FlightNode
+
+        if (plotModeCustomer) {
+          // Customer plot mode - create customer nodes
+          newNode = {
+            id: `node-${Date.now()}`,
+            type: 'customer',
+            lat: e.latlng.lat,
+            lng: e.latlng.lng,
+            label: `Customer ${missionConfig.nodes.filter((n) => n.type === 'customer').length + 1}`,
+          }
+        } else {
+          // Nodes plot mode - create waypoint nodes
+          newNode = {
+            id: `node-${Date.now()}`,
+            type: 'waypoint',
+            lat: e.latlng.lat,
+            lng: e.latlng.lng,
+            label: `Waypoint ${missionConfig.nodes.filter((n) => n.type === 'waypoint').length + 1}`,
+          }
         }
+
         addNode(newNode)
       },
     })
@@ -113,6 +133,7 @@ function MapContent() {
           center={[26.4619, -81.7726]}
           zoom={15}
           attributionControl={false}
+          zoomControl={false}
         >
           <TileLayer
             attribution='&copy; OpenStreetMap contributors &copy; CARTO'
@@ -125,6 +146,9 @@ function MapContent() {
           {/* Render flight nodes */}
           {missionConfig.nodes.map((node) => {
             const hazardColor = getHazardColor(node.severity)
+            // Nodes are draggable only when both plot modes are OFF
+            const isDraggable = !plotModeCustomer && !plotModeNodes
+
             return (
               <React.Fragment key={node.id}>
                 {/* Render circle for hazard nodes */}
@@ -144,7 +168,15 @@ function MapContent() {
                   position={[node.lat, node.lng]}
                   anchor={[0.25, 1]}
                   color={getNodeColor(node.type)}
+                  onClick={() => {
+                    // Only allow selecting when plot modes are off
+                    if (!plotModeCustomer && !plotModeNodes) {
+                      setSelectedNodeId(node.id)
+                    }
+                  }}
                   onRightClick={() => removeWaypoint(node.id)}
+                  draggable={isDraggable}
+                  onDragEnd={(lat, lng) => updateNode(node.id, { lat, lng })}
                 />
               </React.Fragment>
             )

@@ -15,6 +15,9 @@ type Props = {
   align?: Align
   anchor?: PointTuple
   onRightClick?: () => void
+  onClick?: () => void
+  onDragEnd?: (lat: number, lng: number) => void
+  draggable?: boolean
   LucideIcon?: React.FC<LucideProps>
 }
 
@@ -25,6 +28,9 @@ export default function LucideMarker({
   align = 'center',
   anchor,
   onRightClick,
+  onClick,
+  onDragEnd,
+  draggable = false,
   LucideIcon = FlagTriangleRight,
 }: Props) {
   const [icon, setIcon] = useState<L.DivIcon | null>(null)
@@ -62,10 +68,19 @@ export default function LucideMarker({
     <Marker
       position={position}
       icon={icon}
+      draggable={draggable}
       eventHandlers={{
+        click: () => {
+          onClick?.()
+        },
         contextmenu: e => {
           e.originalEvent.preventDefault() // prevent browser menu
           onRightClick?.()
+        },
+        dragend: e => {
+          const marker = e.target
+          const newPos = marker.getLatLng()
+          onDragEnd?.(newPos.lat, newPos.lng)
         },
       }}
     />

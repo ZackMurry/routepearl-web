@@ -24,6 +24,9 @@ import {
   LogOut,
   Route,
   FolderOpen,
+  ArrowUp,
+  ArrowDown,
+  MousePointer2,
 } from 'lucide-react'
 
 export function BottomPanel() {
@@ -45,6 +48,9 @@ export function BottomPanel() {
     removeNode,
     generateRoute,
     isGeneratingRoute,
+    plotModeCustomer,
+    setPlotModeCustomer,
+    selectedNodeId,
   } = useFlightPlanner()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -150,7 +156,7 @@ export function BottomPanel() {
           pointerEvents: 'auto',
         }}
       >
-        <Card className="rounded-t-lg rounded-b-none shadow-xl mx-4 mb-0" style={{ backgroundColor: 'white' }}>
+        <Card className="rounded-t-lg rounded-b-none shadow-xl mx-4 mb-0" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)' }}>
           <Flex justify="between" align="center" className="p-3">
             <Flex gap="4" align="center">
               {isFlightPlannerMode ? (
@@ -232,10 +238,10 @@ export function BottomPanel() {
           pointerEvents: 'auto',
         }}
       >
-        <Card className="h-full rounded-none shadow-xl" style={{ backgroundColor: 'white', height: '100%' }}>
+        <Card className="h-full rounded-none shadow-xl" style={{ height: '100%' }}>
           <Flex direction="column" className="h-full">
             {/* Header */}
-            <Flex justify="between" align="center" className="p-3 border-b">
+            <Flex justify="between" align="center" className="p-3 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)' }}>
               <Flex gap="4" align="center">
                 <Flex align="center" gap="2">
                   <Route size={18} />
@@ -269,24 +275,41 @@ export function BottomPanel() {
               </Flex>
             </Flex>
 
-            <Flex className="flex-1" style={{ minHeight: 0 }}>
+            <Flex className="flex-1" style={{ minHeight: 0, backgroundColor: 'white' }}>
               {/* Left: Customer Nodes List */}
               <Box className="flex-1 p-4 border-r" style={{ overflow: 'hidden' }}>
                 <Flex justify="between" align="center" className="mb-3">
                   <Text size="2" weight="bold">
                     Customer Locations ({customerNodes.length})
                   </Text>
-                  <Button size="1" onClick={handleAddCustomer}>
-                    <Plus size={14} /> Add Customer
-                  </Button>
+                  <Flex gap="2">
+                    <Button
+                      size="1"
+                      variant={plotModeCustomer ? 'solid' : 'soft'}
+                      color={plotModeCustomer ? 'blue' : 'gray'}
+                      onClick={() => setPlotModeCustomer(!plotModeCustomer)}
+                    >
+                      <MousePointer2 size={14} /> Plot
+                    </Button>
+                    <Button size="1" onClick={handleAddCustomer}>
+                      <Plus size={14} /> Add Customer
+                    </Button>
+                  </Flex>
                 </Flex>
 
                 <ScrollArea style={{ height: 'calc(100% - 2.5rem)' }}>
                   <div className="space-y-2 pr-2">
                     {customerNodes.map((node, index) => (
-                      <Card key={node.id} className="p-2">
+                      <Card
+                        key={node.id}
+                        className="p-2"
+                        style={{
+                          backgroundColor: selectedNodeId === node.id ? '#eff6ff' : 'white',
+                          border: selectedNodeId === node.id ? '2px solid #3b82f6' : undefined,
+                        }}
+                      >
                         <Flex justify="between" align="start">
-                          <Flex direction="column" gap="1" className="flex-1 mr-2">
+                          <Flex direction="column" gap="2" className="flex-1 mr-2">
                             <Flex align="center" gap="2">
                               <MapPin size={14} />
                               <TextField.Root
@@ -299,10 +322,72 @@ export function BottomPanel() {
                                 style={{ flex: 1 }}
                               />
                             </Flex>
-                            <Flex gap="1" className="text-xs text-gray-500">
-                              <Text size="1">
-                                {node.lat.toFixed(4)}, {node.lng.toFixed(4)}
-                              </Text>
+                            <Flex gap="2">
+                              {/* Latitude with increment/decrement */}
+                              <Flex align="center" gap="1" style={{ flex: 1 }}>
+                                <TextField.Root
+                                  value={node.lat}
+                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                    updateNode(node.id, { lat: parseFloat(e.target.value) || 0 })
+                                  }
+                                  placeholder="Latitude"
+                                  size="1"
+                                  type="number"
+                                  step="0.0001"
+                                  style={{ flex: 1 }}
+                                />
+                                <Flex direction="column" gap="1">
+                                  <IconButton
+                                    size="1"
+                                    variant="soft"
+                                    onClick={() => updateNode(node.id, { lat: parseFloat((node.lat + 0.0001).toFixed(6)) })}
+                                    style={{ minWidth: '24px', minHeight: '18px', padding: '2px 4px' }}
+                                  >
+                                    <ArrowUp size={12} />
+                                  </IconButton>
+                                  <IconButton
+                                    size="1"
+                                    variant="soft"
+                                    onClick={() => updateNode(node.id, { lat: parseFloat((node.lat - 0.0001).toFixed(6)) })}
+                                    style={{ minWidth: '24px', minHeight: '18px', padding: '2px 4px' }}
+                                  >
+                                    <ArrowDown size={12} />
+                                  </IconButton>
+                                </Flex>
+                              </Flex>
+
+                              {/* Longitude with increment/decrement */}
+                              <Flex align="center" gap="1" style={{ flex: 1 }}>
+                                <TextField.Root
+                                  value={node.lng}
+                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                    updateNode(node.id, { lng: parseFloat(e.target.value) || 0 })
+                                  }
+                                  placeholder="Longitude"
+                                  size="1"
+                                  type="number"
+                                  step="0.0001"
+                                  style={{ flex: 1 }}
+                                />
+                                <Flex direction="column" gap="1">
+                                  <IconButton
+                                    size="1"
+                                    variant="soft"
+                                    onClick={() => updateNode(node.id, { lng: parseFloat((node.lng + 0.0001).toFixed(6)) })}
+                                    style={{ minWidth: '24px', minHeight: '18px', padding: '2px 4px' }}
+                                  >
+                                    <ArrowUp size={12} />
+                                  </IconButton>
+                                  <IconButton
+                                    size="1"
+                                    variant="soft"
+                                    onClick={() => updateNode(node.id, { lng: parseFloat((node.lng - 0.0001).toFixed(6)) })}
+                                    style={{ minWidth: '24px', minHeight: '18px', padding: '2px 4px' }}
+                                  >
+                                    <ArrowDown size={12} />
+                                  </IconButton>
+                                </Flex>
+                              </Flex>
                             </Flex>
                           </Flex>
                           <IconButton
@@ -425,10 +510,10 @@ export function BottomPanel() {
         pointerEvents: 'auto',
       }}
     >
-      <Card className="h-full rounded-none shadow-xl" style={{ backgroundColor: 'white', height: '100%' }}>
+      <Card className="h-full rounded-none shadow-xl" style={{ height: '100%' }}>
         <Flex direction="column" className="h-full">
           {/* Header */}
-          <Flex justify="between" align="center" className="p-3 border-b">
+          <Flex justify="between" align="center" className="p-3 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)' }}>
             <Flex gap="4" align="center">
               <Flex align="center" gap="2">
                 <FileText size={18} />
@@ -458,7 +543,7 @@ export function BottomPanel() {
             </IconButton>
           </Flex>
 
-          <Flex className="flex-1" style={{ minHeight: 0 }}>
+          <Flex className="flex-1" style={{ minHeight: 0, backgroundColor: 'white' }}>
             {/* Left: Current Tasks */}
             <Box className="flex-1 p-4 border-r" style={{ overflow: 'hidden' }}>
               <Text size="2" weight="bold" className="mb-3 block">

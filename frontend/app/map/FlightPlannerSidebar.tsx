@@ -33,6 +33,9 @@ import {
   FolderOpen,
   Upload,
   Download,
+  ArrowUp,
+  ArrowDown,
+  MousePointer2,
 } from 'lucide-react'
 import { FlightNode, HazardZone, RoutingAlgorithm } from '@/lib/types'
 
@@ -52,6 +55,9 @@ export function FlightPlannerSidebar() {
     setSidebarCollapsed,
     isFlightPlannerMode,
     setIsFlightPlannerMode,
+    plotModeNodes,
+    setPlotModeNodes,
+    selectedNodeId,
   } = useFlightPlanner()
 
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -407,28 +413,46 @@ export function FlightPlannerSidebar() {
                       ? missionConfig.nodes.filter(n => n.type !== 'customer').length
                       : missionConfig.nodes.length})
                   </Text>
-                  <Button
-                    size="1"
-                    onClick={() => {
-                      const newNode: FlightNode = {
-                        id: `node-${Date.now()}`,
-                        type: 'waypoint',
-                        lat: 26.4619, // Default FGCU coordinates
-                        lng: -81.7726,
-                        label: `Node ${missionConfig.nodes.length + 1}`,
-                      }
-                      addNode(newNode)
-                    }}
-                  >
-                    <Plus size={14} /> Add Node
-                  </Button>
+                  <Flex gap="2">
+                    <Button
+                      size="1"
+                      variant={plotModeNodes ? 'solid' : 'soft'}
+                      color={plotModeNodes ? 'blue' : 'gray'}
+                      onClick={() => setPlotModeNodes(!plotModeNodes)}
+                    >
+                      <MousePointer2 size={14} /> Plot
+                    </Button>
+                    <Button
+                      size="1"
+                      onClick={() => {
+                        const newNode: FlightNode = {
+                          id: `node-${Date.now()}`,
+                          type: 'waypoint',
+                          lat: 26.4619, // Default FGCU coordinates
+                          lng: -81.7726,
+                          label: `Node ${missionConfig.nodes.length + 1}`,
+                        }
+                        addNode(newNode)
+                      }}
+                    >
+                      <Plus size={14} /> Add Node
+                    </Button>
+                  </Flex>
                 </Flex>
 
-                <div className="space-y-2">
-                  {missionConfig.nodes
-                    .filter(node => !isFlightPlannerMode || node.type !== 'customer')
-                    .map((node, index) => (
-                    <Card key={node.id} className="p-3">
+                <ScrollArea style={{ height: 'calc(100vh - 250px - 9rem)' }}>
+                  <div className="space-y-2 pr-2">
+                    {missionConfig.nodes
+                      .filter(node => !isFlightPlannerMode || node.type !== 'customer')
+                      .map((node, index) => (
+                    <Card
+                      key={node.id}
+                      className="p-3"
+                      style={{
+                        backgroundColor: selectedNodeId === node.id ? '#eff6ff' : 'white',
+                        border: selectedNodeId === node.id ? '2px solid #3b82f6' : undefined,
+                      }}
+                    >
                       <Flex justify="between" align="start" className="mb-2">
                         <Flex align="center" gap="2">
                           <MapPin size={16} />
@@ -485,22 +509,67 @@ export function FlightPlannerSidebar() {
                         </Select.Root>
 
                         <Flex gap="2">
-                          <TextField.Root
-                            placeholder="Lat"
-                            value={node.lat}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNode(node.id, { lat: parseFloat(e.target.value) })}
-                            size="1"
-                            type="number"
-                            step="0.000001"
-                          />
-                          <TextField.Root
-                            placeholder="Lng"
-                            value={node.lng}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNode(node.id, { lng: parseFloat(e.target.value) })}
-                            size="1"
-                            type="number"
-                            step="0.000001"
-                          />
+                          {/* Latitude with increment/decrement */}
+                          <Flex align="center" gap="1" style={{ flex: 1 }}>
+                            <TextField.Root
+                              placeholder="Lat"
+                              value={node.lat}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNode(node.id, { lat: parseFloat(e.target.value) || 0 })}
+                              size="1"
+                              type="number"
+                              step="0.0001"
+                              style={{ flex: 1 }}
+                            />
+                            <Flex direction="column" gap="1">
+                              <IconButton
+                                size="1"
+                                variant="soft"
+                                onClick={() => updateNode(node.id, { lat: parseFloat((node.lat + 0.0001).toFixed(6)) })}
+                                style={{ minWidth: '24px', minHeight: '18px', padding: '2px 4px' }}
+                              >
+                                <ArrowUp size={12} />
+                              </IconButton>
+                              <IconButton
+                                size="1"
+                                variant="soft"
+                                onClick={() => updateNode(node.id, { lat: parseFloat((node.lat - 0.0001).toFixed(6)) })}
+                                style={{ minWidth: '24px', minHeight: '18px', padding: '2px 4px' }}
+                              >
+                                <ArrowDown size={12} />
+                              </IconButton>
+                            </Flex>
+                          </Flex>
+
+                          {/* Longitude with increment/decrement */}
+                          <Flex align="center" gap="1" style={{ flex: 1 }}>
+                            <TextField.Root
+                              placeholder="Lng"
+                              value={node.lng}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNode(node.id, { lng: parseFloat(e.target.value) || 0 })}
+                              size="1"
+                              type="number"
+                              step="0.0001"
+                              style={{ flex: 1 }}
+                            />
+                            <Flex direction="column" gap="1">
+                              <IconButton
+                                size="1"
+                                variant="soft"
+                                onClick={() => updateNode(node.id, { lng: parseFloat((node.lng + 0.0001).toFixed(6)) })}
+                                style={{ minWidth: '24px', minHeight: '18px', padding: '2px 4px' }}
+                              >
+                                <ArrowUp size={12} />
+                              </IconButton>
+                              <IconButton
+                                size="1"
+                                variant="soft"
+                                onClick={() => updateNode(node.id, { lng: parseFloat((node.lng - 0.0001).toFixed(6)) })}
+                                style={{ minWidth: '24px', minHeight: '18px', padding: '2px 4px' }}
+                              >
+                                <ArrowDown size={12} />
+                              </IconButton>
+                            </Flex>
+                          </Flex>
                         </Flex>
 
                         {node.type === 'hazard' && (
@@ -552,16 +621,17 @@ export function FlightPlannerSidebar() {
                     </Card>
                   ))}
 
-                  {missionConfig.nodes.filter(node => !isFlightPlannerMode || node.type !== 'customer').length === 0 && (
-                    <Box className="text-center p-6 bg-gray-50 rounded">
-                      <Text size="2" color="gray">
-                        {isFlightPlannerMode
-                          ? 'No depot, station, waypoint, or hazard nodes added yet. Click "Add Node" to start planning.'
-                          : 'No nodes added yet. Click "Add Node" to start planning.'}
-                      </Text>
-                    </Box>
-                  )}
-                </div>
+                    {missionConfig.nodes.filter(node => !isFlightPlannerMode || node.type !== 'customer').length === 0 && (
+                      <Box className="text-center p-6 bg-gray-50 rounded">
+                        <Text size="2" color="gray">
+                          {isFlightPlannerMode
+                            ? 'No depot, station, waypoint, or hazard nodes added yet. Click "Add Node" to start planning.'
+                            : 'No nodes added yet. Click "Add Node" to start planning.'}
+                        </Text>
+                      </Box>
+                    )}
+                  </div>
+                </ScrollArea>
               </Tabs.Content>
 
               {/* Advanced Tab */}
