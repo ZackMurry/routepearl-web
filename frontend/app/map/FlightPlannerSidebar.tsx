@@ -30,7 +30,6 @@ import {
   Play,
   Pause,
   Square,
-  FolderOpen,
   Upload,
   Download,
   ArrowUp,
@@ -64,11 +63,6 @@ export function FlightPlannerSidebar() {
 
   const handleMakeFlightPlan = () => {
     setIsFlightPlannerMode(true)
-  }
-
-  const handleLoadFlightPlan = () => {
-    // TODO: Show list of saved missions to load
-    console.log('Load flight plan clicked')
   }
 
   const handleImportFlightPlan = () => {
@@ -155,9 +149,6 @@ export function FlightPlannerSidebar() {
                     <Button size="3" className="w-full" onClick={handleMakeFlightPlan}>
                       <Plus size={16} /> Make Flight Plan
                     </Button>
-                    <Button size="3" variant="soft" className="w-full" onClick={handleLoadFlightPlan}>
-                      <FolderOpen size={16} /> Load Flight Plan
-                    </Button>
                     <Button size="3" variant="soft" className="w-full" onClick={handleImportFlightPlan}>
                       <Upload size={16} /> Import Flight Plan
                     </Button>
@@ -165,7 +156,7 @@ export function FlightPlannerSidebar() {
 
                   <Box className="mt-3 p-3 bg-gray-50 rounded">
                     <Text size="1" color="gray">
-                      Create a new flight plan, load a saved plan, or import from a file.
+                      Create a new flight plan or import from a saved JSON file.
                     </Text>
                   </Box>
                 </Box>

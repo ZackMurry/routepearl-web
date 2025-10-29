@@ -266,6 +266,9 @@ export function BottomPanel() {
               </Flex>
 
               <Flex gap="2">
+                <Button size="1" variant="soft" color="blue" onClick={exportMission}>
+                  <Download size={14} /> Save
+                </Button>
                 <Button size="1" variant="soft" color="gray" onClick={handleExitFlightPlanner}>
                   <LogOut size={14} /> Exit Planner
                 </Button>

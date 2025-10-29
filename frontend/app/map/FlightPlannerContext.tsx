@@ -165,33 +165,47 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   }
 
   const saveMission = () => {
-    if (currentMission && typeof window !== 'undefined') {
-      const updatedMission: Mission = {
-        ...currentMission,
+    if (typeof window === 'undefined') return
+
+    // Create a new mission if one doesn't exist
+    let missionToSave = currentMission
+    if (!missionToSave) {
+      missionToSave = {
+        id: `mission-${Date.now()}`,
         config: missionConfig,
+        status: 'idle',
+        createdAt: new Date(),
         updatedAt: new Date(),
-        route: {
-          truckRoute,
-          droneRoutes,
-        },
       }
-      setCurrentMission(updatedMission)
+      setCurrentMission(missionToSave)
+    }
 
-      // Save to localStorage
-      try {
-        const savedMissions = JSON.parse(localStorage.getItem('missions') || '[]')
-        const existingIndex = savedMissions.findIndex((m: Mission) => m.id === currentMission.id)
+    const updatedMission: Mission = {
+      ...missionToSave,
+      config: missionConfig,
+      updatedAt: new Date(),
+      route: {
+        truckRoute,
+        droneRoutes,
+      },
+    }
+    setCurrentMission(updatedMission)
 
-        if (existingIndex >= 0) {
-          savedMissions[existingIndex] = updatedMission
-        } else {
-          savedMissions.push(updatedMission)
-        }
+    // Save to localStorage
+    try {
+      const savedMissions = JSON.parse(localStorage.getItem('missions') || '[]')
+      const existingIndex = savedMissions.findIndex((m: Mission) => m.id === missionToSave!.id)
 
-        localStorage.setItem('missions', JSON.stringify(savedMissions))
-      } catch (error) {
-        console.error('Failed to save mission:', error)
+      if (existingIndex >= 0) {
+        savedMissions[existingIndex] = updatedMission
+      } else {
+        savedMissions.push(updatedMission)
       }
+
+      localStorage.setItem('missions', JSON.stringify(savedMissions))
+      console.log('Mission saved successfully:', updatedMission.config.missionName)
+    } catch (error) {
+      console.error('Failed to save mission:', error)
     }
   }
 
@@ -203,11 +217,23 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   }
 
   const exportMission = () => {
-    if (!currentMission) return
+    // Create a new mission if one doesn't exist
+    let missionToExport = currentMission
+    if (!missionToExport) {
+      missionToExport = {
+        id: `mission-${Date.now()}`,
+        config: missionConfig,
+        status: 'idle',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+      setCurrentMission(missionToExport)
+    }
 
     const missionData = {
-      ...currentMission,
+      ...missionToExport,
       config: missionConfig,
+      updatedAt: new Date(),
       route: {
         truckRoute,
         droneRoutes,
