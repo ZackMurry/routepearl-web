@@ -35,6 +35,8 @@ interface FlightPlannerContextType {
   setSidebarCollapsed: (collapsed: boolean) => void
   bottomPanelExpanded: boolean
   setBottomPanelExpanded: (expanded: boolean) => void
+  bottomPanelHeight: number
+  setBottomPanelHeight: (height: number) => void
   isFlightPlannerMode: boolean
   setIsFlightPlannerMode: (mode: boolean) => void
   plotModeCustomer: boolean
@@ -79,7 +81,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [activePanelTab, setActivePanelTab] = useState<'overview' | 'nodes' | 'advanced'>('overview')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [bottomPanelExpanded, setBottomPanelExpanded] = useState(false)
-  const [isFlightPlannerMode, setIsFlightPlannerMode] = useState(true) // Default to flight planner mode
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(256) // Default 16rem = 256px
+  const [isFlightPlannerMode, setIsFlightPlannerMode] = useState(false) // Default to mission management mode
   const [isGeneratingRoute, setIsGeneratingRoute] = useState(false)
   const [plotModeCustomer, setPlotModeCustomerInternal] = useState(false)
   const [plotModeNodes, setPlotModeNodesInternal] = useState(false)
@@ -356,6 +359,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setSidebarCollapsed,
     bottomPanelExpanded,
     setBottomPanelExpanded,
+    bottomPanelHeight,
+    setBottomPanelHeight,
     isFlightPlannerMode,
     setIsFlightPlannerMode,
     plotModeCustomer,

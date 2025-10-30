@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import { useFlightPlanner } from './FlightPlannerContext'
 import { FlightNode } from '@/lib/types'
 import { Box, Card, Flex, Text, Button, Badge, IconButton, ScrollArea, TextField } from '@radix-ui/themes'
@@ -35,6 +35,8 @@ export function BottomPanel() {
     missionConfig,
     bottomPanelExpanded,
     setBottomPanelExpanded,
+    bottomPanelHeight,
+    setBottomPanelHeight,
     saveMission,
     exportMission,
     importMission,
@@ -55,6 +57,42 @@ export function BottomPanel() {
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const csvInputRef = useRef<HTMLInputElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStartY, setDragStartY] = useState(0)
+  const [dragStartHeight, setDragStartHeight] = useState(0)
+
+  // Mouse event handlers for resizing
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true)
+    setDragStartY(e.clientY)
+    setDragStartHeight(bottomPanelHeight)
+    e.preventDefault()
+  }
+
+  useEffect(() => {
+    if (!isDragging) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaY = dragStartY - e.clientY
+      const minHeightPercent = isFlightPlannerMode ? 0.32 : 0.24 // 30% for flight planner, 24% for mission management
+      const minHeight = window.innerHeight * minHeightPercent
+      const maxHeight = window.innerHeight * 0.8 // 80% of viewport height
+      const newHeight = Math.max(minHeight, Math.min(maxHeight, dragStartHeight + deltaY))
+      setBottomPanelHeight(newHeight)
+    }
+
+    const handleMouseUp = () => {
+      setIsDragging(false)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDragging, dragStartY, dragStartHeight, setBottomPanelHeight, isFlightPlannerMode])
 
   const handleImport = () => {
     fileInputRef.current?.click()
@@ -233,11 +271,33 @@ export function BottomPanel() {
           bottom: 0,
           left: 0,
           right: 0,
-          height: '16rem',
+          height: `${bottomPanelHeight}px`,
           zIndex: 1000,
           pointerEvents: 'auto',
         }}
       >
+        {/* Drag Handle */}
+        <div
+          onMouseDown={handleMouseDown}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '6px',
+            cursor: isDragging ? 'grabbing' : 'ns-resize',
+            zIndex: 1001,
+            background: 'transparent',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)'
+          }}
+          onMouseLeave={(e) => {
+            if (!isDragging) {
+              e.currentTarget.style.background = 'transparent'
+            }
+          }}
+        />
         <Card className="h-full rounded-none shadow-xl" style={{ height: '100%' }}>
           <Flex direction="column" className="h-full">
             {/* Header */}
@@ -508,11 +568,33 @@ export function BottomPanel() {
         bottom: 0,
         left: 0,
         right: 0,
-        height: '16rem',
+        height: `${bottomPanelHeight}px`,
         zIndex: 1000,
         pointerEvents: 'auto',
       }}
     >
+      {/* Drag Handle */}
+      <div
+        onMouseDown={handleMouseDown}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '6px',
+          cursor: isDragging ? 'grabbing' : 'ns-resize',
+          zIndex: 1001,
+          background: 'transparent',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)'
+        }}
+        onMouseLeave={(e) => {
+          if (!isDragging) {
+            e.currentTarget.style.background = 'transparent'
+          }
+        }}
+      />
       <Card className="h-full rounded-none shadow-xl" style={{ height: '100%' }}>
         <Flex direction="column" className="h-full">
           {/* Header */}
