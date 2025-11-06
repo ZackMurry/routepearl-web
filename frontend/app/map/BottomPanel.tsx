@@ -60,6 +60,9 @@ export function BottomPanel() {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStartY, setDragStartY] = useState(0)
   const [dragStartHeight, setDragStartHeight] = useState(0)
+  const [toastOpen, setToastOpen] = useState(false)
+  const [toastMessage, setToastMessage] = useState('')
+  const [toastType, setToastType] = useState<'success' | 'error'>('success')
 
   // Mouse event handlers for resizing
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -172,6 +175,30 @@ export function BottomPanel() {
     addNode(newNode)
   }
 
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToastMessage(message)
+    setToastType(type)
+    setToastOpen(true)
+  }
+
+  const handleSave = () => {
+    try {
+      saveMission()
+      showToast(`Mission "${missionConfig.missionName}" saved successfully!`, 'success')
+    } catch (error) {
+      showToast('Failed to save mission', 'error')
+    }
+  }
+
+  const handleExport = () => {
+    try {
+      exportMission()
+      showToast(`Mission "${missionConfig.missionName}" exported successfully!`, 'success')
+    } catch (error) {
+      showToast('Failed to export mission', 'error')
+    }
+  }
+
   const handleExitFlightPlanner = () => {
     setIsFlightPlannerMode(false)
   }
@@ -180,20 +207,62 @@ export function BottomPanel() {
   const hasRoute = truckRoute.length > 0 || droneRoutes.length > 0
   const customerNodes = missionConfig.nodes.filter((n) => n.type === 'customer')
 
+  // Simple Toast UI Component (without Radix Toast to avoid DOM conflicts with Leaflet)
+  const ToastUI = () => {
+    if (!toastOpen) return null
+
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '2rem',
+          right: '2rem',
+          backgroundColor: toastType === 'success' ? '#10b981' : '#ef4444',
+          color: 'white',
+          borderRadius: '8px',
+          padding: '1rem 1.5rem',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          zIndex: 10000,
+          minWidth: '300px',
+          animation: 'slideIn 0.2s ease-out',
+        }}
+        onClick={() => setToastOpen(false)}
+      >
+        <span style={{ fontWeight: 'bold', fontSize: '14px' }}>
+          {toastType === 'success' ? '✓' : '✗'} {toastMessage}
+        </span>
+      </div>
+    )
+  }
+
+  // Auto-close toast after 3 seconds
+  useEffect(() => {
+    if (toastOpen) {
+      const timer = setTimeout(() => {
+        setToastOpen(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [toastOpen])
+
   // Collapsed state
   if (!bottomPanelExpanded) {
     return (
-      <div
-        className="flight-planner-bottom"
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 1000,
-          pointerEvents: 'auto',
-        }}
-      >
+      <>
+        <div
+          className="flight-planner-bottom"
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1000,
+            pointerEvents: 'auto',
+          }}
+        >
         <Card className="rounded-t-lg rounded-b-none shadow-xl mx-4 mb-0" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)' }}>
           <Flex justify="between" align="center" className="p-3">
             <Flex gap="4" align="center">
@@ -257,25 +326,28 @@ export function BottomPanel() {
             </Flex>
           </Flex>
         </Card>
-      </div>
+        </div>
+        <ToastUI />
+      </>
     )
   }
 
   // Expanded state - Flight Planner Mode
   if (isFlightPlannerMode) {
     return (
-      <div
-        className="flight-planner-bottom"
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: `${bottomPanelHeight}px`,
-          zIndex: 1000,
-          pointerEvents: 'auto',
-        }}
-      >
+      <>
+        <div
+          className="flight-planner-bottom"
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: `${bottomPanelHeight}px`,
+            zIndex: 1000,
+            pointerEvents: 'auto',
+          }}
+        >
         {/* Drag Handle */}
         <div
           onMouseDown={handleMouseDown}
@@ -326,7 +398,7 @@ export function BottomPanel() {
               </Flex>
 
               <Flex gap="2">
-                <Button size="1" variant="soft" color="blue" onClick={exportMission}>
+                <Button size="1" variant="soft" color="blue" onClick={handleExport}>
                   <Download size={14} /> Save
                 </Button>
                 <Button size="1" variant="soft" color="gray" onClick={handleExitFlightPlanner}>
@@ -512,10 +584,10 @@ export function BottomPanel() {
                       Save Plan
                     </Text>
                     <Flex gap="2">
-                      <Button size="2" variant="soft" className="flex-1" onClick={saveMission}>
+                      <Button size="2" variant="soft" className="flex-1" onClick={handleSave}>
                         <Save size={16} /> Save
                       </Button>
-                      <Button size="2" variant="soft" className="flex-1" onClick={exportMission}>
+                      <Button size="2" variant="soft" className="flex-1" onClick={handleExport}>
                         <Download size={16} /> Export
                       </Button>
                     </Flex>
@@ -549,7 +621,9 @@ export function BottomPanel() {
           className="hidden"
         />
         <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
-      </div>
+        </div>
+        <ToastUI />
+      </>
     )
   }
 
@@ -561,18 +635,19 @@ export function BottomPanel() {
   ]
 
   return (
-    <div
-      className="flight-planner-bottom"
-      style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: `${bottomPanelHeight}px`,
-        zIndex: 1000,
-        pointerEvents: 'auto',
-      }}
-    >
+    <>
+      <div
+        className="flight-planner-bottom"
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: `${bottomPanelHeight}px`,
+          zIndex: 1000,
+          pointerEvents: 'auto',
+        }}
+      >
       {/* Drag Handle */}
       <div
         onMouseDown={handleMouseDown}
@@ -761,7 +836,9 @@ export function BottomPanel() {
           </Flex>
         </Flex>
       </Card>
-    </div>
+      </div>
+      <ToastUI />
+    </>
   )
 }
 

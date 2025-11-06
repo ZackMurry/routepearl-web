@@ -81,7 +81,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [activePanelTab, setActivePanelTab] = useState<'overview' | 'nodes' | 'advanced'>('overview')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [bottomPanelExpanded, setBottomPanelExpanded] = useState(false)
-  const [bottomPanelHeight, setBottomPanelHeight] = useState(256) // Default 16rem = 256px
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(330) // Default height increased to show Save Plan section
   const [isFlightPlannerMode, setIsFlightPlannerMode] = useState(false) // Default to mission management mode
   const [isGeneratingRoute, setIsGeneratingRoute] = useState(false)
   const [plotModeCustomer, setPlotModeCustomerInternal] = useState(false)
@@ -207,6 +207,11 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
       localStorage.setItem('missions', JSON.stringify(savedMissions))
       console.log('Mission saved successfully:', updatedMission.config.missionName)
+      console.log('Route data saved:', {
+        truckRoutePoints: truckRoute.length,
+        droneRoutePaths: droneRoutes.length,
+        hasRoute: truckRoute.length > 0 || droneRoutes.length > 0,
+      })
     } catch (error) {
       console.error('Failed to save mission:', error)
     }
@@ -217,6 +222,12 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setMissionConfig(mission.config)
     setTruckRoute(mission.route?.truckRoute || [])
     setDroneRoutes(mission.route?.droneRoutes || [])
+    console.log('Mission loaded:', mission.config.missionName)
+    console.log('Route data loaded:', {
+      truckRoutePoints: mission.route?.truckRoute?.length || 0,
+      droneRoutePaths: mission.route?.droneRoutes?.length || 0,
+      hasRoute: (mission.route?.truckRoute?.length || 0) > 0 || (mission.route?.droneRoutes?.length || 0) > 0,
+    })
   }
 
   const exportMission = () => {
@@ -242,6 +253,13 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
         droneRoutes,
       },
     }
+
+    console.log('Exporting mission:', missionConfig.missionName)
+    console.log('Route data exported:', {
+      truckRoutePoints: truckRoute.length,
+      droneRoutePaths: droneRoutes.length,
+      hasRoute: truckRoute.length > 0 || droneRoutes.length > 0,
+    })
 
     const dataStr = JSON.stringify(missionData, null, 2)
     const dataBlob = new Blob([dataStr], { type: 'application/json' })
