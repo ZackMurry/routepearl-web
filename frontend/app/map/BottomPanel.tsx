@@ -107,7 +107,12 @@ export function BottomPanel() {
       const reader = new FileReader()
       reader.onload = (e) => {
         const content = e.target?.result as string
+        console.log('File content loaded, importing mission...')
         importMission(content)
+        // Show success toast after a brief delay to ensure state is updated
+        setTimeout(() => {
+          showToast(`Mission imported successfully!`, 'success')
+        }, 100)
       }
       reader.readAsText(file)
     }
@@ -559,6 +564,20 @@ export function BottomPanel() {
                     <Route size={16} /> Generate Optimal Route
                   </Button>
 
+                  {customerNodes.length > 0 && !hasRoute && (
+                    <Box className="bg-orange-50 p-3 rounded">
+                      <Flex align="center" gap="2" className="mb-1">
+                        <AlertCircle size={16} className="text-orange-600" />
+                        <Text size="2" weight="bold" color="orange">
+                          Route Required
+                        </Text>
+                      </Flex>
+                      <Text size="1" color="gray">
+                        Generate a route before you can launch the mission.
+                      </Text>
+                    </Box>
+                  )}
+
                   <Box className="border-t pt-3">
                     <Text size="2" weight="bold" className="mb-2 block">
                       Import/Export
@@ -604,6 +623,14 @@ export function BottomPanel() {
                       <Text size="1" color="gray">
                         Route is ready for review. Check the map for the optimized path.
                       </Text>
+                      <Flex gap="2" className="mt-2 text-xs">
+                        <Text size="1" color="gray">
+                          Truck: {truckRoute.length} pts
+                        </Text>
+                        <Text size="1" color="gray">
+                          Drones: {droneRoutes.length} paths
+                        </Text>
+                      </Flex>
                     </Box>
                   )}
                 </div>

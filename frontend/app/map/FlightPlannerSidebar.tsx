@@ -35,6 +35,7 @@ import {
   ArrowUp,
   ArrowDown,
   MousePointer2,
+  Lock,
 } from 'lucide-react'
 import { FlightNode, HazardZone, RoutingAlgorithm } from '@/lib/types'
 
@@ -57,6 +58,11 @@ export function FlightPlannerSidebar() {
     plotModeNodes,
     setPlotModeNodes,
     selectedNodeId,
+    truckRoute,
+    droneRoutes,
+    missionLaunched,
+    launchMission,
+    stopMission,
   } = useFlightPlanner()
 
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -137,26 +143,41 @@ export function FlightPlannerSidebar() {
             <ScrollArea className="flex-1">
               <div className="p-4 space-y-6">
                 {/* Mission Management Section */}
-                <Box>
+                <Box
+                  className={missionLaunched ? 'opacity-60' : ''}
+                  style={{
+                    backgroundColor: missionLaunched ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
+                    padding: missionLaunched ? '12px' : '0',
+                    borderRadius: missionLaunched ? '8px' : '0',
+                    border: missionLaunched ? '1px solid rgba(239, 68, 68, 0.2)' : 'none',
+                  }}
+                >
                   <Flex align="center" gap="2" className="mb-3">
-                    <Settings size={18} />
+                    {missionLaunched ? <Lock size={18} className="text-red-500" /> : <Settings size={18} />}
                     <Text size="3" weight="bold">
                       Mission Management
                     </Text>
+                    {missionLaunched && (
+                      <Badge color="red" size="1">
+                        Locked
+                      </Badge>
+                    )}
                   </Flex>
 
                   <div className="space-y-2">
-                    <Button size="3" className="w-full" onClick={handleMakeFlightPlan}>
+                    <Button size="3" className="w-full" onClick={handleMakeFlightPlan} disabled={missionLaunched}>
                       <Plus size={16} /> Make Flight Plan
                     </Button>
-                    <Button size="3" variant="soft" className="w-full" onClick={handleImportFlightPlan}>
+                    <Button size="3" variant="soft" className="w-full" onClick={handleImportFlightPlan} disabled={missionLaunched}>
                       <Upload size={16} /> Import Flight Plan
                     </Button>
                   </div>
 
                   <Box className="mt-3 p-3 bg-gray-50 rounded">
                     <Text size="1" color="gray">
-                      Create a new flight plan or import from a saved JSON file.
+                      {missionLaunched
+                        ? 'Mission is active. Stop the mission to modify flight plans.'
+                        : 'Create a new flight plan or import from a saved JSON file.'}
                     </Text>
                   </Box>
                 </Box>
@@ -175,25 +196,48 @@ export function FlightPlannerSidebar() {
                       size="3"
                       color="green"
                       className="w-full"
-                      disabled={!missionConfig.nodes.length}
+                      disabled={!missionConfig.nodes.length || (truckRoute.length === 0 && droneRoutes.length === 0) || missionLaunched}
+                      onClick={launchMission}
                     >
-                      <Play size={16} /> Launch Mission
+                      <Play size={16} /> {missionLaunched ? 'Mission Active' : 'Launch Mission'}
                     </Button>
                     <Flex gap="2">
                       <Button size="3" color="orange" variant="soft" className="flex-1" disabled>
                         <Pause size={16} /> Pause
                       </Button>
-                      <Button size="3" color="red" variant="soft" className="flex-1" disabled>
+                      <Button
+                        size="3"
+                        color="red"
+                        variant="soft"
+                        className="flex-1"
+                        disabled={!missionLaunched}
+                        onClick={stopMission}
+                      >
                         <Square size={16} /> Stop
                       </Button>
                     </Flex>
                   </div>
 
-                  <Box className="mt-3 p-3 bg-blue-50 rounded">
-                    <Text size="2" color="blue">
-                      <strong>Status:</strong> Ready to plan
+                  <Box className={`mt-3 p-3 rounded ${missionLaunched ? 'bg-green-50' : 'bg-blue-50'}`}>
+                    <Text size="2" color={missionLaunched ? 'green' : 'blue'}>
+                      <strong>Status:</strong> {
+                        missionLaunched
+                          ? 'Mission Active'
+                          : !missionConfig.nodes.length
+                            ? 'No waypoints'
+                            : (truckRoute.length === 0 && droneRoutes.length === 0)
+                              ? 'Route not generated'
+                              : 'Ready to launch'
+                      }
                       <br />
-                      Create or load a flight plan to begin.
+                      {missionLaunched
+                        ? 'The mission is currently running. Click Stop to end the mission.'
+                        : !missionConfig.nodes.length
+                          ? 'Add waypoints to create a flight plan.'
+                          : (truckRoute.length === 0 && droneRoutes.length === 0)
+                            ? 'Generate a route before launching the mission.'
+                            : 'Mission is ready to launch.'
+                      }
                     </Text>
                   </Box>
                 </Box>

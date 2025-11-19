@@ -22,11 +22,9 @@ interface FlightPlannerContextType {
   updateHazardZone: (id: string, updates: Partial<HazardZone>) => void
   removeHazardZone: (id: string) => void
 
-  // Route state
+  // Route state (derived from missionConfig.routes)
   truckRoute: Point[]
   droneRoutes: Point[][]
-  setTruckRoute: (route: Point[]) => void
-  setDroneRoutes: (routes: Point[][]) => void
 
   // UI state
   activePanelTab: 'overview' | 'nodes' | 'advanced'
@@ -56,6 +54,11 @@ interface FlightPlannerContextType {
   // Route generation
   generateRoute: () => Promise<void>
   isGeneratingRoute: boolean
+
+  // Mission launch
+  missionLaunched: boolean
+  launchMission: () => void
+  stopMission: () => void
 }
 
 const FlightPlannerContext = createContext<FlightPlannerContextType | undefined>(undefined)
@@ -66,6 +69,7 @@ const defaultMissionConfig: MissionConfig = {
   nodes: [],
   algorithm: 'alns',
   hazardZones: [],
+  routes: undefined,
 }
 
 export function FlightPlannerProvider({ children }: { children: ReactNode }) {
@@ -73,9 +77,9 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [currentMission, setCurrentMission] = useState<Mission | null>(null)
   const [missionConfig, setMissionConfig] = useState<MissionConfig>(defaultMissionConfig)
 
-  // Route state
-  const [truckRoute, setTruckRoute] = useState<Point[]>([])
-  const [droneRoutes, setDroneRoutes] = useState<Point[][]>([])
+  // Route state (computed from missionConfig.routes)
+  const truckRoute = missionConfig.routes?.truckRoute || []
+  const droneRoutes = missionConfig.routes?.droneRoutes || []
 
   // UI state
   const [activePanelTab, setActivePanelTab] = useState<'overview' | 'nodes' | 'advanced'>('overview')
@@ -87,6 +91,16 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [plotModeCustomer, setPlotModeCustomerInternal] = useState(false)
   const [plotModeNodes, setPlotModeNodesInternal] = useState(false)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [missionLaunched, setMissionLaunched] = useState(false)
+
+  // Debug logging for route changes
+  React.useEffect(() => {
+    console.log('Truck route updated:', truckRoute.length, 'points')
+  }, [truckRoute])
+
+  React.useEffect(() => {
+    console.log('Drone routes updated:', droneRoutes.length, 'paths')
+  }, [droneRoutes])
 
   // Wrapper functions to ensure mutual exclusivity
   const setPlotModeCustomer = (mode: boolean) => {
@@ -163,8 +177,6 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     }
     setCurrentMission(newMission)
     setMissionConfig(defaultMissionConfig)
-    setTruckRoute([])
-    setDroneRoutes([])
   }
 
   const saveMission = () => {
@@ -187,10 +199,6 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
       ...missionToSave,
       config: missionConfig,
       updatedAt: new Date(),
-      route: {
-        truckRoute,
-        droneRoutes,
-      },
     }
     setCurrentMission(updatedMission)
 
@@ -208,9 +216,9 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('missions', JSON.stringify(savedMissions))
       console.log('Mission saved successfully:', updatedMission.config.missionName)
       console.log('Route data saved:', {
-        truckRoutePoints: truckRoute.length,
-        droneRoutePaths: droneRoutes.length,
-        hasRoute: truckRoute.length > 0 || droneRoutes.length > 0,
+        truckRoutePoints: missionConfig.routes?.truckRoute?.length || 0,
+        droneRoutePaths: missionConfig.routes?.droneRoutes?.length || 0,
+        hasRoute: (missionConfig.routes?.truckRoute?.length || 0) > 0 || (missionConfig.routes?.droneRoutes?.length || 0) > 0,
       })
     } catch (error) {
       console.error('Failed to save mission:', error)
@@ -220,13 +228,11 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const loadMission = (mission: Mission) => {
     setCurrentMission(mission)
     setMissionConfig(mission.config)
-    setTruckRoute(mission.route?.truckRoute || [])
-    setDroneRoutes(mission.route?.droneRoutes || [])
     console.log('Mission loaded:', mission.config.missionName)
     console.log('Route data loaded:', {
-      truckRoutePoints: mission.route?.truckRoute?.length || 0,
-      droneRoutePaths: mission.route?.droneRoutes?.length || 0,
-      hasRoute: (mission.route?.truckRoute?.length || 0) > 0 || (mission.route?.droneRoutes?.length || 0) > 0,
+      truckRoutePoints: mission.config.routes?.truckRoute?.length || 0,
+      droneRoutePaths: mission.config.routes?.droneRoutes?.length || 0,
+      hasRoute: (mission.config.routes?.truckRoute?.length || 0) > 0 || (mission.config.routes?.droneRoutes?.length || 0) > 0,
     })
   }
 
@@ -248,17 +254,13 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
       ...missionToExport,
       config: missionConfig,
       updatedAt: new Date(),
-      route: {
-        truckRoute,
-        droneRoutes,
-      },
     }
 
     console.log('Exporting mission:', missionConfig.missionName)
     console.log('Route data exported:', {
-      truckRoutePoints: truckRoute.length,
-      droneRoutePaths: droneRoutes.length,
-      hasRoute: truckRoute.length > 0 || droneRoutes.length > 0,
+      truckRoutePoints: missionConfig.routes?.truckRoute?.length || 0,
+      droneRoutePaths: missionConfig.routes?.droneRoutes?.length || 0,
+      hasRoute: (missionConfig.routes?.truckRoute?.length || 0) > 0 || (missionConfig.routes?.droneRoutes?.length || 0) > 0,
     })
 
     const dataStr = JSON.stringify(missionData, null, 2)
@@ -274,17 +276,61 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const importMission = (data: string) => {
     try {
       const mission: Mission = JSON.parse(data)
+      console.log('Importing mission:', mission.config?.missionName)
+      console.log('Mission data:', mission)
+      console.log('Route data in import:', {
+        hasTruckRoute: !!mission.config.routes?.truckRoute,
+        truckRouteLength: mission.config.routes?.truckRoute?.length || 0,
+        hasDroneRoutes: !!mission.config.routes?.droneRoutes,
+        droneRoutesLength: mission.config.routes?.droneRoutes?.length || 0,
+      })
       loadMission(mission)
     } catch (error) {
       console.error('Failed to import mission:', error)
     }
   }
 
+  // Launch mission
+  const launchMission = () => {
+    if (!currentMission) {
+      // Create a new mission if one doesn't exist
+      const newMission: Mission = {
+        id: `mission-${Date.now()}`,
+        config: missionConfig,
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+      setCurrentMission(newMission)
+    } else {
+      // Update existing mission status
+      setCurrentMission({
+        ...currentMission,
+        status: 'active',
+        updatedAt: new Date(),
+      })
+    }
+    setMissionLaunched(true)
+    console.log('Mission launched:', missionConfig.missionName)
+  }
+
+  // Stop mission
+  const stopMission = () => {
+    if (currentMission) {
+      setCurrentMission({
+        ...currentMission,
+        status: 'idle',
+        updatedAt: new Date(),
+      })
+    }
+    setMissionLaunched(false)
+    console.log('Mission stopped')
+  }
+
   // Generate route using backend API
   const generateRoute = async () => {
     if (missionConfig.nodes.length < 2) {
-      setTruckRoute([])
-      setDroneRoutes([])
+      updateMissionConfig({ routes: undefined })
       return
     }
 
@@ -326,29 +372,34 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
       const data = await res.json()
 
+      // Prepare route data
+      let truckPoints: Point[] = []
+      let dronePaths: Point[][] = []
+
       // --- Truck route ---
       if (data.routes.truck_route) {
-        const truckPoints: Point[] = data.routes.truck_route.flatMap((segment: number[][]) =>
+        truckPoints = data.routes.truck_route.flatMap((segment: number[][]) =>
           segment.map(([lat, lon]) => ({ lat, lng: lon })),
         )
-        setTruckRoute(truckPoints)
         console.log('Truck route:', truckPoints)
-      } else {
-        setTruckRoute([])
       }
 
       // --- Drone route ---
       if (data.routes.drone_route) {
-        const dronePaths = []
         const toLatLon = (coord: number[]): Point => ({ lat: coord[0], lng: coord[1] })
         for (const dp of data.routes.drone_route) {
           dronePaths.push([toLatLon(dp[0]), toLatLon(dp[1]), toLatLon(dp[2])])
         }
-        setDroneRoutes(dronePaths)
         console.log('Drone route:', dronePaths)
-      } else {
-        setDroneRoutes([])
       }
+
+      // Save routes to missionConfig
+      updateMissionConfig({
+        routes: {
+          truckRoute: truckPoints,
+          droneRoutes: dronePaths,
+        },
+      })
     } catch (err) {
       console.error(err)
     } finally {
@@ -369,8 +420,6 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     removeHazardZone,
     truckRoute,
     droneRoutes,
-    setTruckRoute,
-    setDroneRoutes,
     activePanelTab,
     setActivePanelTab,
     sidebarCollapsed,
@@ -394,6 +443,9 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     importMission,
     generateRoute,
     isGeneratingRoute,
+    missionLaunched,
+    launchMission,
+    stopMission,
   }
 
   return <FlightPlannerContext.Provider value={value}>{children}</FlightPlannerContext.Provider>
