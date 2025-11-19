@@ -3,7 +3,7 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { useFlightPlanner } from './FlightPlannerContext'
 import { FlightNode } from '@/lib/types'
-import { Box, Card, Flex, Text, Button, Badge, IconButton, ScrollArea, TextField } from '@radix-ui/themes'
+import { Box, Card, Flex, Text, Button, Badge, IconButton, ScrollArea, TextField, Progress, Tabs } from '@radix-ui/themes'
 import {
   ChevronUp,
   ChevronDown,
@@ -27,6 +27,9 @@ import {
   ArrowUp,
   ArrowDown,
   MousePointer2,
+  Package,
+  Truck,
+  Plane,
 } from 'lucide-react'
 
 export function BottomPanel() {
@@ -53,6 +56,7 @@ export function BottomPanel() {
     plotModeCustomer,
     setPlotModeCustomer,
     selectedNodeId,
+    missionLaunched,
   } = useFlightPlanner()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -63,6 +67,7 @@ export function BottomPanel() {
   const [toastOpen, setToastOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
+  const [missionTab, setMissionTab] = useState<'status' | 'customers'>('status')
 
   // Mouse event handlers for resizing
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -655,6 +660,275 @@ export function BottomPanel() {
   }
 
   // Expanded state - Mission Management Mode
+  // Calculate delivery stats (mock for now - will be replaced with real-time tracking)
+  const totalCustomers = missionConfig.nodes.filter((n) => n.type === 'customer').length
+  const deliveredPackages = 0 // TODO: Track actual deliveries
+  const deliveryProgress = totalCustomers > 0 ? (deliveredPackages / totalCustomers) * 100 : 0
+
+  // Mock mission tracking data (TODO: Replace with real-time tracking)
+  const currentSortie = 0 // 0 means not started
+  const totalSorties = droneRoutes.length
+  const currentTruckPoint = 0
+  const totalTruckPoints = truckRoute.length
+  const isReturningToDepot = false // Will determine if truck is on purple return line
+
+  // If mission is launched, show mission status tabs
+  if (missionLaunched && !isFlightPlannerMode) {
+    return (
+      <>
+        <div
+          className="flight-planner-bottom"
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: `${bottomPanelHeight}px`,
+            zIndex: 1000,
+            pointerEvents: 'auto',
+          }}
+        >
+          {/* Drag Handle */}
+          <div
+            onMouseDown={handleMouseDown}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '6px',
+              cursor: isDragging ? 'grabbing' : 'ns-resize',
+              zIndex: 1001,
+              background: 'transparent',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)'
+            }}
+            onMouseLeave={(e) => {
+              if (!isDragging) {
+                e.currentTarget.style.background = 'transparent'
+              }
+            }}
+          />
+          <Card className="h-full rounded-none shadow-xl" style={{ height: '100%' }}>
+            <Flex direction="column" className="h-full">
+              {/* Header */}
+              <Flex justify="between" align="center" className="p-3 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)' }}>
+                <Flex gap="4" align="center">
+                  <Flex align="center" gap="2">
+                    <FileText size={18} />
+                    <Text size="3" weight="bold">
+                      Mission Active
+                    </Text>
+                    <Badge color="green" size="2">
+                      Running
+                    </Badge>
+                  </Flex>
+
+                  <Flex gap="3" align="center" className="text-gray-600">
+                    <Flex gap="1" align="center">
+                      <Package size={14} />
+                      <Text size="1">{deliveredPackages}/{totalCustomers} delivered</Text>
+                    </Flex>
+                    <Flex gap="1" align="center">
+                      <Clock size={14} />
+                      <Text size="1">00:00 elapsed</Text>
+                    </Flex>
+                  </Flex>
+                </Flex>
+
+                <IconButton size="2" variant="ghost" onClick={() => setBottomPanelExpanded(false)}>
+                  <ChevronDown size={20} />
+                </IconButton>
+              </Flex>
+
+              {/* Tabs */}
+              <Tabs.Root value={missionTab} onValueChange={(v) => setMissionTab(v as 'status' | 'customers')} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <Tabs.List className="px-4 pt-2">
+                  <Tabs.Trigger value="status">
+                    <Play size={16} className="mr-1" />
+                    Mission Status
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="customers">
+                    <MapPin size={16} className="mr-1" />
+                    Customers
+                  </Tabs.Trigger>
+                </Tabs.List>
+
+                {/* Tab 1: Mission Status */}
+                <Tabs.Content value="status" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'auto' }}>
+                  <ScrollArea style={{ height: '100%' }}>
+                    <div className="space-y-4 pr-2">
+                      {/* Drone Tasks */}
+                      <Box>
+                        <Flex align="center" gap="2" className="mb-3">
+                          <Plane size={18} className="text-blue-500" />
+                          <Text size="3" weight="bold">
+                            Drone Tasks
+                          </Text>
+                        </Flex>
+
+                        <Card className="p-4">
+                          <div className="space-y-3">
+                            {/* Sortie Progress */}
+                            <Box>
+                              <Flex justify="between" align="center" className="mb-2">
+                                <Text size="2" weight="medium">Sortie Progress</Text>
+                                <Badge color={currentSortie === 0 ? 'gray' : currentSortie === totalSorties ? 'green' : 'blue'} size="2">
+                                  {currentSortie === 0 ? 'Standby' : currentSortie === totalSorties ? 'Complete' : 'In Progress'}
+                                </Badge>
+                              </Flex>
+                              <Flex justify="between" className="mb-1">
+                                <Text size="1" color="gray">Current Sortie:</Text>
+                                <Text size="1" weight="bold">{currentSortie}/{totalSorties}</Text>
+                              </Flex>
+                              <Progress value={(currentSortie / Math.max(totalSorties, 1)) * 100} />
+                            </Box>
+
+                            {/* Delivery Status */}
+                            <Box className="border-t pt-3">
+                              <Text size="2" weight="medium" className="block mb-2">Delivery Status</Text>
+                              <Flex justify="between" className="mb-1">
+                                <Text size="1" color="gray">Packages Delivered:</Text>
+                                <Text size="1" weight="bold">{deliveredPackages}/{totalCustomers}</Text>
+                              </Flex>
+                              {droneRoutes.length > 0 && (
+                                <Box className="mt-2 p-2 bg-blue-50 rounded">
+                                  <Text size="1" color="blue">
+                                    {currentSortie === 0
+                                      ? 'Drone ready for first sortie'
+                                      : currentSortie < totalSorties
+                                        ? `Currently on sortie ${currentSortie} of ${totalSorties}`
+                                        : 'All sorties completed'}
+                                  </Text>
+                                </Box>
+                              )}
+                            </Box>
+                          </div>
+                        </Card>
+                      </Box>
+
+                      {/* Truck Tasks */}
+                      <Box>
+                        <Flex align="center" gap="2" className="mb-3">
+                          <Truck size={18} className="text-purple-500" />
+                          <Text size="3" weight="bold">
+                            Truck Tasks
+                          </Text>
+                        </Flex>
+
+                        <Card className="p-4">
+                          <div className="space-y-3">
+                            {/* Route Progress */}
+                            <Box>
+                              <Flex justify="between" align="center" className="mb-2">
+                                <Text size="2" weight="medium">Route Progress</Text>
+                                <Badge color={currentTruckPoint === 0 ? 'gray' : currentTruckPoint === totalTruckPoints ? 'green' : 'blue'} size="2">
+                                  {currentTruckPoint === 0 ? 'Standby' : currentTruckPoint === totalTruckPoints ? 'Complete' : 'In Progress'}
+                                </Badge>
+                              </Flex>
+                              <Flex justify="between" className="mb-1">
+                                <Text size="1" color="gray">Points Reached:</Text>
+                                <Text size="1" weight="bold">{currentTruckPoint}/{totalTruckPoints}</Text>
+                              </Flex>
+                              <Progress value={(currentTruckPoint / Math.max(totalTruckPoints, 1)) * 100} />
+                            </Box>
+
+                            {/* Route Status */}
+                            <Box className="border-t pt-3">
+                              <Text size="2" weight="medium" className="block mb-2">Route Status</Text>
+                              {isReturningToDepot ? (
+                                <Box className="p-2 bg-purple-50 rounded">
+                                  <Flex align="center" gap="2">
+                                    <Badge color="purple">Returning</Badge>
+                                    <Text size="1" color="purple">Truck is on return route to depot</Text>
+                                  </Flex>
+                                </Box>
+                              ) : (
+                                <Box className="p-2 bg-blue-50 rounded">
+                                  <Text size="1" color="blue">
+                                    {currentTruckPoint === 0
+                                      ? 'Truck ready to start route'
+                                      : 'Truck is on delivery route'}
+                                  </Text>
+                                </Box>
+                              )}
+                            </Box>
+                          </div>
+                        </Card>
+                      </Box>
+                    </div>
+                  </ScrollArea>
+                </Tabs.Content>
+
+                {/* Tab 2: Customers */}
+                <Tabs.Content value="customers" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'auto' }}>
+                  <Box>
+                    {/* Progress Summary */}
+                    <Box className="mb-4 p-4 bg-gray-50 rounded">
+                      <Flex justify="between" align="center" className="mb-2">
+                        <Text size="2" weight="bold">Overall Delivery Progress</Text>
+                        <Text size="3" weight="bold" color="blue">{deliveredPackages}/{totalCustomers}</Text>
+                      </Flex>
+                      <Progress value={deliveryProgress} size="3" />
+                      <Text size="1" color="gray" className="mt-1 block">
+                        {Math.round(deliveryProgress)}% complete
+                      </Text>
+                    </Box>
+
+                    {/* Customer List */}
+                    <Text size="2" weight="bold" className="mb-3 block">
+                      Customer Locations
+                    </Text>
+                    <ScrollArea style={{ height: 'calc(100% - 120px)' }}>
+                      <div className="space-y-2 pr-2">
+                        {customerNodes.map((customer, index) => {
+                          const isDelivered = false // TODO: Track actual deliveries
+                          return (
+                            <Card key={customer.id} className="p-3">
+                              <Flex justify="between" align="center">
+                                <Flex align="center" gap="2" className="flex-1">
+                                  <MapPin size={16} className={isDelivered ? 'text-green-500' : 'text-gray-400'} />
+                                  <Box className="flex-1">
+                                    <Text size="2" weight="medium">
+                                      {customer.label || `Customer ${index + 1}`}
+                                    </Text>
+                                    <Text size="1" color="gray">
+                                      {customer.lat.toFixed(6)}, {customer.lng.toFixed(6)}
+                                    </Text>
+                                  </Box>
+                                </Flex>
+                                <Badge color={isDelivered ? 'green' : 'gray'} size="2">
+                                  {isDelivered ? (
+                                    <Flex align="center" gap="1">
+                                      <CheckCircle size={12} />
+                                      Delivered
+                                    </Flex>
+                                  ) : (
+                                    <Flex align="center" gap="1">
+                                      <Clock size={12} />
+                                      Pending
+                                    </Flex>
+                                  )}
+                                </Badge>
+                              </Flex>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    </ScrollArea>
+                  </Box>
+                </Tabs.Content>
+              </Tabs.Root>
+            </Flex>
+          </Card>
+        </div>
+        <ToastUI />
+      </>
+    )
+  }
+
+  // Default Mission Management Mode (not launched)
   const mockTasks = [
     { id: 1, name: 'Pre-flight check', status: 'pending', progress: 0 },
     { id: 2, name: 'Route validation', status: 'pending', progress: 0 },

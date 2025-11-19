@@ -428,6 +428,74 @@ export function FlightPlannerSidebar() {
                     </Box>
                   </div>
                 </Box>
+
+                <Box className="border-t pt-3">
+                  <Text size="2" weight="bold" className="mb-2 block">
+                    Route Indicators
+                  </Text>
+                  <div className="space-y-2">
+                    <Box>
+                      <Text size="1" weight="bold" className="block mb-1">Delivery Type:</Text>
+                      <div className="space-y-1 ml-2">
+                        <Flex gap="2" align="center">
+                          <div className="px-2 py-1 text-xs rounded" style={{ backgroundColor: '#ef4444', color: 'white' }}>🚁</div>
+                          <Text size="1">Drone delivery</Text>
+                        </Flex>
+                        <Flex gap="2" align="center">
+                          <div className="px-2 py-1 text-xs rounded" style={{ backgroundColor: '#3b82f6', color: 'white' }}>🚛</div>
+                          <Text size="1">Truck delivery</Text>
+                        </Flex>
+                      </div>
+                    </Box>
+                    <Box>
+                      <Text size="1" weight="bold" className="block mb-1">Sortie Route Colors:</Text>
+                      <div className="space-y-1 ml-2">
+                        <Flex gap="2" align="center">
+                          <div className="w-8 h-3 rounded" style={{ background: 'linear-gradient(to right, #10b981, #14b8a6)' }}></div>
+                          <Text size="1">Outbound (launch → delivery)</Text>
+                        </Flex>
+                        <Flex gap="2" align="center">
+                          <div className="w-8 h-3 rounded" style={{ background: 'linear-gradient(to right, #f97316, #ef4444)' }}></div>
+                          <Text size="1">Return (delivery → landing)</Text>
+                        </Flex>
+                      </div>
+                    </Box>
+                    <Box>
+                      <Text size="1" weight="bold" className="block mb-1">Final Sortie (Mission End):</Text>
+                      <div className="space-y-1 ml-2">
+                        <Flex gap="2" align="center">
+                          <div className="w-8 h-3 rounded" style={{ background: 'linear-gradient(to right, #facc15, #fbbf24)' }}></div>
+                          <Text size="1">Final outbound</Text>
+                        </Flex>
+                        <Flex gap="2" align="center">
+                          <div className="w-8 h-3 rounded" style={{ background: 'linear-gradient(to right, #f59e0b, #f97316)' }}></div>
+                          <Text size="1">Final return (mission complete)</Text>
+                        </Flex>
+                        <Flex gap="2" align="center">
+                          <div className="px-2 py-1 text-xs rounded" style={{ backgroundColor: '#facc15', color: 'white', fontSize: '12px', minWidth: '30px', textAlign: 'center' }}>S2 ✓</div>
+                          <Text size="1">Final sortie label</Text>
+                        </Flex>
+                      </div>
+                    </Box>
+                    <Box>
+                      <Text size="1" weight="bold" className="block mb-1">Sortie Markers:</Text>
+                      <div className="space-y-1 ml-2">
+                        <Flex gap="2" align="center">
+                          <div className="px-2 py-1 text-xs rounded" style={{ backgroundColor: '#f97316', color: 'white', fontSize: '10px' }}>S1 ⬆</div>
+                          <Text size="1">Launch point (sortie start)</Text>
+                        </Flex>
+                        <Flex gap="2" align="center">
+                          <div className="px-2 py-1 text-xs rounded" style={{ backgroundColor: '#10b981', color: 'white', fontSize: '10px' }}>S1 ⬇</div>
+                          <Text size="1">Return point (sortie end)</Text>
+                        </Flex>
+                        <Flex gap="2" align="center">
+                          <div className="px-2 py-1 text-xs rounded" style={{ backgroundColor: '#ef4444', color: 'white', fontSize: '12px', minWidth: '30px', textAlign: 'center' }}>S1</div>
+                          <Text size="1">Sortie label on path</Text>
+                        </Flex>
+                      </div>
+                    </Box>
+                  </div>
+                </Box>
               </Tabs.Content>
 
               {/* Nodes Tab */}
