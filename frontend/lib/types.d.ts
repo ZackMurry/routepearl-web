@@ -26,6 +26,91 @@ export interface HazardZone {
   description?: string
 }
 
+// ============================================================================
+// Route Timing Types (for backend-computed timing data)
+// ============================================================================
+
+/**
+ * Timing data for a travel segment between two nodes
+ */
+export interface RouteTimingSegment {
+  segmentIndex: number
+  fromNodeId: string
+  toNodeId: string
+  travelTimeMinutes: number
+  distanceKm: number
+}
+
+/**
+ * Timing data for a truck stop at a node
+ */
+export interface TruckNodeTiming {
+  nodeId: string
+  nodeType: 'depot' | 'customer' | 'station' | 'waypoint'
+  arrivalTimeMinutes: number // Minutes from mission start
+  departureTimeMinutes: number // Minutes from mission start
+  serviceTimeMinutes: number // Time spent at node
+  chargingTimeMinutes?: number // If charging station
+  waitingTimeMinutes?: number // If waiting for drone
+  segmentFromPrevious?: RouteTimingSegment
+}
+
+/**
+ * Timing data for a drone sortie (launch -> customer -> recovery)
+ */
+export interface DroneSortieTiming {
+  sortieNumber: number
+  droneId: number
+  launchNodeId: string
+  customerNodeId: string
+  recoveryNodeId: string
+  departureFromLaunchMinutes: number
+  arrivalAtCustomerMinutes: number
+  serviceAtCustomerMinutes: number
+  departureFromCustomerMinutes: number
+  arrivalAtRecoveryMinutes: number
+  totalSortieDurationMinutes: number
+  launchToCustomerDistanceKm: number
+  customerToRecoveryDistanceKm: number
+}
+
+/**
+ * Complete timing data for a route, as computed by the backend algorithm
+ */
+export interface RouteTiming {
+  totalCompletionTimeMinutes: number
+  totalCompletionTimeFormatted: string // e.g., "1h 45m"
+  truckTotalDistanceKm: number
+  droneTotalDistanceKm: number
+  totalDistanceKm: number
+  truckNodes: TruckNodeTiming[]
+  droneSorties: DroneSortieTiming[]
+  parameters: {
+    droneSpeedKmh: number
+    truckSpeedKmh: number
+    serviceTimeMinutes: number
+    chargingSetupTimeMinutes: number
+  }
+}
+
+/**
+ * Enhanced route data structure that includes timing information
+ * Used for saving/loading missions with full timing data
+ */
+export interface EnhancedRouteData {
+  // Core route geometry
+  truckRoute: Point[]
+  droneRoutes: Point[][]
+
+  // Backend-computed timing data (optional - may be absent for legacy data)
+  timing?: RouteTiming
+
+  // Metadata
+  generatedAt: string // ISO timestamp
+  algorithmVersion?: string
+  computedOnBackend: boolean
+}
+
 export interface MissionConfig {
   // High-level parameters
   missionName: string
@@ -40,7 +125,8 @@ export interface MissionConfig {
   hazardZones: HazardZone[]
 
   // Generated routes (from optimization algorithm)
-  routes?: {
+  // Uses EnhancedRouteData for full timing support, or legacy format for backwards compatibility
+  routes?: EnhancedRouteData | {
     truckRoute: Point[]
     droneRoutes: Point[][]
   }

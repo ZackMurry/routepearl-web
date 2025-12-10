@@ -30,7 +30,9 @@ import {
   Package,
   Truck,
   Plane,
+  Timer,
 } from 'lucide-react'
+import { TimelineTab } from './timeline'
 
 export function BottomPanel() {
   const {
@@ -67,7 +69,7 @@ export function BottomPanel() {
   const [toastOpen, setToastOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
-  const [missionTab, setMissionTab] = useState<'status' | 'customers'>('status')
+  const [missionTab, setMissionTab] = useState<'status' | 'customers' | 'timeline'>('status')
 
   // Mouse event handlers for resizing
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -743,7 +745,7 @@ export function BottomPanel() {
               </Flex>
 
               {/* Tabs */}
-              <Tabs.Root value={missionTab} onValueChange={(v) => setMissionTab(v as 'status' | 'customers')} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <Tabs.Root value={missionTab} onValueChange={(v) => setMissionTab(v as 'status' | 'customers' | 'timeline')} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <Tabs.List className="px-4 pt-2">
                   <Tabs.Trigger value="status">
                     <Play size={16} className="mr-1" />
@@ -752,6 +754,10 @@ export function BottomPanel() {
                   <Tabs.Trigger value="customers">
                     <MapPin size={16} className="mr-1" />
                     Customers
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="timeline">
+                    <Timer size={16} className="mr-1" />
+                    Timeline
                   </Tabs.Trigger>
                 </Tabs.List>
 
@@ -918,6 +924,11 @@ export function BottomPanel() {
                       </div>
                     </ScrollArea>
                   </Box>
+                </Tabs.Content>
+
+                {/* Tab 3: Timeline */}
+                <Tabs.Content value="timeline" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'auto' }}>
+                  <TimelineTab />
                 </Tabs.Content>
               </Tabs.Root>
             </Flex>
