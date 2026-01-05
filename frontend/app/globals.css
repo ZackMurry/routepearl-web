@@ -26,3 +26,11 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.leaflet-grab.leaflet-cursor-crosshair {
+  cursor: crosshair !important;
+}
+
+.leaflet-grabbing.leaflet-cursor-crosshair {
+  cursor: crosshair !important;
+}

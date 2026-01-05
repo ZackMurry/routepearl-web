@@ -1,40 +1,8 @@
 'use client'
-
-// Haversine distance in meters
-function distance(a: Point, b: Point): number {
-  const R = 6371000 // Earth radius in meters
-  const toRad = (deg: number) => (deg * Math.PI) / 180
-
-  const dLat = toRad(b.lat - a.lat)
-  const dLng = toRad(b.lng - a.lng)
-
-  const lat1 = toRad(a.lat)
-  const lat2 = toRad(b.lat)
-
-  const h =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
-
-  return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
-}
-
-// brute force permutations
-function permute<T>(arr: T[]): T[][] {
-  if (arr.length <= 1) return [arr]
-  const result: T[][] = []
-  arr.forEach((item, i) => {
-    const rest = [...arr.slice(0, i), ...arr.slice(i + 1)]
-    for (const p of permute(rest)) {
-      result.push([item, ...p])
-    }
-  })
-  return result
-}
-
-import React from 'react'
-import { MapContainer, TileLayer, Polyline, useMapEvents, Circle } from 'react-leaflet'
+import React, { useEffect } from 'react'
+import { MapContainer, TileLayer, useMapEvents, Circle, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import './flight-planner.css'
-import LucideMarker from './LucideMarker'
 import { Point, FlightNode } from '@/lib/types'
 import TextMarker from '@/components/TextMarker'
 import ArrowheadPolyline from '@/components/ArrowheadPolyline'
@@ -42,158 +10,23 @@ import chroma from 'chroma-js'
 import { FlightPlannerProvider, useFlightPlanner } from './FlightPlannerContext'
 import { FlightPlannerSidebar } from './FlightPlannerSidebar'
 import { BottomPanel } from './BottomPanel'
+import FlightNodeMarker from './FlightNodeMarker'
+import SortieFlightPath from './SortieFlightPath'
+import classNames from 'classnames'
+import ClickHandler from './ClickHandler'
 
 function MapContent() {
-  const {
-    missionConfig,
-    addNode,
-    removeNode,
-    updateNode,
-    truckRoute,
-    droneRoutes,
-    isFlightPlannerMode,
-    plotModeCustomer,
-    plotModeNodes,
-    selectedNodeId,
-    setSelectedNodeId,
-  } = useFlightPlanner()
+  const { missionConfig, addNode, truckRoute, droneRoutes, plotModeCustomer, plotModeNodes } = useFlightPlanner()
 
-  // Helper function: Check if a point matches a node (within 0.0001 degrees ~11m)
-  const pointMatchesNode = (point: Point, node: FlightNode): boolean => {
-    const latDiff = Math.abs(point.lat - node.lat)
-    const lngDiff = Math.abs(point.lng - node.lng)
-    return latDiff < 0.0001 && lngDiff < 0.0001
-  }
-
-  // Helper function: Get drone delivery nodes (middle point of each sortie)
-  const getDroneDeliveryNodes = (): Set<string> => {
-    const deliveryNodeIds = new Set<string>()
-    droneRoutes.forEach((sortie) => {
-      if (sortie.length >= 2) {
-        const deliveryPoint = sortie[1] // Middle point is the delivery
-        const matchingNode = missionConfig.nodes.find((node) => pointMatchesNode(deliveryPoint, node))
-        if (matchingNode) {
-          deliveryNodeIds.add(matchingNode.id)
-        }
-      }
-    })
-    return deliveryNodeIds
-  }
-
-  // Helper function: Get truck delivery nodes
-  const getTruckDeliveryNodes = (): Set<string> => {
-    const truckDeliveryIds = new Set<string>()
-    const droneDeliveryIds = getDroneDeliveryNodes()
-
-    // Customer nodes not served by drone are served by truck
-    missionConfig.nodes.forEach((node) => {
-      if (node.type === 'customer' && !droneDeliveryIds.has(node.id)) {
-        truckDeliveryIds.add(node.id)
-      }
-    })
-
-    return truckDeliveryIds
-  }
-
-  // Helper function: Get ALL sortie info for a node (a node can have multiple roles)
-  const getAllSortieInfo = (node: FlightNode): Array<{ type: 'launch' | 'return' | 'delivery'; sortieNumber: number }> => {
-    const sortieInfos: Array<{ type: 'launch' | 'return' | 'delivery'; sortieNumber: number }> = []
-
-    for (let i = 0; i < droneRoutes.length; i++) {
-      const sortie = droneRoutes[i]
-      if (sortie.length >= 3) {
-        if (pointMatchesNode(sortie[0], node)) {
-          sortieInfos.push({ type: 'launch', sortieNumber: i + 1 })
-        }
-        if (pointMatchesNode(sortie[1], node)) {
-          sortieInfos.push({ type: 'delivery', sortieNumber: i + 1 })
-        }
-        if (pointMatchesNode(sortie[2], node)) {
-          sortieInfos.push({ type: 'return', sortieNumber: i + 1 })
-        }
-      }
-    }
-
-    return sortieInfos
-  }
-
-  const droneDeliveryNodes = getDroneDeliveryNodes()
-  const truckDeliveryNodes = getTruckDeliveryNodes()
-
-  // Get color based on node type
-  const getNodeColor = (type: string): string => {
-    switch (type) {
-      case 'depot':
-        return '#3b82f6' // blue
-      case 'customer':
-        return '#10b981' // green
-      case 'station':
-        return '#f97316' // orange
-      case 'waypoint':
-        return '#8b5cf6' // purple
-      case 'hazard':
-        return '#ef4444' // red
-      default:
-        return '#6b7280' // gray
-    }
-  }
-
-  // Get color based on hazard severity
-  const getHazardColor = (severity?: 'low' | 'medium' | 'high'): string => {
-    switch (severity) {
-      case 'low':
-        return '#eab308' // yellow
-      case 'medium':
-        return '#f97316' // orange
-      case 'high':
-        return '#ef4444' // red
-      default:
-        return '#f97316' // orange (default)
-    }
-  }
-
-  function ClickHandler() {
-    useMapEvents({
-      click(e) {
-        // Only create nodes if one of the plot modes is enabled
-        if (!plotModeCustomer && !plotModeNodes) return
-
-        let newNode: FlightNode
-
-        if (plotModeCustomer) {
-          // Customer plot mode - create customer nodes
-          newNode = {
-            id: `node-${Date.now()}`,
-            type: 'customer',
-            lat: e.latlng.lat,
-            lng: e.latlng.lng,
-            label: `Customer ${missionConfig.nodes.filter((n) => n.type === 'customer').length + 1}`,
-          }
-        } else {
-          // Nodes plot mode - create waypoint nodes
-          newNode = {
-            id: `node-${Date.now()}`,
-            type: 'waypoint',
-            lat: e.latlng.lat,
-            lng: e.latlng.lng,
-            label: `Waypoint ${missionConfig.nodes.filter((n) => n.type === 'waypoint').length + 1}`,
-          }
-        }
-
-        addNode(newNode)
-      },
-    })
-    return null
-  }
-
-  const removeWaypoint = (id: string) => removeNode(id)
+  console.log(plotModeNodes)
 
   return (
     <>
       <div style={{ height: '100vh', width: '100%', position: 'relative' }}>
         <MapContainer
           style={{ height: '100%', width: '100%' }}
-          center={[26.4619, -81.7726]}
+          className={plotModeNodes ? 'leaflet-cursor-crosshair' : undefined}
+          center={[38.9404, -92.3277]}
           zoom={15}
           attributionControl={false}
           zoomControl={false}
@@ -207,248 +40,88 @@ function MapContent() {
           <ClickHandler />
 
           {/* Render flight nodes */}
-          {missionConfig.nodes.map((node) => {
-            const hazardColor = getHazardColor(node.severity)
-            // Nodes are draggable only when both plot modes are OFF
-            const isDraggable = !plotModeCustomer && !plotModeNodes
-            const isDroneDelivery = droneDeliveryNodes.has(node.id)
-            const isTruckDelivery = truckDeliveryNodes.has(node.id)
-            const allSortieInfo = getAllSortieInfo(node)
-
-            return (
-              <React.Fragment key={node.id}>
-                {/* Render circle for hazard nodes */}
-                {node.type === 'hazard' && (
-                  <Circle
-                    center={[node.lat, node.lng]}
-                    radius={node.radius || 100} // Default 100m radius
-                    pathOptions={{
-                      color: hazardColor,
-                      fillColor: hazardColor,
-                      fillOpacity: 0.15,
-                      weight: 2,
-                    }}
-                  />
-                )}
-                <LucideMarker
-                  position={[node.lat, node.lng]}
-                  anchor={[0.25, 1]}
-                  color={getNodeColor(node.type)}
-                  onClick={() => {
-                    // Only allow selecting when plot modes are off
-                    if (!plotModeCustomer && !plotModeNodes) {
-                      setSelectedNodeId(node.id)
-                    }
-                  }}
-                  onRightClick={() => removeWaypoint(node.id)}
-                  draggable={isDraggable}
-                  onDragEnd={(lat, lng) => updateNode(node.id, { lat, lng })}
-                />
-
-                {/* Delivery type indicator */}
-                {isDroneDelivery && (
-                  <TextMarker
-                    position={[node.lat, node.lng]}
-                    text="🚁"
-                    offset={[15, -35]}
-                    style={{
-                      backgroundColor: '#ef4444',
-                      color: 'white',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                      border: '2px solid white',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                    }}
-                  />
-                )}
-                {isTruckDelivery && (
-                  <TextMarker
-                    position={[node.lat, node.lng]}
-                    text="🚛"
-                    offset={[15, -35]}
-                    style={{
-                      backgroundColor: '#3b82f6',
-                      color: 'white',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                      border: '2px solid white',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                    }}
-                  />
-                )}
-
-                {/* Sortie info indicators (for launch/return points) - can have multiple */}
-                {allSortieInfo
-                  .filter(info => info.type !== 'delivery')
-                  .map((sortieInfo, idx) => (
-                    <TextMarker
-                      key={`${node.id}-sortie-${sortieInfo.sortieNumber}-${sortieInfo.type}`}
-                      position={[node.lat, node.lng]}
-                      text={sortieInfo.type === 'launch' ? `S${sortieInfo.sortieNumber} ⬆` : `S${sortieInfo.sortieNumber} ⬇`}
-                      offset={[-45 - (idx * 50), -35]} // Stack horizontally if multiple markers
-                      style={{
-                        backgroundColor: sortieInfo.type === 'launch' ? '#f97316' : '#10b981',
-                        color: 'white',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        fontWeight: 'bold',
-                        border: '1px solid white',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                      }}
-                    />
-                  ))}
-              </React.Fragment>
-            )
-          })}
+          {missionConfig.nodes.map(node => (
+            <FlightNodeMarker key={node.id} node={node} />
+          ))}
 
           {/* Render hazard zones */}
-          {missionConfig.hazardZones.map((zone) => (
+          {missionConfig.hazardZones.map(zone => (
             <Circle
               key={zone.id}
               center={[zone.center.lat, zone.center.lng]}
               radius={zone.radius}
               pathOptions={{
                 color: zone.severity === 'high' ? 'red' : zone.severity === 'medium' ? 'orange' : 'yellow',
-                fillColor:
-                  zone.severity === 'high' ? 'red' : zone.severity === 'medium' ? 'orange' : 'yellow',
+                fillColor: zone.severity === 'high' ? 'red' : zone.severity === 'medium' ? 'orange' : 'yellow',
                 fillOpacity: 0.2,
               }}
             />
           ))}
 
-        {/* Truck route */}
-        {/* {truckRoute.length > 1 && (
-          <>
-            <Polyline positions={truckRoute.map(p => [p.lat, p.lng])} color='blue' />
-            {truckRoute.map((pt, i) => (
-              <TextMarker key={i} position={[pt.lat, pt.lng]} text={`${i}`} />
-            ))}
-          </>
-        )} */}
+          {truckRoute.length > 1 && (
+            <>
+              {/* Truck route with arrows - use chunked segments for better arrow distribution */}
+              {(() => {
+                // Create segments of truck route for arrow placement
+                const chunkSize = Math.max(1, Math.floor(truckRoute.length / 15)) // ~15 arrows total
+                const segments: Point[][] = []
+                for (let i = 0; i < truckRoute.length - 1; i += chunkSize) {
+                  const end = Math.min(i + chunkSize + 1, truckRoute.length)
+                  segments.push(truckRoute.slice(i, end))
+                }
 
-        {/* Drone routes */}
-        {/* {droneRoutes.map((destinations, i) => (
-          <React.Fragment key={`fragment-${i}`}>
-            <Polyline key={`polyline-${i}`} positions={destinations.map(p => [p.lat, p.lng])} color='red' />
-          </React.Fragment>
-        ))}
-        {droneRoutes
-          .reduce((acc, sortie) => [...acc, ...sortie], [])
-          .map((pt, idx) => (
-            <TextMarker key={idx} position={[pt.lat, pt.lng]} text={`${idx}`} />
-          ))} */}
+                return segments.map((segment, segmentIndex) => {
+                  const progress = segmentIndex / Math.max(1, segments.length - 1)
+                  const color = chroma.scale(['blue', 'purple'])(progress).hex()
+                  return (
+                    <ArrowheadPolyline
+                      key={`truck-segment-${segmentIndex}`}
+                      positions={segment}
+                      color={color}
+                      weight={3}
+                      arrowSize={10}
+                      arrowRepeat={0}
+                      arrowOffset='100%'
+                    />
+                  )
+                })
+              })()}
+            </>
+          )}
 
-        {truckRoute.length > 1 && (
-          <>
-            {/* Truck route with arrows - use chunked segments for better arrow distribution */}
-            {(() => {
-              // Create segments of truck route for arrow placement
-              const chunkSize = Math.max(1, Math.floor(truckRoute.length / 15)) // ~15 arrows total
-              const segments: Point[][] = []
-              for (let i = 0; i < truckRoute.length - 1; i += chunkSize) {
-                const end = Math.min(i + chunkSize + 1, truckRoute.length)
-                segments.push(truckRoute.slice(i, end))
-              }
+          {/* Drone routes with gradient and arrows */}
+          {droneRoutes.map((sortie, sortieIndex) => (
+            <SortieFlightPath key={`sortie-path-${sortieIndex}`} sortie={sortie} sortieIndex={sortieIndex} />
+          ))}
 
-              return segments.map((segment, segmentIndex) => {
-                const progress = segmentIndex / Math.max(1, segments.length - 1)
-                const color = chroma.scale(['blue', 'purple'])(progress).hex()
-                return (
-                  <ArrowheadPolyline
-                    key={`truck-segment-${segmentIndex}`}
-                    positions={segment}
-                    color={color}
-                    weight={3}
-                    arrowSize={10}
-                    arrowRepeat={0}
-                    arrowOffset="100%"
-                  />
-                )
-              })
-            })()}
-          </>
-        )}
-
-        {/* Drone routes with gradient and arrows */}
-        {droneRoutes.map((sortie, sortieIndex) =>
-          sortie.map((pt, segmentIndex) => {
-            const next = sortie[segmentIndex + 1]
-            if (!next) return null
-
-            // Check if this is the final sortie
+          {/* Sortie labels on drone paths */}
+          {droneRoutes.map((sortie, sortieIndex) => {
+            if (sortie.length < 2) return null
             const isFinalSortie = sortieIndex === droneRoutes.length - 1
-
-            // Determine if this is the outbound (start) or return (end) segment
-            let color: string
-            if (isFinalSortie) {
-              // Final sortie - use yellow/amber to indicate mission conclusion
-              if (segmentIndex === 0) {
-                // Final sortie outbound: Yellow to amber gradient
-                color = chroma.scale(['#facc15', '#fbbf24'])(0.5).hex()
-              } else {
-                // Final sortie return: Amber to orange (mission complete)
-                color = chroma.scale(['#f59e0b', '#f97316'])(0.5).hex()
-              }
-            } else {
-              // Regular sorties
-              if (segmentIndex === 0) {
-                // First segment: Launch → Delivery (Start of sortie)
-                // Green to teal gradient (suggests beginning/takeoff/go)
-                color = chroma.scale(['#10b981', '#14b8a6'])(0.5).hex()
-              } else {
-                // Second segment: Delivery → Return (End of sortie)
-                // Orange to red gradient (suggests completion/landing/stop)
-                color = chroma.scale(['#f97316', '#ef4444'])(0.5).hex()
-              }
-            }
-
+            // Place label at the midpoint between launch and delivery
+            const midLat = (sortie[0].lat + sortie[1].lat) / 2
+            const midLng = (sortie[0].lng + sortie[1].lng) / 2
             return (
-              <ArrowheadPolyline
-                key={`sortie-${sortieIndex}-segment-${segmentIndex}`}
-                positions={[pt, next]}
-                color={color}
-                weight={isFinalSortie ? 5 : 4} // Slightly thicker for final sortie
-                arrowSize={isFinalSortie ? 14 : 12} // Larger arrows for final sortie
-                arrowRepeat={0} // One arrow at the end of each segment
-                arrowOffset="100%"
+              <TextMarker
+                key={`sortie-label-${sortieIndex}`}
+                position={[midLat, midLng]}
+                text={isFinalSortie ? `S${sortieIndex + 1} ✓` : `S${sortieIndex + 1}`}
+                style={{
+                  backgroundColor: isFinalSortie ? '#facc15' : '#ef4444',
+                  color: 'white',
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  border: '2px solid white',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                  minWidth: '30px',
+                  textAlign: 'center',
+                  display: 'inline-block',
+                }}
               />
             )
-          }),
-        )}
-
-        {/* Sortie labels on drone paths */}
-        {droneRoutes.map((sortie, sortieIndex) => {
-          if (sortie.length < 2) return null
-          const isFinalSortie = sortieIndex === droneRoutes.length - 1
-          // Place label at the midpoint between launch and delivery
-          const midLat = (sortie[0].lat + sortie[1].lat) / 2
-          const midLng = (sortie[0].lng + sortie[1].lng) / 2
-          return (
-            <TextMarker
-              key={`sortie-label-${sortieIndex}`}
-              position={[midLat, midLng]}
-              text={isFinalSortie ? `S${sortieIndex + 1} ✓` : `S${sortieIndex + 1}`}
-              style={{
-                backgroundColor: isFinalSortie ? '#facc15' : '#ef4444',
-                color: 'white',
-                padding: '4px 8px',
-                borderRadius: '12px',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                border: '2px solid white',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                minWidth: '30px',
-                textAlign: 'center',
-                display: 'inline-block',
-              }}
-            />
-          )
-        })}
+          })}
         </MapContainer>
 
         {/* Sidebar and Bottom Panel */}

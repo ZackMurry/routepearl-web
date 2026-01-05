@@ -119,50 +119,50 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
   // Update mission config
   const updateMissionConfig = (updates: Partial<MissionConfig>) => {
-    setMissionConfig((prev) => ({ ...prev, ...updates }))
+    setMissionConfig(prev => ({ ...prev, ...updates }))
   }
 
   // Node management
   const addNode = (node: FlightNode) => {
-    setMissionConfig((prev) => ({
+    setMissionConfig(prev => ({
       ...prev,
       nodes: [...prev.nodes, node],
     }))
   }
 
   const updateNode = (id: string, updates: Partial<FlightNode>) => {
-    setMissionConfig((prev) => ({
+    setMissionConfig(prev => ({
       ...prev,
-      nodes: prev.nodes.map((node) => (node.id === id ? { ...node, ...updates } : node)),
+      nodes: prev.nodes.map(node => (node.id === id ? { ...node, ...updates } : node)),
     }))
   }
 
   const removeNode = (id: string) => {
-    setMissionConfig((prev) => ({
+    setMissionConfig(prev => ({
       ...prev,
-      nodes: prev.nodes.filter((node) => node.id !== id),
+      nodes: prev.nodes.filter(node => node.id !== id),
     }))
   }
 
   // Hazard zone management
   const addHazardZone = (zone: HazardZone) => {
-    setMissionConfig((prev) => ({
+    setMissionConfig(prev => ({
       ...prev,
       hazardZones: [...prev.hazardZones, zone],
     }))
   }
 
   const updateHazardZone = (id: string, updates: Partial<HazardZone>) => {
-    setMissionConfig((prev) => ({
+    setMissionConfig(prev => ({
       ...prev,
-      hazardZones: prev.hazardZones.map((zone) => (zone.id === id ? { ...zone, ...updates } : zone)),
+      hazardZones: prev.hazardZones.map(zone => (zone.id === id ? { ...zone, ...updates } : zone)),
     }))
   }
 
   const removeHazardZone = (id: string) => {
-    setMissionConfig((prev) => ({
+    setMissionConfig(prev => ({
       ...prev,
-      hazardZones: prev.hazardZones.filter((zone) => zone.id !== id),
+      hazardZones: prev.hazardZones.filter(zone => zone.id !== id),
     }))
   }
 
@@ -218,7 +218,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
       console.log('Route data saved:', {
         truckRoutePoints: missionConfig.routes?.truckRoute?.length || 0,
         droneRoutePaths: missionConfig.routes?.droneRoutes?.length || 0,
-        hasRoute: (missionConfig.routes?.truckRoute?.length || 0) > 0 || (missionConfig.routes?.droneRoutes?.length || 0) > 0,
+        hasRoute:
+          (missionConfig.routes?.truckRoute?.length || 0) > 0 || (missionConfig.routes?.droneRoutes?.length || 0) > 0,
       })
     } catch (error) {
       console.error('Failed to save mission:', error)
@@ -232,7 +233,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     console.log('Route data loaded:', {
       truckRoutePoints: mission.config.routes?.truckRoute?.length || 0,
       droneRoutePaths: mission.config.routes?.droneRoutes?.length || 0,
-      hasRoute: (mission.config.routes?.truckRoute?.length || 0) > 0 || (mission.config.routes?.droneRoutes?.length || 0) > 0,
+      hasRoute:
+        (mission.config.routes?.truckRoute?.length || 0) > 0 || (mission.config.routes?.droneRoutes?.length || 0) > 0,
     })
   }
 
@@ -335,16 +337,14 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     }
 
     // Separate nodes by type
-    const depots = missionConfig.nodes.filter((n) => n.type === 'depot')
-    const customers = missionConfig.nodes.filter((n) => n.type === 'customer')
-    const stations = missionConfig.nodes.filter((n) => n.type === 'station')
+    const depots = missionConfig.nodes.filter(n => n.type === 'depot')
+    const customers = missionConfig.nodes.filter(n => n.type === 'customer')
+    const stations = missionConfig.nodes.filter(n => n.type === 'station')
 
     // If no explicit depots, use first waypoint
     const finalDepots = depots.length > 0 ? depots : [missionConfig.nodes[0]]
     const finalCustomers =
-      customers.length > 0
-        ? customers
-        : missionConfig.nodes.filter((n) => !finalDepots.includes(n) && n.type !== 'hazard')
+      customers.length > 0 ? customers : missionConfig.nodes.filter(n => !finalDepots.includes(n) && n.type !== 'hazard')
 
     setIsGeneratingRoute(true)
     try {
@@ -352,9 +352,16 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          depots: finalDepots.map((n) => ({ id: n.id, lat: n.lat, lon: n.lng })),
-          customers: finalCustomers.map((n) => ({ id: n.id, lat: n.lat, lon: n.lng })),
-          stations: stations.map((n) => ({ id: n.id, lat: n.lat, lon: n.lng })),
+          depots: finalDepots.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
+          customers: finalCustomers.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
+          stations: stations.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
+          boundary: [
+            [38, -93],
+            [38, -92],
+            [39, -92],
+            [39, -93],
+          ],
+          provider: 'OSRM-Online',
           // TODO: Uncomment when backend is ready to handle hazards
           // hazards: hazards.map((n, index) => ({
           //   id: index + 1,
