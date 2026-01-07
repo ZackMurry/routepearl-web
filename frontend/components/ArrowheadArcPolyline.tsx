@@ -36,6 +36,7 @@ interface SortieArcPathsProps {
   /** Optional style override for TextMarker */
   labelStyle?: React.CSSProperties
   endPaddingPx?: number // space to leave before endpoint
+  startPaddingPx?: number // space to leave before endpoint
   dashUnderArrowPadPx?: number // extra space so dashes don't reach arrow
   debugGuidePoints?: boolean
   debugGuideMaxPoints?: number
@@ -105,27 +106,33 @@ function pickLabelLatLng(latlngs: L.LatLng[], t: number): L.LatLng | null {
   return latlngs[idx]
 }
 
-function trimEndByPx(map: L.Map, latlngs: L.LatLng[], endPaddingPx: number): L.LatLng[] {
+function trimByPx(map: L.Map, latlngs: L.LatLng[], paddingPx: number, isEnd: boolean): L.LatLng[] {
   if (latlngs.length < 2) return latlngs
-  if (endPaddingPx <= 0) return latlngs
+  if (paddingPx <= 0) return latlngs
 
-  const pts = latlngs.map(ll => map.latLngToLayerPoint(ll))
+  // Work in forward direction; reverse if trimming from start
+  const arr = isEnd ? latlngs : [...latlngs].reverse()
+  const pts = arr.map(ll => map.latLngToLayerPoint(ll))
 
-  // total length in px
+  // Total length in px
   let total = 0
   for (let i = 1; i < pts.length; i++) {
     total += pts[i].distanceTo(pts[i - 1])
   }
 
-  const target = total - endPaddingPx
-  if (target <= 0) return [latlngs[0]] // too short; nothing meaningful to draw
+  const target = total - paddingPx
+  if (target <= 0) {
+    // Nothing meaningful remains
+    const single = arr[0]
+    return isEnd ? [single] : [single]
+  }
 
-  // walk until we reach target, then interpolate final point
   let acc = 0
-  const out: L.LatLng[] = [latlngs[0]]
+  const out: L.LatLng[] = [arr[0]]
 
   for (let i = 1; i < pts.length; i++) {
     const segLen = pts[i].distanceTo(pts[i - 1])
+
     if (acc + segLen >= target) {
       const remain = target - acc
       const t = segLen === 0 ? 0 : remain / segLen
@@ -134,14 +141,15 @@ function trimEndByPx(map: L.Map, latlngs: L.LatLng[], endPaddingPx: number): L.L
       const y = pts[i - 1].y + (pts[i].y - pts[i - 1].y) * t
 
       out.push(map.layerPointToLatLng(new L.Point(x, y)))
-      return out
+      break
     }
 
     acc += segLen
-    out.push(latlngs[i])
+    out.push(arr[i])
   }
 
-  return out
+  // Restore original order if we reversed
+  return isEnd ? out : out.reverse()
 }
 
 function downsampleByCount<T>(arr: T[], count: number): T[] {
@@ -187,6 +195,7 @@ export default function SortieArcPaths({
   labelStyle,
 
   endPaddingPx = 10,
+  startPaddingPx = 12,
   dashUnderArrowPadPx = 12,
   debugGuidePoints = false,
   debugGuideMaxPoints = 200,
@@ -230,18 +239,21 @@ export default function SortieArcPaths({
     const outFull = buildArcLatLngs(map, A_ll, B_ll, curvature, sOut)
     const inFull = buildArcLatLngs(map, B_ll, C_ll, curvature, sIn)
 
-    // const inGuide = trimEndByPx(map, inFull, endPaddingPx)
+    // 1) Trim start (isEnd = false)
+    const outBase = trimByPx(map, outFull, startPaddingPx, false)
+    const inBase = trimByPx(map, inFull, startPaddingPx, false)
 
+    // 2) Trim end for arrow + dash spacing (isEnd = true)
     const extra = dashed ? dashUnderArrowPadPx : 0
-    const inStroke = trimEndByPx(map, inFull, endPaddingPx + extra)
-    const outGuideFull = trimEndByPx(map, outFull, endPaddingPx)
+
+    const outStroke = trimByPx(map, outBase, endPaddingPx + extra, true)
+    const inStroke = trimByPx(map, inBase, endPaddingPx + extra, true)
+
+    const outGuideFull = trimByPx(map, outBase, endPaddingPx, true)
+    const inGuideFull = trimByPx(map, inBase, endPaddingPx, true)
+
     const outGuide = downsampleByCount(outGuideFull, 10)
-    const inGuideFull = trimEndByPx(map, inFull, endPaddingPx)
     const inGuide = downsampleByCount(inGuideFull, 10)
-
-    const outStroke = trimEndByPx(map, outFull, endPaddingPx + (dashed ? dashUnderArrowPadPx : 0))
-
-    // same for inbound
 
     return {
       outbound: { stroke: outStroke, guide: outGuide },
@@ -249,6 +261,7 @@ export default function SortieArcPaths({
       outboundLabelPos: outboundLabel ? pickLabelLatLng(outGuide, labelT) : null,
       inboundLabelPos: inboundLabel ? pickLabelLatLng(inGuide, labelT) : null,
     }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     map,
