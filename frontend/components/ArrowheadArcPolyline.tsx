@@ -3,7 +3,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useMap } from 'react-leaflet'
+import { useMap, CircleMarker, Polyline } from 'react-leaflet'
+
 import * as L from 'leaflet'
 import { Point } from '@/lib/types'
 import TextMarker from './TextMarker'
@@ -35,6 +36,10 @@ interface SortieArcPathsProps {
   /** Optional style override for TextMarker */
   labelStyle?: React.CSSProperties
   endPaddingPx?: number // space to leave before endpoint
+  dashUnderArrowPadPx?: number // extra space so dashes don't reach arrow
+  debugGuidePoints?: boolean
+  debugGuideMaxPoints?: number
+  debugGuidePointRadius?: number
 }
 
 function quadBezier(p0: L.Point, p1: L.Point, p2: L.Point, t: number): L.Point {
@@ -139,35 +144,24 @@ function trimEndByPx(map: L.Map, latlngs: L.LatLng[], endPaddingPx: number): L.L
   return out
 }
 
-function trimToFraction(map: L.Map, latlngs: L.LatLng[], fraction: number): L.LatLng[] {
-  if (latlngs.length < 2) return latlngs
-  const f = Math.max(0, Math.min(1, fraction))
+function downsampleByCount<T>(arr: T[], count: number): T[] {
+  if (arr.length <= 2) return arr
+  const n = Math.max(2, Math.floor(count))
+  if (arr.length <= n) return arr
 
-  const pts = latlngs.map(ll => map.latLngToLayerPoint(ll))
-
-  let total = 0
-  for (let i = 1; i < pts.length; i++) total += pts[i].distanceTo(pts[i - 1])
-  const target = total * f
-  if (target <= 0) return [latlngs[0]]
-
-  let acc = 0
-  const out: L.LatLng[] = [latlngs[0]]
-
-  for (let i = 1; i < pts.length; i++) {
-    const segLen = pts[i].distanceTo(pts[i - 1])
-    if (acc + segLen >= target) {
-      const remain = target - acc
-      const t = segLen === 0 ? 0 : remain / segLen
-      const x = pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t
-      const y = pts[i - 1].y + (pts[i].y - pts[i - 1].y) * t
-      out.push(map.layerPointToLatLng(new L.Point(x, y)))
-      return out
-    }
-    acc += segLen
-    out.push(latlngs[i])
+  const out: T[] = []
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1)
+    const idx = Math.round(t * (arr.length - 1))
+    out.push(arr[idx])
   }
 
-  return out
+  // De-dupe adjacent duplicates (can happen due to rounding)
+  const dedup: T[] = [out[0]]
+  for (let i = 1; i < out.length; i++) {
+    if (out[i] !== dedup[dedup.length - 1]) dedup.push(out[i])
+  }
+  return dedup
 }
 
 export default function SortieArcPaths({
@@ -192,7 +186,11 @@ export default function SortieArcPaths({
   labelT = 0.65,
   labelStyle,
 
-  endPaddingPx = 8,
+  endPaddingPx = 10,
+  dashUnderArrowPadPx = 12,
+  debugGuidePoints = false,
+  debugGuideMaxPoints = 200,
+  debugGuidePointRadius = 3,
 }: SortieArcPathsProps) {
   const map = useMap()
   const [decoratorLoaded, setDecoratorLoaded] = useState(false)
@@ -212,41 +210,62 @@ export default function SortieArcPaths({
     const bump = () => setViewKey(k => k + 1)
 
     map.on('zoomend', bump)
-    map.on('moveend', bump) // optional; include if panning changes your desired pixel-based curvature/trim
+    // map.on('moveend', bump) // optional; include if panning changes your desired pixel-based curvature/trim
 
     return () => {
       map.off('zoomend', bump)
-      map.off('moveend', bump)
+      // map.off('moveend', bump)
     }
   }, [map])
 
-  const { outboundLatLngs, inboundLatLngs, outboundLabelPos, inboundLabelPos } = useMemo(() => {
+  const { outbound, inbound, outboundLabelPos, inboundLabelPos } = useMemo(() => {
     const [A, B, C] = sortie
-
     const A_ll = L.latLng(A.lat, A.lng)
     const B_ll = L.latLng(B.lat, B.lng)
     const C_ll = L.latLng(C.lat, C.lng)
 
-    const sOut = outsideTriangleSign(map, A, B, C) // AB away from C
-    const sIn = outsideTriangleSign(map, B, C, A) // BC away from A
+    const sOut = outsideTriangleSign(map, A, B, C)
+    const sIn = outsideTriangleSign(map, B, C, A)
 
-    const outRaw = buildArcLatLngs(map, A_ll, B_ll, curvature, sOut)
-    const inRaw = buildArcLatLngs(map, B_ll, C_ll, curvature, sIn)
+    const outFull = buildArcLatLngs(map, A_ll, B_ll, curvature, sOut)
+    const inFull = buildArcLatLngs(map, B_ll, C_ll, curvature, sIn)
 
-    const out = trimEndByPx(map, outRaw, endPaddingPx)
-    const inbd = trimEndByPx(map, inRaw, endPaddingPx)
+    // const inGuide = trimEndByPx(map, inFull, endPaddingPx)
+
+    const extra = dashed ? dashUnderArrowPadPx : 0
+    const inStroke = trimEndByPx(map, inFull, endPaddingPx + extra)
+    const outGuideFull = trimEndByPx(map, outFull, endPaddingPx)
+    const outGuide = downsampleByCount(outGuideFull, 10)
+    const inGuideFull = trimEndByPx(map, inFull, endPaddingPx)
+    const inGuide = downsampleByCount(inGuideFull, 10)
+
+    const outStroke = trimEndByPx(map, outFull, endPaddingPx + (dashed ? dashUnderArrowPadPx : 0))
+
+    // same for inbound
 
     return {
-      outboundLatLngs: out,
-      inboundLatLngs: inbd,
-      outboundLabelPos: outboundLabel ? pickLabelLatLng(out, labelT) : null,
-      inboundLabelPos: inboundLabel ? pickLabelLatLng(inbd, labelT) : null,
+      outbound: { stroke: outStroke, guide: outGuide },
+      inbound: { stroke: inStroke, guide: inGuide },
+      outboundLabelPos: outboundLabel ? pickLabelLatLng(outGuide, labelT) : null,
+      inboundLabelPos: inboundLabel ? pickLabelLatLng(inGuide, labelT) : null,
     }
-  }, [map, sortie, curvature, outboundLabel, inboundLabel, labelT, endPaddingPx, viewKey])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    map,
+    sortie,
+    curvature,
+    dashed,
+    endPaddingPx,
+    dashUnderArrowPadPx,
+    outboundLabel,
+    inboundLabel,
+    labelT,
+    viewKey, // re-calculate when user changes the zoom
+  ])
 
   useEffect(() => {
     if (!decoratorLoaded) return
-    if (outboundLatLngs.length < 2 && inboundLatLngs.length < 2) return
+    if (outbound.guide.length < 3 && inbound.guide.length < 2) return
 
     const L_extended = (window as any).L
     if (!L_extended?.polylineDecorator || !L_extended?.Symbol) {
@@ -256,24 +275,35 @@ export default function SortieArcPaths({
 
     const layers: L.Layer[] = []
 
-    const addLeg = (latlngs: L.LatLng[], color: string) => {
-      if (latlngs.length < 2) return
+    const addLeg = (leg: { stroke: L.LatLng[]; guide: L.LatLng[] }, color: string) => {
+      if (leg.guide.length < 2) return
 
-      const polyline = L.polyline(latlngs, {
-        color,
-        weight,
-        dashArray: dashed ? dashArray ?? '8 8' : undefined,
-        dashOffset,
+      // 1) Visible stroke (dashed) ends earlier
+      if (leg.stroke.length >= 2) {
+        const strokeLine = L.polyline(leg.stroke, {
+          color,
+          weight,
+          dashArray: dashed ? dashArray ?? '8 8' : undefined,
+          dashOffset,
+        }).addTo(map)
+        layers.push(strokeLine)
+      }
+
+      // 2) Invisible guide line ends later; arrow sits at its end
+      const guideLine = L.polyline(leg.guide, {
+        opacity: 0,
+        weight: 0,
+        interactive: false,
       }).addTo(map)
-      layers.push(polyline)
+      layers.push(guideLine)
 
       try {
         // @ts-ignore
-        const decorator = L_extended.polylineDecorator(polyline, {
+        const decorator = L_extended.polylineDecorator(guideLine, {
           patterns: [
             {
-              offset: arrowOffset,
-              repeat: arrowRepeat,
+              offset: '100%',
+              repeat: 0,
               // @ts-ignore
               symbol: L_extended.Symbol.arrowHead({
                 pixelSize: arrowSize,
@@ -289,8 +319,8 @@ export default function SortieArcPaths({
       }
     }
 
-    addLeg(outboundLatLngs, outboundColor)
-    addLeg(inboundLatLngs, inboundColor)
+    addLeg(outbound, outboundColor)
+    addLeg(inbound, inboundColor)
 
     return () => {
       for (const layer of layers) {
@@ -304,8 +334,8 @@ export default function SortieArcPaths({
   }, [
     map,
     decoratorLoaded,
-    outboundLatLngs,
-    inboundLatLngs,
+    outbound,
+    inbound,
     outboundColor,
     inboundColor,
     weight,
@@ -349,6 +379,22 @@ export default function SortieArcPaths({
           text={inboundLabel}
           style={{ ...defaultLabelStyle, ...labelStyle }}
         />
+      )}
+      {debugGuidePoints && (
+        <>
+          {/* Optional: show the guide path itself */}
+          <Polyline positions={outbound.guide} pathOptions={{ weight: 1, opacity: 0.8 }} />
+          <Polyline positions={inbound.guide} pathOptions={{ weight: 1, opacity: 0.8 }} />
+
+          {/* Show guide vertices */}
+          {outbound.guide.slice(0, debugGuideMaxPoints).map((ll, i) => (
+            <CircleMarker key={`dbg-out-${i}`} center={ll} radius={debugGuidePointRadius} pathOptions={{ opacity: 1 }} />
+          ))}
+
+          {inbound.guide.slice(0, debugGuideMaxPoints).map((ll, i) => (
+            <CircleMarker key={`dbg-in-${i}`} center={ll} radius={debugGuidePointRadius} pathOptions={{ opacity: 1 }} />
+          ))}
+        </>
       )}
     </>
   )

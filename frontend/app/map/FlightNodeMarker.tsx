@@ -15,7 +15,6 @@ interface Props {
 interface Marker {
   icon: LucideIcon
   anchor: [number, number]
-  fill?: string
   size?: number
 }
 
@@ -37,7 +36,6 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
     [droneRoutes, node],
   )
 
-  const isTruckDelivery = node.type === 'customer' && !isDroneDelivery
   const isDraggable = !plotModeCustomer && !plotModeNodes
 
   const getAllSortieInfo = (node: FlightNode): Array<{ type: 'launch' | 'return' | 'delivery'; sortieNumber: number }> => {
@@ -65,7 +63,7 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
     depot: {
       icon: ((props: LucideProps) => <Square fill='black' {...props} />) as LucideIcon,
       anchor: [0.5, 0.5] as [number, number],
-      fill: 'black',
+      size: 16,
     },
     customer: {
       icon: ((props: LucideProps) => <LucideCircle {...props} fill='#f9e912' />) as LucideIcon,
@@ -114,7 +112,6 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
           draggable={isDraggable}
           onDragEnd={(lat, lng) => updateNode(node.id, { lat, lng })}
           LucideIcon={marker.icon}
-          fill={marker.fill}
           size={marker.size ?? 24}
         />
       )}
