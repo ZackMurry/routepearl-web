@@ -8,6 +8,8 @@ import * as L from 'leaflet'
 import { Point } from '@/lib/types'
 import TextMarker from './TextMarker'
 
+type Leg = 'outbound' | 'inbound'
+
 interface ArrowheadArcPolylineProps {
   positions: Point[] // expected: [start, end]
   color?: string
@@ -21,14 +23,11 @@ interface ArrowheadArcPolylineProps {
    * Typical: 0.15 - 0.35
    */
   curvature?: number
-
-  /**
-   * If true, alternates arc direction (+/-) using `arcDirectionSeed`
-   * so outbound/inbound don’t overlap perfectly.
-   */
-  alternateDirection?: boolean
-  arcDirectionSeed?: number // e.g. segment index
   label?: string
+  dashed?: boolean
+  dashArray?: string
+  dashOffset?: string
+  leg?: Leg
 }
 
 function quadBezier(p0: L.Point, p1: L.Point, p2: L.Point, t: number): L.Point {
@@ -93,9 +92,14 @@ export default function ArrowheadArcPolyline({
   weight = 3,
   arrowRepeat = '80px',
   arrowOffset = '50px',
-  curvature = 0.25,
+  curvature = 0.22,
+  dashed = false,
+  dashArray,
+  dashOffset,
   label,
+  leg,
 }: ArrowheadArcPolylineProps) {
+  console.log(positions)
   const map = useMap()
   const [decoratorLoaded, setDecoratorLoaded] = useState(false)
 
@@ -115,15 +119,16 @@ export default function ArrowheadArcPolyline({
     const start = L.latLng(positions[0].lat, positions[0].lng)
     const end = L.latLng(positions[1].lat, positions[1].lng)
 
-    // Flip direction to reduce overlap if desired.
-    const base = hashSign(pairKey(positions[0], positions[1]))
-    const forward =
-      positions[0].lat < positions[1].lat || (positions[0].lat === positions[1].lat && positions[0].lng <= positions[1].lng)
+    // Stable per unordered pair
+    const base: 1 | -1 = hashSign(pairKey(positions[0], positions[1]))
 
-    const sign: 1 | -1 = forward ? base : base === 1 ? -1 : 1
+    // Outbound vs inbound flips the arc side
+    const phase: 1 | -1 = leg === 'inbound' ? -1 : 1
+
+    const sign: 1 | -1 = (base * phase) as 1 | -1
 
     return buildArcLatLngs(map, start, end, curvature, sign)
-  }, [map, positions, curvature])
+  }, [map, positions, curvature, leg])
 
   const labelLatLng = useMemo(() => {
     if (!label || latlngs.length < 2) return null
@@ -143,7 +148,13 @@ export default function ArrowheadArcPolyline({
       return
     }
 
-    const polyline = L.polyline(latlngs, { color, weight }).addTo(map)
+    // const polyline = L.polyline(latlngs, { color, weight }).addTo(map)
+    const polyline = L.polyline(latlngs, {
+      color,
+      weight,
+      dashArray: dashed ? dashArray ?? '8 8' : undefined,
+      dashOffset,
+    }).addTo(map)
 
     let decorator: any = null
     try {

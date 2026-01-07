@@ -34,9 +34,8 @@ const SortieFlightPath: FC<Props> = ({ sortie, sortieIndex }) => {
           arrowSize={isFinalSortie ? 14 : 12}
           arrowRepeat={0}
           arrowOffset='100%'
-          curvature={0.28}
-          alternateDirection
-          arcDirectionSeed={i}
+          curvature={0.22}
+          dashed
         />
       ))}
     </>
