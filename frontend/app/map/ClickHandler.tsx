@@ -45,8 +45,6 @@ const ClickHandler = () => {
     } else if (!shouldBeCrosshair && isCrosshair) {
       map.getContainer().className = map.getContainer().className.replaceAll(' leaflet-cursor-crosshair', '')
     }
-    console.log(map.getContainer().classList)
-    console.log('container class:', map.getContainer().className)
   }, [map, plotModeNodes, plotModeCustomer])
   return null
 }

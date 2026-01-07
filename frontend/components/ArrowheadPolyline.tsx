@@ -22,7 +22,7 @@ export default function ArrowheadPolyline({
   arrowSize = 10,
   weight = 3,
   arrowRepeat = '80px', // Default: arrow every 80 pixels
-  arrowOffset = '50px' // Default: start 50px from beginning
+  arrowOffset = '50px', // Default: start 50px from beginning
 }: ArrowheadPolylineProps) {
   const map = useMap()
   const [decoratorLoaded, setDecoratorLoaded] = useState(false)
@@ -30,6 +30,7 @@ export default function ArrowheadPolyline({
   // Load the polyline decorator library
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // @ts-ignore next-line
       import('leaflet-polylinedecorator')
         .then(() => {
           setDecoratorLoaded(true)
@@ -70,7 +71,7 @@ export default function ArrowheadPolyline({
               pathOptions: {
                 color,
                 fillOpacity: 1,
-                weight: 0
+                weight: 0,
               },
             }),
           },

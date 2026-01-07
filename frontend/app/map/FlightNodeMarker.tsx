@@ -82,7 +82,7 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
       <LucideMarker
         position={[node.lat, node.lng]}
         anchor={[0.25, 1]}
-        color={getOrDefault(NODE_COLORS, node.type)}
+        color={isDroneDelivery ? '#4673bd' : 'black'}
         onClick={() => {
           // Only allow selecting when plot modes are off
           if (!plotModeCustomer && !plotModeNodes) {
@@ -95,7 +95,7 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
       />
 
       {/* Delivery type indicator */}
-      {isDroneDelivery && (
+      {/* {isDroneDelivery && (
         <TextMarker
           position={[node.lat, node.lng]}
           text='🚁'
@@ -111,46 +111,30 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
             boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
           }}
         />
-      )}
-      {isTruckDelivery && (
-        <TextMarker
-          position={[node.lat, node.lng]}
-          text='🚛'
-          offset={[15, -35]}
-          style={{
-            backgroundColor: '#3b82f6',
-            color: 'white',
-            padding: '2px 6px',
-            borderRadius: '4px',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            border: '2px solid white',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-          }}
-        />
-      )}
+      )} */}
 
       {/* Sortie info indicators (for launch/return points) - can have multiple */}
-      {allSortieInfo
-        .filter(info => info.type !== 'delivery')
-        .map((sortieInfo, idx) => (
-          <TextMarker
-            key={`${node.id}-sortie-${sortieInfo.sortieNumber}-${sortieInfo.type}`}
-            position={[node.lat, node.lng]}
-            text={sortieInfo.type === 'launch' ? `S${sortieInfo.sortieNumber} ⬆` : `S${sortieInfo.sortieNumber} ⬇`}
-            offset={[-45 - idx * 50, -35]} // Stack horizontally if multiple markers
-            style={{
-              backgroundColor: sortieInfo.type === 'launch' ? '#f97316' : '#10b981',
-              color: 'white',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              fontSize: '11px',
-              fontWeight: 'bold',
-              border: '1px solid white',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-            }}
-          />
-        ))}
+      {false &&
+        allSortieInfo
+          .filter(info => info.type !== 'delivery')
+          .map((sortieInfo, idx) => (
+            <TextMarker
+              key={`${node.id}-sortie-${sortieInfo.sortieNumber}-${sortieInfo.type}`}
+              position={[node.lat, node.lng]}
+              text={sortieInfo.type === 'launch' ? `S${sortieInfo.sortieNumber} ⬆` : `S${sortieInfo.sortieNumber} ⬇`}
+              offset={[-45 - idx * 50, -35]} // Stack horizontally if multiple markers
+              style={{
+                backgroundColor: sortieInfo.type === 'launch' ? '#f97316' : '#10b981',
+                color: 'white',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                border: '1px solid white',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              }}
+            />
+          ))}
     </React.Fragment>
   )
 }

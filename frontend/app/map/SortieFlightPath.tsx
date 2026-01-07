@@ -3,6 +3,7 @@ import { FC } from 'react'
 import { useFlightPlanner } from './FlightPlannerContext'
 import chroma from 'chroma-js'
 import ArrowheadPolyline from '@/components/ArrowheadPolyline'
+import ArrowheadArcPolyline from '@/components/ArrowheadArcPolyline'
 
 interface Props {
   sortie: Point[]
@@ -24,14 +25,18 @@ const SortieFlightPath: FC<Props> = ({ sortie, sortieIndex }) => {
   return (
     <>
       {sortie.slice(0, -1).map((pt, i) => (
-        <ArrowheadPolyline
+        <ArrowheadArcPolyline
           key={`sortie-${sortieIndex}-segment-${i}`}
           positions={[pt, sortie[i + 1]]}
-          color={colors[i === 0 ? 'outbound' : 'inbound']}
-          weight={isFinalSortie ? 5 : 4} // Slightly thicker for final sortie
-          arrowSize={isFinalSortie ? 14 : 12} // Larger arrows for final sortie
-          arrowRepeat={0} // One arrow at the end of each segment
+          color='#4673bd'
+          label={`S${sortieIndex + 1}`}
+          weight={3}
+          arrowSize={isFinalSortie ? 14 : 12}
+          arrowRepeat={0}
           arrowOffset='100%'
+          curvature={0.28}
+          alternateDirection
+          arcDirectionSeed={i}
         />
       ))}
     </>
