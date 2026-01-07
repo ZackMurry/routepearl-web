@@ -13,6 +13,7 @@ interface Props {
 const SortieFlightPath: FC<Props> = ({ sortie, sortieIndex }) => {
   const { droneRoutes } = useFlightPlanner()
   const isFinalSortie = sortieIndex === droneRoutes.length - 1
+  if (sortie.length < 3) return <></>
 
   const colors = {
     outbound: isFinalSortie
@@ -27,9 +28,11 @@ const SortieFlightPath: FC<Props> = ({ sortie, sortieIndex }) => {
       {sortie.slice(0, -1).map((pt, i) => (
         <ArrowheadArcPolyline
           key={`sortie-${sortieIndex}-segment-${i}`}
-          positions={[pt, sortie[i + 1]]}
-          color='#4673bd'
-          label={`S${sortieIndex + 1}`}
+          sortie={sortie as [Point, Point, Point]}
+          inboundColor='#4673bd'
+          outboundColor='#4673bd'
+          outboundLabel={`S${sortieIndex + 1} out`}
+          inboundLabel={`S${sortieIndex + 1} in`}
           weight={3}
           arrowSize={isFinalSortie ? 14 : 12}
           arrowRepeat={0}

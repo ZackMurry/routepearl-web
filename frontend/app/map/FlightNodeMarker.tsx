@@ -1,14 +1,22 @@
 import { FlightNode } from '@/lib/types'
-import React, { FC, useMemo } from 'react'
+import React, { FC, ReactNode, useMemo } from 'react'
 import { Circle } from 'react-leaflet'
 import LucideMarker from './LucideMarker'
 import { getOrDefault, pointMatchesNode } from '@/lib/util'
 import TextMarker from '@/components/TextMarker'
 import { useFlightPlanner } from './FlightPlannerContext'
 import { HAZARD_COLORS, NODE_COLORS } from '@/lib/constants'
+import { Circle as LucideCircle, LucideIcon, LucideProps, MapPin, Square, Zap } from 'lucide-react'
 
 interface Props {
   node: FlightNode
+}
+
+interface Marker {
+  icon: LucideIcon
+  anchor: [number, number]
+  fill?: string
+  size?: number
 }
 
 const FlightNodeMarker: FC<Props> = ({ node }) => {
@@ -16,17 +24,7 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
   // Nodes are draggable only when both plot modes are OFF
 
   // Helper function: Get ALL sortie info for a node (a node can have multiple roles)
-  const {
-    updateNode,
-    removeNode,
-    truckRoute,
-    droneRoutes,
-    isFlightPlannerMode,
-    plotModeCustomer,
-    plotModeNodes,
-    missionConfig,
-    setSelectedNodeId,
-  } = useFlightPlanner()
+  const { updateNode, removeNode, droneRoutes, plotModeCustomer, plotModeNodes, setSelectedNodeId } = useFlightPlanner()
 
   const isDroneDelivery = useMemo(
     () =>
@@ -63,6 +61,27 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
     return sortieInfos
   }
   const allSortieInfo = getAllSortieInfo(node)
+  const marker: Marker | null = {
+    depot: {
+      icon: ((props: LucideProps) => <Square fill='black' {...props} />) as LucideIcon,
+      anchor: [0.5, 0.5] as [number, number],
+      fill: 'black',
+    },
+    customer: {
+      icon: ((props: LucideProps) => <LucideCircle {...props} fill='#f9e912' />) as LucideIcon,
+      anchor: [0.5, 0.5] as [number, number],
+      size: 16,
+    },
+    station: {
+      icon: Zap,
+      anchor: [0, 0] as [number, number],
+    },
+    waypoint: {
+      icon: MapPin,
+      anchor: [0, 0] as [number, number],
+    },
+    hazard: null,
+  }[node.type]
 
   return (
     <React.Fragment key={node.id}>
@@ -79,20 +98,26 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
           }}
         />
       )}
-      <LucideMarker
-        position={[node.lat, node.lng]}
-        anchor={[0.25, 1]}
-        color={isDroneDelivery ? '#4673bd' : 'black'}
-        onClick={() => {
-          // Only allow selecting when plot modes are off
-          if (!plotModeCustomer && !plotModeNodes) {
-            setSelectedNodeId(node.id)
-          }
-        }}
-        onRightClick={() => removeNode(node.id)}
-        draggable={isDraggable}
-        onDragEnd={(lat, lng) => updateNode(node.id, { lat, lng })}
-      />
+
+      {marker && (
+        <LucideMarker
+          position={[node.lat, node.lng]}
+          anchor={marker.anchor}
+          color={isDroneDelivery ? '#4673bd' : 'black'}
+          onClick={() => {
+            // Only allow selecting when plot modes are off
+            if (!plotModeCustomer && !plotModeNodes) {
+              setSelectedNodeId(node.id)
+            }
+          }}
+          onRightClick={() => removeNode(node.id)}
+          draggable={isDraggable}
+          onDragEnd={(lat, lng) => updateNode(node.id, { lat, lng })}
+          LucideIcon={marker.icon}
+          fill={marker.fill}
+          size={marker.size ?? 24}
+        />
+      )}
 
       {/* Delivery type indicator */}
       {/* {isDroneDelivery && (

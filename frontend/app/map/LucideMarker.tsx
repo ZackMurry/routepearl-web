@@ -19,6 +19,7 @@ type Props = {
   onDragEnd?: (lat: number, lng: number) => void
   draggable?: boolean
   LucideIcon?: React.FC<LucideProps>
+  fill?: string
 }
 
 export default function LucideMarker({
