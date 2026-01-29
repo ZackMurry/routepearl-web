@@ -60,7 +60,7 @@ export default function LucideMarker({
     })
 
     setIcon(leafletIcon)
-  }, [align, anchor, size, color])
+  }, [align, anchor, size, color, LucideIcon])
 
   if (!icon) return null
 

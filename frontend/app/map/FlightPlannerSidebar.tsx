@@ -63,6 +63,7 @@ export function FlightPlannerSidebar() {
     missionLaunched,
     launchMission,
     stopMission,
+    importMission,
   } = useFlightPlanner()
 
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -82,9 +83,8 @@ export function FlightPlannerSidebar() {
       reader.onload = (e) => {
         const content = e.target?.result as string
         try {
-          const mission = JSON.parse(content)
-          // Load the mission and enter flight planner mode to view/edit it
-          updateMissionConfig(mission.config || mission)
+          // Use importMission to properly assign missing address IDs
+          importMission(content)
           setIsFlightPlannerMode(true)
         } catch (error) {
           console.error('Failed to import flight plan:', error)

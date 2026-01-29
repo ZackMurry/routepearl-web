@@ -139,15 +139,15 @@ export function BottomPanel() {
 
         lines.forEach((line) => {
           if (!line.trim()) return
-          const [type, label, lat, lng, action] = line.split(',')
+          const [type, _label, lat, lng, action] = line.split(',')
 
           if (type === 'customer' || !type) {
+            // Label and addressId will be auto-assigned by FlightPlannerContext
             const newNode: FlightNode = {
               id: `node-${Date.now()}-${Math.random()}`,
               type: 'customer',
               lat: parseFloat(lat),
               lng: parseFloat(lng),
-              label: label || `Customer ${missionConfig.nodes.filter(n => n.type === 'customer').length + 1}`,
               action: action || '',
             }
             addNode(newNode)
@@ -161,9 +161,9 @@ export function BottomPanel() {
   const handleExportCSV = () => {
     const customers = missionConfig.nodes.filter((n) => n.type === 'customer')
     const csvContent = [
-      'Type,Label,Latitude,Longitude,Action',
+      'Type,AddressID,Latitude,Longitude,Action',
       ...customers.map(
-        (node) => `${node.type},${node.label || ''},${node.lat},${node.lng},${node.action || ''}`
+        (node) => `${node.type},${node.addressId || ''},${node.lat},${node.lng},${node.action || ''}`
       ),
     ].join('\n')
 
@@ -177,12 +177,12 @@ export function BottomPanel() {
   }
 
   const handleAddCustomer = () => {
+    // Label and addressId will be auto-assigned by FlightPlannerContext
     const newNode: FlightNode = {
       id: `node-${Date.now()}`,
       type: 'customer',
       lat: 26.4619, // Default FGCU coordinates
       lng: -81.7726,
-      label: `Customer ${missionConfig.nodes.filter((n) => n.type === 'customer').length + 1}`,
     }
     addNode(newNode)
   }
@@ -446,7 +446,7 @@ export function BottomPanel() {
 
                 <ScrollArea style={{ height: 'calc(100% - 2.5rem)' }}>
                   <div className="space-y-2 pr-2">
-                    {customerNodes.map((node, index) => (
+                    {customerNodes.map((node) => (
                       <Card
                         key={node.id}
                         className="p-2"
@@ -458,16 +458,10 @@ export function BottomPanel() {
                         <Flex justify="between" align="start">
                           <Flex direction="column" gap="2" className="flex-1 mr-2">
                             <Flex align="center" gap="2">
-                              <MapPin size={14} />
-                              <TextField.Root
-                                value={node.label || ''}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  updateNode(node.id, { label: e.target.value })
-                                }
-                                placeholder={`Customer ${index + 1}`}
-                                size="1"
-                                style={{ flex: 1 }}
-                              />
+                              <MapPin size={14} className="text-green-600" />
+                              <Badge color="green" size="2" style={{ fontWeight: 'bold' }}>
+                                Address ID: {node.addressId || '?'}
+                              </Badge>
                             </Flex>
                             <Flex gap="2">
                               {/* Latitude with increment/decrement */}
@@ -888,7 +882,7 @@ export function BottomPanel() {
                     </Text>
                     <ScrollArea style={{ height: 'calc(100% - 120px)' }}>
                       <div className="space-y-2 pr-2">
-                        {customerNodes.map((customer, index) => {
+                        {customerNodes.map((customer) => {
                           const isDelivered = false // TODO: Track actual deliveries
                           return (
                             <Card key={customer.id} className="p-3">
@@ -897,7 +891,7 @@ export function BottomPanel() {
                                   <MapPin size={16} className={isDelivered ? 'text-green-500' : 'text-gray-400'} />
                                   <Box className="flex-1">
                                     <Text size="2" weight="medium">
-                                      {customer.label || `Customer ${index + 1}`}
+                                      Address ID: {customer.addressId || '?'}
                                     </Text>
                                     <Text size="1" color="gray">
                                       {customer.lat.toFixed(6)}, {customer.lng.toFixed(6)}

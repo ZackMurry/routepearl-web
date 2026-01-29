@@ -35,10 +35,12 @@ import { MapContainer, TileLayer, Polyline, useMapEvents, Circle } from 'react-l
 import 'leaflet/dist/leaflet.css'
 import './flight-planner.css'
 import LucideMarker from './LucideMarker'
+import NumberedMarker from '@/components/NumberedMarker'
 import { Point, FlightNode } from '@/lib/types'
 import TextMarker from '@/components/TextMarker'
 import ArrowheadPolyline from '@/components/ArrowheadPolyline'
 import chroma from 'chroma-js'
+import { Warehouse, Fuel, FlagTriangleRight, AlertTriangle } from 'lucide-react'
 import { FlightPlannerProvider, useFlightPlanner } from './FlightPlannerContext'
 import { FlightPlannerSidebar } from './FlightPlannerSidebar'
 import { BottomPanel } from './BottomPanel'
@@ -162,12 +164,12 @@ function MapContent() {
 
         if (plotModeCustomer) {
           // Customer plot mode - create customer nodes
+          // Label and addressId will be auto-assigned by FlightPlannerContext
           newNode = {
             id: `node-${Date.now()}`,
             type: 'customer',
             lat: e.latlng.lat,
             lng: e.latlng.lng,
-            label: `Customer ${missionConfig.nodes.filter((n) => n.type === 'customer').length + 1}`,
           }
         } else {
           // Nodes plot mode - create waypoint nodes
@@ -207,13 +209,16 @@ function MapContent() {
           <ClickHandler />
 
           {/* Render flight nodes */}
-          {missionConfig.nodes.map((node) => {
+          {missionConfig.nodes.map((node, nodeIndex) => {
             const hazardColor = getHazardColor(node.severity)
             // Nodes are draggable only when both plot modes are OFF
             const isDraggable = !plotModeCustomer && !plotModeNodes
             const isDroneDelivery = droneDeliveryNodes.has(node.id)
             const isTruckDelivery = truckDeliveryNodes.has(node.id)
             const allSortieInfo = getAllSortieInfo(node)
+
+            // Get the Address ID for customer nodes (uses the addressId field directly)
+            const addressId = node.type === 'customer' ? (node.addressId || 1) : 0
 
             return (
               <React.Fragment key={node.id}>
@@ -230,31 +235,54 @@ function MapContent() {
                     }}
                   />
                 )}
-                <LucideMarker
-                  position={[node.lat, node.lng]}
-                  anchor={[0.25, 1]}
-                  color={getNodeColor(node.type)}
-                  onClick={() => {
-                    // Only allow selecting when plot modes are off
-                    if (!plotModeCustomer && !plotModeNodes) {
-                      setSelectedNodeId(node.id)
+                {/* Use NumberedMarker for customers, LucideMarker for other nodes */}
+                {node.type === 'customer' ? (
+                  <NumberedMarker
+                    position={[node.lat, node.lng]}
+                    number={addressId}
+                    color={getNodeColor(node.type)}
+                    onClick={() => {
+                      if (!plotModeCustomer && !plotModeNodes) {
+                        setSelectedNodeId(node.id)
+                      }
+                    }}
+                    onRightClick={() => removeWaypoint(node.id)}
+                    draggable={isDraggable}
+                    onDragEnd={(lat, lng) => updateNode(node.id, { lat, lng })}
+                  />
+                ) : (
+                  <LucideMarker
+                    position={[node.lat, node.lng]}
+                    anchor={node.type === 'depot' || node.type === 'station' ? [0.5, 0.5] : [0.25, 1]}
+                    color={node.type === 'depot' || node.type === 'station' ? '#000000' : getNodeColor(node.type)}
+                    LucideIcon={
+                      node.type === 'depot' ? Warehouse :
+                      node.type === 'station' ? Fuel :
+                      node.type === 'hazard' ? AlertTriangle :
+                      FlagTriangleRight
                     }
-                  }}
-                  onRightClick={() => removeWaypoint(node.id)}
-                  draggable={isDraggable}
-                  onDragEnd={(lat, lng) => updateNode(node.id, { lat, lng })}
-                />
+                    size={node.type === 'depot' || node.type === 'station' ? 28 : 24}
+                    onClick={() => {
+                      if (!plotModeCustomer && !plotModeNodes) {
+                        setSelectedNodeId(node.id)
+                      }
+                    }}
+                    onRightClick={() => removeWaypoint(node.id)}
+                    draggable={isDraggable}
+                    onDragEnd={(lat, lng) => updateNode(node.id, { lat, lng })}
+                  />
+                )}
 
-                {/* Delivery type indicator */}
+                {/* Delivery type indicator - positioned above the marker */}
                 {isDroneDelivery && (
                   <TextMarker
                     position={[node.lat, node.lng]}
                     text="🚁"
-                    offset={[15, -35]}
+                    offset={[-25, -72]}
                     style={{
                       backgroundColor: '#ef4444',
                       color: 'white',
-                      padding: '2px 6px',
+                      padding: '2px 14px',
                       borderRadius: '4px',
                       fontSize: '14px',
                       fontWeight: 'bold',
@@ -267,11 +295,11 @@ function MapContent() {
                   <TextMarker
                     position={[node.lat, node.lng]}
                     text="🚛"
-                    offset={[15, -35]}
+                    offset={[-25, -72]}
                     style={{
                       backgroundColor: '#3b82f6',
                       color: 'white',
-                      padding: '2px 6px',
+                      padding: '2px 14px',
                       borderRadius: '4px',
                       fontSize: '14px',
                       fontWeight: 'bold',
@@ -281,27 +309,36 @@ function MapContent() {
                   />
                 )}
 
-                {/* Sortie info indicators (for launch/return points) - can have multiple */}
+                {/* Sortie info indicators (for launch/return points) - positioned below the marker */}
                 {allSortieInfo
                   .filter(info => info.type !== 'delivery')
-                  .map((sortieInfo, idx) => (
-                    <TextMarker
-                      key={`${node.id}-sortie-${sortieInfo.sortieNumber}-${sortieInfo.type}`}
-                      position={[node.lat, node.lng]}
-                      text={sortieInfo.type === 'launch' ? `S${sortieInfo.sortieNumber} ⬆` : `S${sortieInfo.sortieNumber} ⬇`}
-                      offset={[-45 - (idx * 50), -35]} // Stack horizontally if multiple markers
-                      style={{
-                        backgroundColor: sortieInfo.type === 'launch' ? '#f97316' : '#10b981',
-                        color: 'white',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        fontWeight: 'bold',
-                        border: '1px solid white',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                      }}
-                    />
-                  ))}
+                  .sort((a, b) => a.sortieNumber - b.sortieNumber) // Sort by sortie number ascending
+                  .map((sortieInfo, idx) => {
+                    // Match the sortie color from the route palette (contrasts with green/orange arrows)
+                    const sortieColors = ['#3b82f6', '#8b5cf6', '#ec4899', '#ef4444', '#06b6d4', '#6366f1', '#d946ef']
+                    const sortieColor = sortieColors[(sortieInfo.sortieNumber - 1) % sortieColors.length]
+                    // Arrow color indicates direction: green for launch, orange for return
+                    const arrowColor = sortieInfo.type === 'launch' ? '#10b981' : '#f97316'
+
+                    return (
+                      <TextMarker
+                        key={`${node.id}-sortie-${sortieInfo.sortieNumber}-${sortieInfo.type}`}
+                        position={[node.lat, node.lng]}
+                        text={sortieInfo.type === 'launch' ? `S${sortieInfo.sortieNumber} ⬆` : `S${sortieInfo.sortieNumber} ⬇`}
+                        offset={[-45 + (idx * 45), 12]} // Stack left to right: smallest sortie on left, largest on right
+                        style={{
+                          backgroundColor: sortieColor,
+                          color: 'white',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          border: `2px solid ${arrowColor}`,
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                        }}
+                      />
+                    )
+                  })}
               </React.Fragment>
             )
           })}
@@ -357,12 +394,14 @@ function MapContent() {
 
               return segments.map((segment, segmentIndex) => {
                 const progress = segmentIndex / Math.max(1, segments.length - 1)
-                const color = chroma.scale(['blue', 'purple'])(progress).hex()
+                const color = chroma.scale(['#60a5fa', '#a855f7'])(progress).hex() // Light blue to violet
+                const arrowColor = '#000000' // Black arrows
                 return (
                   <ArrowheadPolyline
                     key={`truck-segment-${segmentIndex}`}
                     positions={segment}
                     color={color}
+                    arrowColor={arrowColor}
                     weight={3}
                     arrowSize={10}
                     arrowRepeat={0}
@@ -374,81 +413,35 @@ function MapContent() {
           </>
         )}
 
-        {/* Drone routes with gradient and arrows */}
+        {/* Drone routes - each sortie has one distinct color */}
         {droneRoutes.map((sortie, sortieIndex) =>
           sortie.map((pt, segmentIndex) => {
             const next = sortie[segmentIndex + 1]
             if (!next) return null
 
-            // Check if this is the final sortie
-            const isFinalSortie = sortieIndex === droneRoutes.length - 1
+            // Each sortie gets a distinct color
+            const sortieColors = ['#3b82f6', '#8b5cf6', '#ec4899', '#ef4444', '#06b6d4', '#6366f1', '#d946ef']
+            const sortieColor = sortieColors[sortieIndex % sortieColors.length]
 
-            // Determine if this is the outbound (start) or return (end) segment
-            let color: string
-            if (isFinalSortie) {
-              // Final sortie - use yellow/amber to indicate mission conclusion
-              if (segmentIndex === 0) {
-                // Final sortie outbound: Yellow to amber gradient
-                color = chroma.scale(['#facc15', '#fbbf24'])(0.5).hex()
-              } else {
-                // Final sortie return: Amber to orange (mission complete)
-                color = chroma.scale(['#f59e0b', '#f97316'])(0.5).hex()
-              }
-            } else {
-              // Regular sorties
-              if (segmentIndex === 0) {
-                // First segment: Launch → Delivery (Start of sortie)
-                // Green to teal gradient (suggests beginning/takeoff/go)
-                color = chroma.scale(['#10b981', '#14b8a6'])(0.5).hex()
-              } else {
-                // Second segment: Delivery → Return (End of sortie)
-                // Orange to red gradient (suggests completion/landing/stop)
-                color = chroma.scale(['#f97316', '#ef4444'])(0.5).hex()
-              }
-            }
+            // Black arrows for all drone routes
+            const arrowColor = '#000000'
 
             return (
               <ArrowheadPolyline
                 key={`sortie-${sortieIndex}-segment-${segmentIndex}`}
                 positions={[pt, next]}
-                color={color}
-                weight={isFinalSortie ? 5 : 4} // Slightly thicker for final sortie
-                arrowSize={isFinalSortie ? 14 : 12} // Larger arrows for final sortie
-                arrowRepeat={0} // One arrow at the end of each segment
-                arrowOffset="100%"
+                color={sortieColor}
+                arrowColor={arrowColor}
+                weight={4}
+                arrowSize={10}
+                arrowRepeat="60px" // Arrows distributed along the line
+                arrowOffset="30px"
+                dashArray="10, 8" // Dotted line for drone routes
               />
             )
           }),
         )}
 
-        {/* Sortie labels on drone paths */}
-        {droneRoutes.map((sortie, sortieIndex) => {
-          if (sortie.length < 2) return null
-          const isFinalSortie = sortieIndex === droneRoutes.length - 1
-          // Place label at the midpoint between launch and delivery
-          const midLat = (sortie[0].lat + sortie[1].lat) / 2
-          const midLng = (sortie[0].lng + sortie[1].lng) / 2
-          return (
-            <TextMarker
-              key={`sortie-label-${sortieIndex}`}
-              position={[midLat, midLng]}
-              text={isFinalSortie ? `S${sortieIndex + 1} ✓` : `S${sortieIndex + 1}`}
-              style={{
-                backgroundColor: isFinalSortie ? '#facc15' : '#ef4444',
-                color: 'white',
-                padding: '4px 8px',
-                borderRadius: '12px',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                border: '2px solid white',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                minWidth: '30px',
-                textAlign: 'center',
-                display: 'inline-block',
-              }}
-            />
-          )
-        })}
         </MapContainer>
 
         {/* Sidebar and Bottom Panel */}

@@ -122,12 +122,72 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setMissionConfig((prev) => ({ ...prev, ...updates }))
   }
 
+  // Helper function to get the next available Address ID for customers
+  // Reuses IDs from deleted customers (finds the lowest available ID)
+  const getNextAvailableAddressId = (nodes: FlightNode[]): number => {
+    const customerNodes = nodes.filter(n => n.type === 'customer')
+    const usedIds = new Set(customerNodes.map(n => n.addressId).filter((id): id is number => id !== undefined))
+
+    // Find the lowest available ID starting from 1
+    let nextId = 1
+    while (usedIds.has(nextId)) {
+      nextId++
+    }
+    return nextId
+  }
+
+  // Helper function to assign missing address IDs to customer nodes
+  // Used when loading/importing missions that may have customers without addressId
+  const assignMissingAddressIds = (nodes: FlightNode[]): FlightNode[] => {
+    const usedIds = new Set<number>()
+
+    // First pass: collect all existing address IDs
+    nodes.forEach(node => {
+      if (node.type === 'customer' && node.addressId !== undefined) {
+        usedIds.add(node.addressId)
+      }
+    })
+
+    // Second pass: assign IDs to customers without one
+    return nodes.map(node => {
+      if (node.type === 'customer' && node.addressId === undefined) {
+        // Find the lowest available ID
+        let nextId = 1
+        while (usedIds.has(nextId)) {
+          nextId++
+        }
+        usedIds.add(nextId)
+        return {
+          ...node,
+          addressId: nextId,
+          label: `Address ID: ${nextId}`,
+        }
+      }
+      return node
+    })
+  }
+
   // Node management
   const addNode = (node: FlightNode) => {
-    setMissionConfig((prev) => ({
-      ...prev,
-      nodes: [...prev.nodes, node],
-    }))
+    setMissionConfig((prev) => {
+      // If it's a customer node, auto-assign the next available Address ID
+      if (node.type === 'customer' && node.addressId === undefined) {
+        const addressId = getNextAvailableAddressId(prev.nodes)
+        const nodeWithAddressId = {
+          ...node,
+          addressId,
+          label: `Address ID: ${addressId}`,
+        }
+        return {
+          ...prev,
+          nodes: [...prev.nodes, nodeWithAddressId],
+        }
+      }
+      return {
+        ...prev,
+        nodes: [...prev.nodes, node],
+      }
+    })
   }
 
   const updateNode = (id: string, updates: Partial<FlightNode>) => {
@@ -226,8 +286,19 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   }
 
   const loadMission = (mission: Mission) => {
-    setCurrentMission(mission)
-    setMissionConfig(mission.config)
+    // Assign missing address IDs to any customers that don't have them
+    const nodesWithIds = assignMissingAddressIds(mission.config.nodes)
+    const configWithIds = {
+      ...mission.config,
+      nodes: nodesWithIds,
+    }
+    const missionWithIds = {
+      ...mission,
+      config: configWithIds,
+    }
+
+    setCurrentMission(missionWithIds)
+    setMissionConfig(configWithIds)
     console.log('Mission loaded:', mission.config.missionName)
     console.log('Route data loaded:', {
       truckRoutePoints: mission.config.routes?.truckRoute?.length || 0,

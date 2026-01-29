@@ -10,20 +10,25 @@ import { Point } from '@/lib/types'
 interface ArrowheadPolylineProps {
   positions: Point[]
   color?: string
+  arrowColor?: string // Separate color for arrowheads (defaults to line color)
   arrowSize?: number
   weight?: number // Line weight/thickness
   arrowRepeat?: string | number // How often arrows appear (e.g., '50px', 100, '10%')
   arrowOffset?: string | number // Starting offset for arrows
+  dashArray?: string // Dash pattern (e.g., '10, 10' for dotted lines)
 }
 
 export default function ArrowheadPolyline({
   positions,
   color = 'blue',
+  arrowColor, // Defaults to line color if not specified
   arrowSize = 10,
   weight = 3,
   arrowRepeat = '80px', // Default: arrow every 80 pixels
-  arrowOffset = '50px' // Default: start 50px from beginning
+  arrowOffset = '50px', // Default: start 50px from beginning
+  dashArray, // e.g., '10, 5' for dashed/dotted lines
 }: ArrowheadPolylineProps) {
+  const effectiveArrowColor = arrowColor || color
   const map = useMap()
   const [decoratorLoaded, setDecoratorLoaded] = useState(false)
 
@@ -52,7 +57,7 @@ export default function ArrowheadPolyline({
     }
 
     const latlngs = positions.map(p => [p.lat, p.lng] as [number, number])
-    const polyline = L.polyline(latlngs, { color, weight }).addTo(map)
+    const polyline = L.polyline(latlngs, { color, weight, dashArray }).addTo(map)
 
     let decorator: any = null
 
@@ -68,9 +73,12 @@ export default function ArrowheadPolyline({
               pixelSize: arrowSize,
               polygon: true,
               pathOptions: {
-                color,
-                fillOpacity: 1,
-                weight: 0
+                color: '#000', // Black border
+                weight: 2, // Border thickness
+                fill: true,
+                fillColor: '#ffffff', // White fill
+                fillOpacity: 1.0,
+                opacity: 1,
               },
             }),
           },
@@ -88,7 +96,7 @@ export default function ArrowheadPolyline({
         // Ignore cleanup errors
       }
     }
-  }, [positions, color, arrowSize, weight, arrowRepeat, arrowOffset, map, decoratorLoaded])
+  }, [positions, color, arrowColor, effectiveArrowColor, arrowSize, weight, arrowRepeat, arrowOffset, dashArray, map, decoratorLoaded])
 
   return null
 }
