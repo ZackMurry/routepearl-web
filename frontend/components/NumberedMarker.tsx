@@ -1,8 +1,8 @@
 'use client'
 
 import { Marker } from 'react-leaflet'
-import L, { LatLngExpression } from 'leaflet'
-import React, { useEffect, useState } from 'react'
+import L, { LatLngExpression, PointTuple } from 'leaflet'
+import { useEffect, useState } from 'react'
 
 type Props = {
   position: LatLngExpression
@@ -61,8 +61,8 @@ export default function NumberedMarker({
     const leafletIcon = L.divIcon({
       html,
       className: '',
-      iconSize: [size, size * 1.4],
-      iconAnchor: [size / 2, size * 1.4], // Point at bottom center
+      iconSize: [size, size * 1.4] as PointTuple,
+      iconAnchor: [size / 2, size * 1.4] as PointTuple,
     })
 
     setIcon(leafletIcon)
