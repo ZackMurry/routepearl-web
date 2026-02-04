@@ -25,8 +25,8 @@ const SortieFlightPath: FC<Props> = ({ sortie, sortieIndex }) => {
           sortie={sortie as [Point, Point, Point]}
           inboundColor={sortieColor}
           outboundColor={sortieColor}
-          outboundLabel={`S${sortieIndex + 1} out`}
-          inboundLabel={`S${sortieIndex + 1} in`}
+          // outboundLabel={`S${sortieIndex + 1} out`}
+          // inboundLabel={`S${sortieIndex + 1} in`}
           weight={4}
           arrowSize={isFinalSortie ? 14 : 12}
           arrowRepeat={0}

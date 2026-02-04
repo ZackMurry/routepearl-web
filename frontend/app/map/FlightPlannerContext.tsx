@@ -426,7 +426,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
           depots: finalDepots.map((n) => ({ id: n.id, lat: n.lat, lon: n.lng })),
           customers: finalCustomers.map((n) => ({ id: n.id, lat: n.lat, lon: n.lng })),
           stations: stations.map((n) => ({ id: n.id, lat: n.lat, lon: n.lng })),
-          algorithm: 'negar'
+          algorithm: 'negar',
+          provider: 'OSRM-Online'
           // TODO: Uncomment when backend is ready to handle hazards
           // hazards: hazards.map((n, index) => ({
           //   id: index + 1,
