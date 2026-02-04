@@ -64,6 +64,7 @@ export function FlightPlannerSidebar() {
     missionLaunched,
     launchMission,
     stopMission,
+    importMission,
   } = useFlightPlanner()
 
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -83,9 +84,8 @@ export function FlightPlannerSidebar() {
       reader.onload = e => {
         const content = e.target?.result as string
         try {
-          const mission = JSON.parse(content)
-          // Load the mission and enter flight planner mode to view/edit it
-          updateMissionConfig(mission.config || mission)
+          // Use importMission to properly assign missing address IDs
+          importMission(content)
           setIsFlightPlannerMode(true)
         } catch (error) {
           console.error('Failed to import flight plan:', error)
@@ -247,38 +247,6 @@ export function FlightPlannerSidebar() {
                   </Box>
                 </Box>
 
-                {/* Mission Info */}
-                <Box className='border-t pt-6'>
-                  <Text size='2' weight='bold' className='mb-2 block'>
-                    Current Mission
-                  </Text>
-                  <Box className='p-3 bg-gray-50 rounded space-y-2'>
-                    <Flex justify='between'>
-                      <Text size='1' color='gray'>
-                        Name:
-                      </Text>
-                      <Text size='1' weight='medium'>
-                        {missionConfig.missionName}
-                      </Text>
-                    </Flex>
-                    <Flex justify='between'>
-                      <Text size='1' color='gray'>
-                        Nodes:
-                      </Text>
-                      <Text size='1' weight='medium'>
-                        {missionConfig.nodes.length}
-                      </Text>
-                    </Flex>
-                    <Flex justify='between'>
-                      <Text size='1' color='gray'>
-                        Algorithm:
-                      </Text>
-                      <Text size='1' weight='medium'>
-                        {missionConfig.algorithm.toUpperCase()}
-                      </Text>
-                    </Flex>
-                  </Box>
-                </Box>
               </div>
             </ScrollArea>
           </Flex>
@@ -386,192 +354,6 @@ export function FlightPlannerSidebar() {
                   </Text>
                 </Box>
 
-                <Box className='bg-blue-50 p-3 rounded'>
-                  <Text size='2' color='blue'>
-                    <strong>Mission Overview:</strong>
-                    <br />
-                    {isFlightPlannerMode ? (
-                      <>
-                        Customers: {missionConfig.nodes.filter(n => n.type === 'customer').length}
-                        <br />
-                        Other Nodes: {missionConfig.nodes.filter(n => n.type !== 'customer').length}
-                      </>
-                    ) : (
-                      <>Nodes: {missionConfig.nodes.length}</>
-                    )}
-                    <br />
-                    Hazards: {missionConfig.nodes.filter(n => n.type === 'hazard').length}
-                    <br />
-                    Algorithm: {missionConfig.algorithm === 'alns' ? 'ALNS' : 'Custom'}
-                  </Text>
-                </Box>
-
-                <Box className='border-t pt-3'>
-                  <Text size='2' weight='bold' className='mb-2 block'>
-                    Node Color Legend
-                  </Text>
-                  <div className='space-y-1'>
-                    <Flex gap='2' align='center'>
-                      <div className='w-3 h-3 rounded-full' style={{ backgroundColor: '#3b82f6' }}></div>
-                      <Text size='1'>Depot (start/end point)</Text>
-                    </Flex>
-                    <Flex gap='2' align='center'>
-                      <div className='w-3 h-3 rounded-full' style={{ backgroundColor: '#10b981' }}></div>
-                      <Text size='1'>Customer (delivery location)</Text>
-                    </Flex>
-                    <Flex gap='2' align='center'>
-                      <div className='w-3 h-3 rounded-full' style={{ backgroundColor: '#f97316' }}></div>
-                      <Text size='1'>Station (charging point)</Text>
-                    </Flex>
-                    <Flex gap='2' align='center'>
-                      <div className='w-3 h-3 rounded-full' style={{ backgroundColor: '#8b5cf6' }}></div>
-                      <Text size='1'>Waypoint (unassigned)</Text>
-                    </Flex>
-                    <Box className='mt-2'>
-                      <Text size='1' weight='bold' className='block mb-1'>
-                        Hazard (shows radius circle):
-                      </Text>
-                      <div className='ml-3 space-y-1'>
-                        <Flex gap='2' align='center'>
-                          <div className='w-3 h-3 rounded-full' style={{ backgroundColor: '#eab308' }}></div>
-                          <Text size='1'>Low severity (yellow)</Text>
-                        </Flex>
-                        <Flex gap='2' align='center'>
-                          <div className='w-3 h-3 rounded-full' style={{ backgroundColor: '#f97316' }}></div>
-                          <Text size='1'>Medium severity (orange)</Text>
-                        </Flex>
-                        <Flex gap='2' align='center'>
-                          <div className='w-3 h-3 rounded-full' style={{ backgroundColor: '#ef4444' }}></div>
-                          <Text size='1'>High severity (red)</Text>
-                        </Flex>
-                      </div>
-                    </Box>
-                  </div>
-                </Box>
-
-                <Box className='border-t pt-3'>
-                  <Text size='2' weight='bold' className='mb-2 block'>
-                    Route Indicators
-                  </Text>
-                  <div className='space-y-2'>
-                    <Box>
-                      <Text size='1' weight='bold' className='block mb-1'>
-                        Delivery Type:
-                      </Text>
-                      <div className='space-y-1 ml-2'>
-                        <Flex gap='2' align='center'>
-                          <div className='px-2 py-1 text-xs rounded' style={{ backgroundColor: '#ef4444', color: 'white' }}>
-                            🚁
-                          </div>
-                          <Text size='1'>Drone delivery</Text>
-                        </Flex>
-                        <Flex gap='2' align='center'>
-                          <div className='px-2 py-1 text-xs rounded' style={{ backgroundColor: '#3b82f6', color: 'white' }}>
-                            🚛
-                          </div>
-                          <Text size='1'>Truck delivery</Text>
-                        </Flex>
-                      </div>
-                    </Box>
-                    <Box>
-                      <Text size='1' weight='bold' className='block mb-1'>
-                        Sortie Route Colors:
-                      </Text>
-                      <div className='space-y-1 ml-2'>
-                        <Flex gap='2' align='center'>
-                          <div
-                            className='w-8 h-3 rounded'
-                            style={{ background: 'linear-gradient(to right, #10b981, #14b8a6)' }}
-                          ></div>
-                          <Text size='1'>Outbound (launch → delivery)</Text>
-                        </Flex>
-                        <Flex gap='2' align='center'>
-                          <div
-                            className='w-8 h-3 rounded'
-                            style={{ background: 'linear-gradient(to right, #f97316, #ef4444)' }}
-                          ></div>
-                          <Text size='1'>Return (delivery → landing)</Text>
-                        </Flex>
-                      </div>
-                    </Box>
-                    <Box>
-                      <Text size='1' weight='bold' className='block mb-1'>
-                        Final Sortie (Mission End):
-                      </Text>
-                      <div className='space-y-1 ml-2'>
-                        <Flex gap='2' align='center'>
-                          <div
-                            className='w-8 h-3 rounded'
-                            style={{ background: 'linear-gradient(to right, #facc15, #fbbf24)' }}
-                          ></div>
-                          <Text size='1'>Final outbound</Text>
-                        </Flex>
-                        <Flex gap='2' align='center'>
-                          <div
-                            className='w-8 h-3 rounded'
-                            style={{ background: 'linear-gradient(to right, #f59e0b, #f97316)' }}
-                          ></div>
-                          <Text size='1'>Final return (mission complete)</Text>
-                        </Flex>
-                        <Flex gap='2' align='center'>
-                          <div
-                            className='px-2 py-1 text-xs rounded'
-                            style={{
-                              backgroundColor: '#facc15',
-                              color: 'white',
-                              fontSize: '12px',
-                              minWidth: '30px',
-                              textAlign: 'center',
-                            }}
-                          >
-                            S2 ✓
-                          </div>
-                          <Text size='1'>Final sortie label</Text>
-                        </Flex>
-                      </div>
-                    </Box>
-                    <Box>
-                      <Text size='1' weight='bold' className='block mb-1'>
-                        Sortie Markers:
-                      </Text>
-                      <div className='space-y-1 ml-2'>
-                        <Flex gap='2' align='center'>
-                          <div
-                            className='px-2 py-1 text-xs rounded'
-                            style={{ backgroundColor: '#f97316', color: 'white', fontSize: '10px' }}
-                          >
-                            S1 ⬆
-                          </div>
-                          <Text size='1'>Launch point (sortie start)</Text>
-                        </Flex>
-                        <Flex gap='2' align='center'>
-                          <div
-                            className='px-2 py-1 text-xs rounded'
-                            style={{ backgroundColor: '#10b981', color: 'white', fontSize: '10px' }}
-                          >
-                            S1 ⬇
-                          </div>
-                          <Text size='1'>Return point (sortie end)</Text>
-                        </Flex>
-                        <Flex gap='2' align='center'>
-                          <div
-                            className='px-2 py-1 text-xs rounded'
-                            style={{
-                              backgroundColor: '#ef4444',
-                              color: 'white',
-                              fontSize: '12px',
-                              minWidth: '30px',
-                              textAlign: 'center',
-                            }}
-                          >
-                            S1
-                          </div>
-                          <Text size='1'>Sortie label on path</Text>
-                        </Flex>
-                      </div>
-                    </Box>
-                  </div>
-                </Box>
               </Tabs.Content>
 
               {/* Nodes Tab */}

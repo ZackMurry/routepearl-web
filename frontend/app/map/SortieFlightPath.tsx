@@ -1,8 +1,6 @@
 import { Point } from '@/lib/types'
 import { FC } from 'react'
 import { useFlightPlanner } from './FlightPlannerContext'
-import chroma from 'chroma-js'
-import ArrowheadPolyline from '@/components/ArrowheadPolyline'
 import ArrowheadArcPolyline from '@/components/ArrowheadArcPolyline'
 
 interface Props {
@@ -15,25 +13,21 @@ const SortieFlightPath: FC<Props> = ({ sortie, sortieIndex }) => {
   const isFinalSortie = sortieIndex === droneRoutes.length - 1
   if (sortie.length < 3) return <></>
 
-  const colors = {
-    outbound: isFinalSortie
-      ? chroma.scale(['#facc15', '#fbbf24'])(0.5).hex()
-      : chroma.scale(['#10b981', '#14b8a6'])(0.5).hex(),
-    inbound: isFinalSortie
-      ? chroma.scale(['#f59e0b', '#f97316'])(0.5).hex()
-      : chroma.scale(['#f97316', '#ef4444'])(0.5).hex(),
-  }
+  // Each sortie gets a distinct color from the palette
+  const sortieColors = ['#3b82f6', '#8b5cf6', '#ec4899', '#ef4444', '#06b6d4', '#6366f1', '#d946ef']
+  const sortieColor = sortieColors[sortieIndex % sortieColors.length]
+
   return (
     <>
       {sortie.slice(0, -1).map((pt, i) => (
         <ArrowheadArcPolyline
           key={`sortie-${sortieIndex}-segment-${i}`}
           sortie={sortie as [Point, Point, Point]}
-          inboundColor='#4673bd'
-          outboundColor='#4673bd'
+          inboundColor={sortieColor}
+          outboundColor={sortieColor}
           outboundLabel={`S${sortieIndex + 1} out`}
           inboundLabel={`S${sortieIndex + 1} in`}
-          weight={3}
+          weight={4}
           arrowSize={isFinalSortie ? 14 : 12}
           arrowRepeat={0}
           arrowOffset='100%'

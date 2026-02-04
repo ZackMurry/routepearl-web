@@ -31,6 +31,10 @@ import {
   Truck,
   Plane,
   Timer,
+  Home,
+  Zap,
+  AlertTriangle,
+  Settings,
 } from 'lucide-react'
 import { TimelineTab } from './timeline'
 
@@ -139,15 +143,15 @@ export function BottomPanel() {
 
         lines.forEach((line) => {
           if (!line.trim()) return
-          const [type, label, lat, lng, action] = line.split(',')
+          const [type, _label, lat, lng, action] = line.split(',')
 
           if (type === 'customer' || !type) {
+            // Label and addressId will be auto-assigned by FlightPlannerContext
             const newNode: FlightNode = {
               id: `node-${Date.now()}-${Math.random()}`,
               type: 'customer',
               lat: parseFloat(lat),
               lng: parseFloat(lng),
-              label: label || `Customer ${missionConfig.nodes.filter(n => n.type === 'customer').length + 1}`,
               action: action || '',
             }
             addNode(newNode)
@@ -161,9 +165,9 @@ export function BottomPanel() {
   const handleExportCSV = () => {
     const customers = missionConfig.nodes.filter((n) => n.type === 'customer')
     const csvContent = [
-      'Type,Label,Latitude,Longitude,Action',
+      'Type,AddressID,Latitude,Longitude,Action',
       ...customers.map(
-        (node) => `${node.type},${node.label || ''},${node.lat},${node.lng},${node.action || ''}`
+        (node) => `${node.type},${node.addressId || ''},${node.lat},${node.lng},${node.action || ''}`
       ),
     ].join('\n')
 
@@ -177,12 +181,12 @@ export function BottomPanel() {
   }
 
   const handleAddCustomer = () => {
+    // Label and addressId will be auto-assigned by FlightPlannerContext
     const newNode: FlightNode = {
       id: `node-${Date.now()}`,
       type: 'customer',
       lat: 26.4619, // Default FGCU coordinates
       lng: -81.7726,
-      label: `Customer ${missionConfig.nodes.filter((n) => n.type === 'customer').length + 1}`,
     }
     addNode(newNode)
   }
@@ -275,67 +279,57 @@ export function BottomPanel() {
             pointerEvents: 'auto',
           }}
         >
-        <Card className="rounded-t-lg rounded-b-none shadow-xl mx-4 mb-0" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)' }}>
-          <Flex justify="between" align="center" className="p-3">
-            <Flex gap="4" align="center">
-              {isFlightPlannerMode ? (
-                <>
-                  <Flex align="center" gap="2">
-                    <Route size={18} />
-                    <Text size="2" weight="bold">
-                      Flight Planner
-                    </Text>
-                  </Flex>
-                  <Flex gap="2" align="center">
-                    <MapPin size={14} />
-                    <Text size="1" color="gray">
-                      {customerNodes.length} customers
-                    </Text>
-                  </Flex>
-                  {hasRoute && (
-                    <Flex gap="2" align="center">
-                      <CheckCircle size={14} className="text-green-500" />
-                      <Text size="1" color="green">
-                        Route Generated
+        <Card className="rounded-t-lg rounded-b-none shadow-xl mx-4 mb-0" style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
+          <Flex direction="column">
+            <Flex justify="between" align="center" className="p-3">
+              <Flex gap="4" align="center">
+                {isFlightPlannerMode ? (
+                  <>
+                    <Flex align="center" gap="2">
+                      <Route size={18} />
+                      <Text size="2" weight="bold">
+                        Flight Planner
                       </Text>
                     </Flex>
-                  )}
-                </>
-              ) : (
-                <>
-                  <Flex align="center" gap="2">
-                    <FileText size={18} />
-                    <Text size="2" weight="bold">
-                      Mission Progress
-                    </Text>
-                    <Badge color={getStatusColor(missionStatus)}>{missionStatus}</Badge>
-                  </Flex>
-                  <Flex gap="2" align="center">
-                    <Clock size={14} />
-                    <Text size="1" color="gray">
-                      00:00 elapsed
-                    </Text>
-                  </Flex>
-                  <Flex gap="2" align="center">
-                    <CheckCircle size={14} className="text-gray-400" />
-                    <Text size="1" color="gray">
-                      3 tasks pending
-                    </Text>
-                  </Flex>
-                </>
-              )}
-            </Flex>
+                    {hasRoute && (
+                      <Flex gap="2" align="center">
+                        <CheckCircle size={14} className="text-green-500" />
+                        <Text size="1" color="green">
+                          Route Generated
+                        </Text>
+                      </Flex>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Flex align="center" gap="2">
+                      <FileText size={18} />
+                      <Text size="2" weight="bold">
+                        Mission Progress
+                      </Text>
+                      <Badge color={getStatusColor(missionStatus)}>{missionStatus}</Badge>
+                    </Flex>
+                  </>
+                )}
+              </Flex>
 
-            <Flex gap="2">
-              {isFlightPlannerMode && (
-                <Button size="1" onClick={generateRoute} loading={isGeneratingRoute}>
-                  <Route size={14} /> Generate
-                </Button>
-              )}
-              <IconButton size="1" variant="ghost" onClick={() => setBottomPanelExpanded(true)}>
-                <ChevronUp size={18} />
-              </IconButton>
+              <Flex gap="2">
+                {isFlightPlannerMode && (
+                  <>
+                    <Button size="1" variant="soft" color="blue" onClick={handleExport}>
+                      <Download size={14} /> Save
+                    </Button>
+                    <Button size="1" variant="soft" color="gray" onClick={handleExitFlightPlanner}>
+                      <LogOut size={14} /> Exit Planner
+                    </Button>
+                  </>
+                )}
+                <IconButton size="1" variant="ghost" onClick={() => setBottomPanelExpanded(true)}>
+                  <ChevronUp size={18} />
+                </IconButton>
+              </Flex>
             </Flex>
+            <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} />
           </Flex>
         </Card>
         </div>
@@ -393,20 +387,14 @@ export function BottomPanel() {
                     Flight Planner
                   </Text>
                 </Flex>
-                <Flex gap="3" align="center" className="text-gray-600">
+                {hasRoute && (
                   <Flex gap="1" align="center">
-                    <MapPin size={14} />
-                    <Text size="1">{customerNodes.length} customers</Text>
+                    <CheckCircle size={14} className="text-green-500" />
+                    <Text size="1" color="green">
+                      Route ready
+                    </Text>
                   </Flex>
-                  {hasRoute && (
-                    <Flex gap="1" align="center">
-                      <CheckCircle size={14} className="text-green-500" />
-                      <Text size="1" color="green">
-                        Route ready
-                      </Text>
-                    </Flex>
-                  )}
-                </Flex>
+                )}
               </Flex>
 
               <Flex gap="2">
@@ -421,6 +409,9 @@ export function BottomPanel() {
                 </IconButton>
               </Flex>
             </Flex>
+
+            {/* Stats Bar */}
+            <MissionStatsBar missionConfig={missionConfig} />
 
             <Flex className="flex-1" style={{ minHeight: 0, backgroundColor: 'white' }}>
               {/* Left: Customer Nodes List */}
@@ -446,7 +437,7 @@ export function BottomPanel() {
 
                 <ScrollArea style={{ height: 'calc(100% - 2.5rem)' }}>
                   <div className="space-y-2 pr-2">
-                    {customerNodes.map((node, index) => (
+                    {customerNodes.map((node) => (
                       <Card
                         key={node.id}
                         className="p-2"
@@ -458,16 +449,10 @@ export function BottomPanel() {
                         <Flex justify="between" align="start">
                           <Flex direction="column" gap="2" className="flex-1 mr-2">
                             <Flex align="center" gap="2">
-                              <MapPin size={14} />
-                              <TextField.Root
-                                value={node.label || ''}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  updateNode(node.id, { label: e.target.value })
-                                }
-                                placeholder={`Customer ${index + 1}`}
-                                size="1"
-                                style={{ flex: 1 }}
-                              />
+                              <MapPin size={14} className="text-green-600" />
+                              <Badge color="green" size="2" style={{ fontWeight: 'bold' }}>
+                                Address ID: {node.addressId || '?'}
+                              </Badge>
                             </Flex>
                             <Flex gap="2">
                               {/* Latitude with increment/decrement */}
@@ -605,20 +590,6 @@ export function BottomPanel() {
                     </div>
                   </Box>
 
-                  <Box className="border-t pt-3">
-                    <Text size="2" weight="bold" className="mb-2 block">
-                      Save Plan
-                    </Text>
-                    <Flex gap="2">
-                      <Button size="2" variant="soft" className="flex-1" onClick={handleSave}>
-                        <Save size={16} /> Save
-                      </Button>
-                      <Button size="2" variant="soft" className="flex-1" onClick={handleExport}>
-                        <Download size={16} /> Export
-                      </Button>
-                    </Flex>
-                  </Box>
-
                   {hasRoute && (
                     <Box className="bg-green-50 p-3 rounded mt-3">
                       <Flex align="center" gap="2" className="mb-2">
@@ -743,6 +714,9 @@ export function BottomPanel() {
                   <ChevronDown size={20} />
                 </IconButton>
               </Flex>
+
+              {/* Stats Bar */}
+              <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} />
 
               {/* Tabs */}
               <Tabs.Root value={missionTab} onValueChange={(v) => setMissionTab(v as 'status' | 'customers' | 'timeline')} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -888,7 +862,7 @@ export function BottomPanel() {
                     </Text>
                     <ScrollArea style={{ height: 'calc(100% - 120px)' }}>
                       <div className="space-y-2 pr-2">
-                        {customerNodes.map((customer, index) => {
+                        {customerNodes.map((customer) => {
                           const isDelivered = false // TODO: Track actual deliveries
                           return (
                             <Card key={customer.id} className="p-3">
@@ -897,7 +871,7 @@ export function BottomPanel() {
                                   <MapPin size={16} className={isDelivered ? 'text-green-500' : 'text-gray-400'} />
                                   <Box className="flex-1">
                                     <Text size="2" weight="medium">
-                                      {customer.label || `Customer ${index + 1}`}
+                                      Address ID: {customer.addressId || '?'}
                                     </Text>
                                     <Text size="1" color="gray">
                                       {customer.lat.toFixed(6)}, {customer.lng.toFixed(6)}
@@ -1014,6 +988,9 @@ export function BottomPanel() {
               <ChevronDown size={20} />
             </IconButton>
           </Flex>
+
+          {/* Stats Bar */}
+          <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} />
 
           <Flex className="flex-1" style={{ minHeight: 0, backgroundColor: 'white' }}>
             {/* Left: Current Tasks */}
@@ -1151,6 +1128,65 @@ export function BottomPanel() {
       </div>
       <ToastUI />
     </>
+  )
+}
+
+// Mission Stats Bar Component
+function MissionStatsBar({
+  missionConfig,
+  missionLaunched,
+  elapsedTime = '00:00',
+}: {
+  missionConfig: {
+    nodes: { type: string }[]
+    algorithm: string
+    estimatedDuration?: number
+  }
+  missionLaunched?: boolean
+  elapsedTime?: string
+}) {
+  const customerCount = missionConfig.nodes.filter((n) => n.type === 'customer').length
+  const depotCount = missionConfig.nodes.filter((n) => n.type === 'depot').length
+  const stationCount = missionConfig.nodes.filter((n) => n.type === 'station').length
+  const hazardCount = missionConfig.nodes.filter((n) => n.type === 'hazard').length
+
+  return (
+    <Flex
+      gap="4"
+      align="center"
+      className="px-4 py-2 border-t"
+      style={{ backgroundColor: 'rgba(249, 250, 251, 0.8)' }}
+    >
+      <Flex gap="1" align="center" title="Customer Locations">
+        <MapPin size={14} className="text-green-600" />
+        <Text size="1" weight="medium">{customerCount}</Text>
+      </Flex>
+      <Flex gap="1" align="center" title="Depots">
+        <Home size={14} className="text-blue-600" />
+        <Text size="1" weight="medium">{depotCount}</Text>
+      </Flex>
+      <Flex gap="1" align="center" title="Charging Stations">
+        <Zap size={14} className="text-orange-500" />
+        <Text size="1" weight="medium">{stationCount}</Text>
+      </Flex>
+      <Flex gap="1" align="center" title="Hazard Zones">
+        <AlertTriangle size={14} className="text-red-500" />
+        <Text size="1" weight="medium">{hazardCount}</Text>
+      </Flex>
+      <Box className="w-px h-4 bg-gray-300" />
+      <Flex gap="1" align="center" title="Algorithm">
+        <Settings size={14} className="text-gray-500" />
+        <Text size="1" weight="medium">{missionConfig.algorithm.toUpperCase()}</Text>
+      </Flex>
+      <Box className="w-px h-4 bg-gray-300" />
+      <Flex gap="1" align="center" title="Time Elapsed / Estimated">
+        <Clock size={14} className={missionLaunched ? 'text-green-600' : 'text-gray-500'} />
+        <Text size="1" weight="medium">
+          {elapsedTime}
+          {missionConfig.estimatedDuration ? ` / ${missionConfig.estimatedDuration}m` : ''}
+        </Text>
+      </Flex>
+    </Flex>
   )
 }
 

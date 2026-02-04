@@ -321,7 +321,14 @@ export default function SortieArcPaths({
               symbol: L_extended.Symbol.arrowHead({
                 pixelSize: arrowSize,
                 polygon: true,
-                pathOptions: { color, fillOpacity: 1, weight: 0 },
+                pathOptions: {
+                  color: '#000', // Black border
+                  weight: 2, // Border thickness
+                  fill: true,
+                  fillColor: '#ffffff', // White fill
+                  fillOpacity: 1.0,
+                  opacity: 1,
+                },
               }),
             },
           ],
