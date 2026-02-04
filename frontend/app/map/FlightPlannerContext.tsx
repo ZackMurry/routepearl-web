@@ -362,6 +362,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
             [39, -93],
           ],
           provider: 'OSRM-Online',
+          algorithm: 'negar',
           // TODO: Uncomment when backend is ready to handle hazards
           // hazards: hazards.map((n, index) => ({
           //   id: index + 1,
