@@ -311,25 +311,40 @@ export default function SortieArcPaths({
       layers.push(guideLine)
 
       try {
+        // Arrow style configuration
+        const arrowStyle = {
+          pixelSize: arrowSize,
+          polygon: true,
+          pathOptions: {
+            color: '#000', // Black border
+            weight: 2, // Border thickness
+            fill: true,
+            fillColor: '#ffffff', // White fill
+            fillOpacity: 1.0,
+            opacity: 1,
+          },
+        }
+
         // @ts-ignore
         const decorator = L_extended.polylineDecorator(guideLine, {
           patterns: [
             {
+              offset: '5%',
+              repeat: 0,
+              // @ts-ignore
+              symbol: L_extended.Symbol.arrowHead(arrowStyle),
+            },
+            {
+              offset: '50%',
+              repeat: 0,
+              // @ts-ignore
+              symbol: L_extended.Symbol.arrowHead(arrowStyle),
+            },
+            {
               offset: '100%',
               repeat: 0,
               // @ts-ignore
-              symbol: L_extended.Symbol.arrowHead({
-                pixelSize: arrowSize,
-                polygon: true,
-                pathOptions: {
-                  color: '#000', // Black border
-                  weight: 2, // Border thickness
-                  fill: true,
-                  fillColor: '#ffffff', // White fill
-                  fillOpacity: 1.0,
-                  opacity: 1,
-                },
-              }),
+              symbol: L_extended.Symbol.arrowHead(arrowStyle),
             },
           ],
         }).addTo(map)

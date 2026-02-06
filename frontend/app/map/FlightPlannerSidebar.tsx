@@ -36,6 +36,11 @@ import {
   ArrowDown,
   MousePointer2,
   Lock,
+  LogOut,
+  Save,
+  Route,
+  CheckCircle,
+  AlertCircle,
 } from 'lucide-react'
 import { FlightNode, HazardZone, RoutingAlgorithm } from '@/lib/types'
 import { useMap } from 'react-leaflet'
@@ -65,9 +70,68 @@ export function FlightPlannerSidebar() {
     launchMission,
     stopMission,
     importMission,
+    exportMission,
+    generateRoute,
+    isGeneratingRoute,
   } = useFlightPlanner()
 
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const csvInputRef = React.useRef<HTMLInputElement>(null)
+
+  const handleImportCSV = () => {
+    csvInputRef.current?.click()
+  }
+
+  const handleCSVImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const content = e.target?.result as string
+        const lines = content.split('\n').slice(1) // Skip header
+        lines.forEach((line) => {
+          if (line.trim()) {
+            const [type, label, lat, lng, action, radius, severity] = line.split(',')
+            if (lat && lng) {
+              addNode({
+                type: (type as 'depot' | 'customer' | 'station' | 'waypoint' | 'hazard') || 'customer',
+                label: label || undefined,
+                lat: parseFloat(lat),
+                lng: parseFloat(lng),
+                action: action || undefined,
+                radius: radius ? parseFloat(radius) : undefined,
+                severity: (severity as 'low' | 'medium' | 'high') || undefined,
+              })
+            }
+          }
+        })
+      }
+      reader.readAsText(file)
+    }
+    // Reset input so same file can be imported again
+    if (event.target) {
+      event.target.value = ''
+    }
+  }
+
+  const handleExportCSV = () => {
+    const csvContent = [
+      'Type,Label,Latitude,Longitude,Action,Radius,Severity',
+      ...missionConfig.nodes.map(
+        (node) => `${node.type},${node.label || node.addressId || ''},${node.lat},${node.lng},${node.action || ''},${node.radius || ''},${node.severity || ''}`
+      ),
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${missionConfig.missionName || 'addresses'}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
 
   const handleMakeFlightPlan = () => {
     setIsFlightPlannerMode(true)
@@ -86,7 +150,6 @@ export function FlightPlannerSidebar() {
         try {
           // Use importMission to properly assign missing address IDs
           importMission(content)
-          setIsFlightPlannerMode(true)
         } catch (error) {
           console.error('Failed to import flight plan:', error)
         }
@@ -161,28 +224,27 @@ export function FlightPlannerSidebar() {
                     )}
                   </Flex>
 
-                  <div className='space-y-2'>
-                    <Button size='3' className='w-full' onClick={handleMakeFlightPlan} disabled={missionLaunched}>
-                      <Plus size={16} /> Make Flight Plan
+                  <Flex direction='column' align='center' gap='4'>
+                    <Button size='3' onClick={handleMakeFlightPlan} disabled={missionLaunched}>
+                      {missionConfig.nodes.length > 0 ? (
+                        <>
+                          <Settings size={16} /> Edit Flight Plan
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={16} /> Make Flight Plan
+                        </>
+                      )}
                     </Button>
                     <Button
                       size='3'
                       variant='soft'
-                      className='w-full'
                       onClick={handleImportFlightPlan}
                       disabled={missionLaunched}
                     >
-                      <Upload size={16} /> Import Flight Plan
+                      <Upload size={16} /> Load Flight Plan
                     </Button>
-                  </div>
-
-                  <Box className='mt-3 p-3 bg-gray-50 rounded'>
-                    <Text size='1' color='gray'>
-                      {missionLaunched
-                        ? 'Mission is active. Stop the mission to modify flight plans.'
-                        : 'Create a new flight plan or import from a saved JSON file.'}
-                    </Text>
-                  </Box>
+                  </Flex>
                 </Box>
 
                 {/* Flight Control Section */}
@@ -194,11 +256,10 @@ export function FlightPlannerSidebar() {
                     </Text>
                   </Flex>
 
-                  <div className='space-y-2'>
+                  <Flex gap='4' justify='center'>
                     <Button
-                      size='3'
+                      size='2'
                       color='green'
-                      className='w-full'
                       disabled={
                         !missionConfig.nodes.length ||
                         (truckRoute.length === 0 && droneRoutes.length === 0) ||
@@ -206,24 +267,21 @@ export function FlightPlannerSidebar() {
                       }
                       onClick={launchMission}
                     >
-                      <Play size={16} /> {missionLaunched ? 'Mission Active' : 'Launch Mission'}
+                      <Play size={14} /> Launch
                     </Button>
-                    <Flex gap='2'>
-                      <Button size='3' color='orange' variant='soft' className='flex-1' disabled>
-                        <Pause size={16} /> Pause
-                      </Button>
-                      <Button
-                        size='3'
-                        color='red'
-                        variant='soft'
-                        className='flex-1'
-                        disabled={!missionLaunched}
-                        onClick={stopMission}
-                      >
-                        <Square size={16} /> Stop
-                      </Button>
-                    </Flex>
-                  </div>
+                    <Button size='2' color='orange' variant='soft' disabled>
+                      <Pause size={14} /> Pause
+                    </Button>
+                    <Button
+                      size='2'
+                      color='red'
+                      variant='soft'
+                      disabled={!missionLaunched}
+                      onClick={stopMission}
+                    >
+                      <Square size={14} /> Stop
+                    </Button>
+                  </Flex>
 
                   <Box className={`mt-3 p-3 rounded ${missionLaunched ? 'bg-green-50' : 'bg-blue-50'}`}>
                     <Text size='2' color={missionLaunched ? 'green' : 'blue'}>
@@ -254,6 +312,7 @@ export function FlightPlannerSidebar() {
 
         {/* Hidden file input */}
         <input ref={fileInputRef} type='file' accept='.json' onChange={handleFileImport} className='hidden' />
+        <input ref={csvInputRef} type='file' accept='.csv' onChange={handleCSVImport} className='hidden' />
       </div>
     )
   }
@@ -292,16 +351,12 @@ export function FlightPlannerSidebar() {
           {/* Tabs */}
           <Tabs.Root
             value={activePanelTab}
-            onValueChange={(v: string) => setActivePanelTab(v as 'overview' | 'nodes' | 'advanced')}
+            onValueChange={(v: string) => setActivePanelTab(v as 'overview' | 'advanced')}
           >
             <Tabs.List className='px-4 pt-2'>
               <Tabs.Trigger value='overview'>
                 <Target size={16} className='mr-1' />
-                Overview
-              </Tabs.Trigger>
-              <Tabs.Trigger value='nodes'>
-                <MapPin size={16} className='mr-1' />
-                Nodes
+                Actions
               </Tabs.Trigger>
               <Tabs.Trigger value='advanced'>
                 <Settings size={16} className='mr-1' />
@@ -310,300 +365,84 @@ export function FlightPlannerSidebar() {
             </Tabs.List>
 
             <ScrollArea className='flex-1'>
-              {/* Overview Tab */}
+              {/* Actions Tab */}
               <Tabs.Content value='overview' className='p-4 space-y-4'>
                 <Box>
-                  <Text size='2' weight='bold' className='mb-2 block'>
-                    Mission Name
-                  </Text>
-                  <TextField.Root
-                    value={missionConfig.missionName}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      updateMissionConfig({ missionName: e.target.value })
-                    }
-                    placeholder='Enter mission name'
-                  />
-                </Box>
+                  <div className='space-y-4'>
+                    <Flex gap='4' justify='center'>
+                      <Button
+                        size='2'
+                        variant='soft'
+                        color='gray'
+                        onClick={() => setIsFlightPlannerMode(false)}
+                      >
+                        <LogOut size={14} /> Exit
+                      </Button>
+                      <Button
+                        size='2'
+                        variant='soft'
+                        color='green'
+                        onClick={() => {
+                          exportMission()
+                          setIsFlightPlannerMode(false)
+                        }}
+                      >
+                        <Save size={14} /> Save & Exit
+                      </Button>
+                      <Button size='2' variant='soft' color='blue' onClick={() => exportMission()}>
+                        <Download size={14} /> Save
+                      </Button>
+                    </Flex>
 
-                <Box>
-                  <Text size='2' weight='bold' className='mb-2 block'>
-                    Mission Goal
-                  </Text>
-                  <TextArea
-                    value={missionConfig.missionGoal}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                      updateMissionConfig({ missionGoal: e.target.value })
-                    }
-                    placeholder='Describe the mission objective...'
-                    rows={4}
-                  />
-                </Box>
+                    <Flex justify='center'>
+                      <Button
+                        size='3'
+                        color='blue'
+                        onClick={generateRoute}
+                        loading={isGeneratingRoute}
+                      >
+                        <Route size={16} /> Generate Optimal Route
+                      </Button>
+                    </Flex>
 
-                <Box>
-                  <Text size='2' weight='bold' className='mb-2 block'>
-                    Estimated Duration (minutes)
-                  </Text>
-                  <TextField.Root
-                    type='number'
-                    value={missionConfig.estimatedDuration || ''}
-                    placeholder='Computed from backend after route generation'
-                    disabled
-                  />
-                  <Text size='1' color='gray' className='mt-1 block'>
-                    This value is calculated by the optimization algorithm
-                  </Text>
-                </Box>
-
-              </Tabs.Content>
-
-              {/* Nodes Tab */}
-              <Tabs.Content value='nodes' className='p-4 space-y-4'>
-                {isFlightPlannerMode && (
-                  <Box className='bg-blue-50 p-3 rounded mb-3'>
-                    <Text size='2' color='blue'>
-                      <strong>Note:</strong> Customer nodes are managed in the bottom panel.
-                      <br />
-                      Use this tab to manage depots, stations, waypoints, and hazards.
-                    </Text>
-                  </Box>
-                )}
-
-                <Flex justify='between' align='center' className='mb-2'>
-                  <Text size='3' weight='bold'>
-                    Flight Nodes (
-                    {isFlightPlannerMode
-                      ? missionConfig.nodes.filter(n => n.type !== 'customer').length
-                      : missionConfig.nodes.length}
-                    )
-                  </Text>
-                  <Flex gap='2'>
-                    <Button
-                      size='1'
-                      variant={plotModeNodes ? 'solid' : 'soft'}
-                      color={plotModeNodes ? 'blue' : 'gray'}
-                      onClick={() => setPlotModeNodes(!plotModeNodes)}
-                    >
-                      <MousePointer2 size={14} /> Plot
-                    </Button>
-                    <Button
-                      size='1'
-                      onClick={() => {
-                        const newNode: FlightNode = {
-                          id: `node-${Date.now()}`,
-                          type: 'waypoint',
-                          lat: 26.4619, // Default FGCU coordinates
-                          lng: -81.7726,
-                          label: `Node ${missionConfig.nodes.length + 1}`,
-                        }
-                        addNode(newNode)
-                      }}
-                    >
-                      <Plus size={14} /> Add Node
-                    </Button>
-                  </Flex>
-                </Flex>
-
-                <ScrollArea style={{ height: 'calc(100vh - 250px - 9rem)' }}>
-                  <div className='space-y-2 pr-2'>
-                    {missionConfig.nodes
-                      .filter(node => !isFlightPlannerMode || node.type !== 'customer')
-                      .map((node, index) => (
-                        <Card
-                          key={node.id}
-                          className='p-3'
-                          style={{
-                            backgroundColor: selectedNodeId === node.id ? '#eff6ff' : 'white',
-                            border: selectedNodeId === node.id ? '2px solid #3b82f6' : undefined,
-                          }}
-                        >
-                          <Flex justify='between' align='start' className='mb-2'>
-                            <Flex align='center' gap='2'>
-                              <MapPin size={16} />
-                              <Text size='2' weight='bold'>
-                                {node.label || `Node ${index + 1}`}
-                              </Text>
-                              <Badge
-                                color={
-                                  node.type === 'hazard' && node.severity
-                                    ? getHazardColor(node.severity)
-                                    : getNodeTypeColor(node.type)
-                                }
-                              >
-                                {node.type}
-                              </Badge>
-                              {node.type === 'hazard' && node.severity && (
-                                <Badge size='1' variant='soft' color={getHazardColor(node.severity)}>
-                                  {node.severity}
-                                </Badge>
-                              )}
-                            </Flex>
-                            <IconButton size='1' variant='ghost' color='red' onClick={() => removeNode(node.id)}>
-                              <Trash2 size={14} />
-                            </IconButton>
-                          </Flex>
-
-                          <Box className='space-y-2'>
-                            <TextField.Root
-                              placeholder='Label'
-                              value={node.label || ''}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                updateNode(node.id, { label: e.target.value })
-                              }
-                              size='1'
-                            />
-
-                            <Select.Root
-                              value={node.type}
-                              onValueChange={(value: string) => {
-                                const updates: Partial<FlightNode> = { type: value as FlightNode['type'] }
-                                // Set default values when changing to hazard type
-                                if (value === 'hazard') {
-                                  if (!node.radius) updates.radius = 100
-                                  if (!node.severity) updates.severity = 'medium'
-                                }
-                                updateNode(node.id, updates)
-                              }}
-                            >
-                              <Select.Trigger />
-                              <Select.Content>
-                                <Select.Item value='depot'>Depot</Select.Item>
-                                {!isFlightPlannerMode && <Select.Item value='customer'>Customer</Select.Item>}
-                                <Select.Item value='station'>Station</Select.Item>
-                                <Select.Item value='waypoint'>Waypoint</Select.Item>
-                                <Select.Item value='hazard'>Hazard</Select.Item>
-                              </Select.Content>
-                            </Select.Root>
-
-                            <Flex gap='2'>
-                              {/* Latitude with increment/decrement */}
-                              <Flex align='center' gap='1' style={{ flex: 1 }}>
-                                <TextField.Root
-                                  placeholder='Lat'
-                                  value={node.lat}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                    updateNode(node.id, { lat: parseFloat(e.target.value) || 0 })
-                                  }
-                                  size='1'
-                                  type='number'
-                                  step='0.0001'
-                                  style={{ flex: 1 }}
-                                />
-                                <Flex direction='column' gap='1'>
-                                  <IconButton
-                                    size='1'
-                                    variant='soft'
-                                    onClick={() => updateNode(node.id, { lat: parseFloat((node.lat + 0.0001).toFixed(6)) })}
-                                    style={{ minWidth: '24px', minHeight: '18px', padding: '2px 4px' }}
-                                  >
-                                    <ArrowUp size={12} />
-                                  </IconButton>
-                                  <IconButton
-                                    size='1'
-                                    variant='soft'
-                                    onClick={() => updateNode(node.id, { lat: parseFloat((node.lat - 0.0001).toFixed(6)) })}
-                                    style={{ minWidth: '24px', minHeight: '18px', padding: '2px 4px' }}
-                                  >
-                                    <ArrowDown size={12} />
-                                  </IconButton>
-                                </Flex>
-                              </Flex>
-
-                              {/* Longitude with increment/decrement */}
-                              <Flex align='center' gap='1' style={{ flex: 1 }}>
-                                <TextField.Root
-                                  placeholder='Lng'
-                                  value={node.lng}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                    updateNode(node.id, { lng: parseFloat(e.target.value) || 0 })
-                                  }
-                                  size='1'
-                                  type='number'
-                                  step='0.0001'
-                                  style={{ flex: 1 }}
-                                />
-                                <Flex direction='column' gap='1'>
-                                  <IconButton
-                                    size='1'
-                                    variant='soft'
-                                    onClick={() => updateNode(node.id, { lng: parseFloat((node.lng + 0.0001).toFixed(6)) })}
-                                    style={{ minWidth: '24px', minHeight: '18px', padding: '2px 4px' }}
-                                  >
-                                    <ArrowUp size={12} />
-                                  </IconButton>
-                                  <IconButton
-                                    size='1'
-                                    variant='soft'
-                                    onClick={() => updateNode(node.id, { lng: parseFloat((node.lng - 0.0001).toFixed(6)) })}
-                                    style={{ minWidth: '24px', minHeight: '18px', padding: '2px 4px' }}
-                                  >
-                                    <ArrowDown size={12} />
-                                  </IconButton>
-                                </Flex>
-                              </Flex>
-                            </Flex>
-
-                            {node.type === 'hazard' && (
-                              <>
-                                <TextField.Root
-                                  placeholder='Radius (m)'
-                                  value={node.radius || ''}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                    updateNode(node.id, { radius: parseFloat(e.target.value) || 100 })
-                                  }
-                                  size='1'
-                                  type='number'
-                                />
-
-                                <Select.Root
-                                  value={node.severity || 'medium'}
-                                  onValueChange={(value: string) =>
-                                    updateNode(node.id, { severity: value as 'low' | 'medium' | 'high' })
-                                  }
-                                >
-                                  <Select.Trigger placeholder='Severity' />
-                                  <Select.Content>
-                                    <Select.Item value='low'>Low Severity</Select.Item>
-                                    <Select.Item value='medium'>Medium Severity</Select.Item>
-                                    <Select.Item value='high'>High Severity</Select.Item>
-                                  </Select.Content>
-                                </Select.Root>
-
-                                <TextField.Root
-                                  placeholder='Description (optional)'
-                                  value={node.description || ''}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                    updateNode(node.id, { description: e.target.value })
-                                  }
-                                  size='1'
-                                />
-                              </>
-                            )}
-
-                            {node.type !== 'hazard' && (
-                              <TextField.Root
-                                placeholder='Action (optional)'
-                                value={node.action || ''}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  updateNode(node.id, { action: e.target.value })
-                                }
-                                size='1'
-                              />
-                            )}
-                          </Box>
-                        </Card>
-                      ))}
-
-                    {missionConfig.nodes.filter(node => !isFlightPlannerMode || node.type !== 'customer').length === 0 && (
-                      <Box className='text-center p-6 bg-gray-50 rounded'>
-                        <Text size='2' color='gray'>
-                          {isFlightPlannerMode
-                            ? 'No depot, station, waypoint, or hazard nodes added yet. Click "Add Node" to start planning.'
-                            : 'No nodes added yet. Click "Add Node" to start planning.'}
+                    {/* Route Status Messages */}
+                    {missionConfig.nodes.filter(n => n.type === 'customer').length > 0 && truckRoute.length === 0 && droneRoutes.length === 0 && (
+                      <Box className='bg-orange-50 p-3 rounded'>
+                        <Flex align='center' gap='2' className='mb-1'>
+                          <AlertCircle size={16} className='text-orange-600' />
+                          <Text size='2' weight='bold' color='orange'>
+                            Route Required
+                          </Text>
+                        </Flex>
+                        <Text size='1' color='gray'>
+                          Generate a route before you can launch the mission.
                         </Text>
                       </Box>
                     )}
+
+                    {(truckRoute.length > 0 || droneRoutes.length > 0) && (
+                      <Box className='bg-green-50 p-3 rounded'>
+                        <Flex align='center' gap='2' className='mb-2'>
+                          <CheckCircle size={16} className='text-green-600' />
+                          <Text size='2' weight='bold' color='green'>
+                            Route Generated
+                          </Text>
+                        </Flex>
+                        <Text size='1' color='gray'>
+                          Route is ready for review. Check the map for the optimized path.
+                        </Text>
+                        <Flex gap='2' className='mt-2 text-xs'>
+                          <Text size='1' color='gray'>
+                            Truck: {truckRoute.length} pts
+                          </Text>
+                          <Text size='1' color='gray'>
+                            Drones: {droneRoutes.length} paths
+                          </Text>
+                        </Flex>
+                      </Box>
+                    )}
                   </div>
-                </ScrollArea>
+                </Box>
               </Tabs.Content>
 
               {/* Advanced Tab */}
@@ -624,12 +463,37 @@ export function FlightPlannerSidebar() {
                   </Select.Root>
                 </Box>
 
-                <Box className='bg-gray-50 p-3 rounded mt-4'>
-                  <Text size='2' color='gray'>
-                    <strong>Note:</strong> Additional algorithm parameters will be added here.
-                    <br />
-                    Hazard zones are now managed in the Nodes tab.
+                <Box>
+                  <Text size='2' weight='bold' className='mb-3 block'>
+                    Import/Export Addresses
                   </Text>
+                  <Flex direction='column' align='center' gap='4'>
+                    <Button size='2' variant='soft' onClick={handleImportCSV}>
+                      <Upload size={16} /> Import Addresses (CSV)
+                    </Button>
+                    <Button size='2' variant='soft' onClick={handleExportCSV} disabled={missionConfig.nodes.length === 0}>
+                      <Download size={16} /> Export Addresses (CSV)
+                    </Button>
+                  </Flex>
+                </Box>
+
+                <Box className='border-t pt-4'>
+                  <Text size='2' weight='bold' className='mb-3 block'>
+                    Reset
+                  </Text>
+                  <Flex justify='center'>
+                    <Button
+                      size='2'
+                      variant='soft'
+                      color='red'
+                      onClick={() => {
+                        updateMissionConfig({ nodes: [], routes: undefined })
+                      }}
+                      disabled={missionConfig.nodes.length === 0}
+                    >
+                      <Trash2 size={16} /> Reset Flight Plan
+                    </Button>
+                  </Flex>
                 </Box>
               </Tabs.Content>
             </ScrollArea>

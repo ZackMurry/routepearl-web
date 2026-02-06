@@ -4,6 +4,7 @@ import { Circle } from 'react-leaflet'
 import LucideMarker from './LucideMarker'
 import { getOrDefault, pointMatchesNode } from '@/lib/util'
 import TextMarker from '@/components/TextMarker'
+import NumberedMarker from '@/components/NumberedMarker'
 import { useFlightPlanner } from './FlightPlannerContext'
 import { HAZARD_COLORS, NODE_COLORS } from '@/lib/constants'
 import { Circle as LucideCircle, LucideIcon, LucideProps, MapPin, Square, Zap } from 'lucide-react'
@@ -97,7 +98,27 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
         />
       )}
 
-      {marker && (
+      {/* Render NumberedMarker for customer nodes */}
+      {node.type === 'customer' && (
+        <NumberedMarker
+          position={[node.lat, node.lng]}
+          number={node.addressId || 0}
+          size={28}
+          color="#ffffff"
+          textColor="#000000"
+          onClick={() => {
+            if (!plotModeCustomer && !plotModeNodes) {
+              setSelectedNodeId(node.id)
+            }
+          }}
+          onRightClick={() => removeNode(node.id)}
+          draggable={isDraggable}
+          onDragEnd={(lat, lng) => updateNode(node.id, { lat, lng })}
+        />
+      )}
+
+      {/* Render LucideMarker for non-customer nodes */}
+      {marker && node.type !== 'customer' && (
         <LucideMarker
           position={[node.lat, node.lng]}
           anchor={marker.anchor}

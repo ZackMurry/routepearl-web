@@ -136,31 +136,58 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     return nextId
   }
 
-  // Helper function to assign missing address IDs to customer nodes
-  // Used when loading/importing missions that may have customers without addressId
-  const assignMissingAddressIds = (nodes: FlightNode[]): FlightNode[] => {
-    const usedIds = new Set<number>()
+  // Helper function to get the next available Flight Node ID for non-customer nodes
+  // Reuses IDs from deleted flight nodes (finds the lowest available ID)
+  const getNextAvailableFlightNodeId = (nodes: FlightNode[]): number => {
+    const flightNodes = nodes.filter(n => n.type !== 'customer')
+    const usedIds = new Set(flightNodes.map(n => n.flightNodeId).filter((id): id is number => id !== undefined))
 
-    // First pass: collect all existing address IDs
+    // Find the lowest available ID starting from 1
+    let nextId = 1
+    while (usedIds.has(nextId)) {
+      nextId++
+    }
+    return nextId
+  }
+
+  // Helper function to assign missing IDs to nodes
+  // Used when loading/importing missions that may have nodes without IDs
+  const assignMissingNodeIds = (nodes: FlightNode[]): FlightNode[] => {
+    const usedCustomerIds = new Set<number>()
+    const usedFlightNodeIds = new Set<number>()
+
+    // First pass: collect all existing IDs
     nodes.forEach(node => {
       if (node.type === 'customer' && node.addressId !== undefined) {
-        usedIds.add(node.addressId)
+        usedCustomerIds.add(node.addressId)
+      } else if (node.type !== 'customer' && node.flightNodeId !== undefined) {
+        usedFlightNodeIds.add(node.flightNodeId)
       }
     })
 
-    // Second pass: assign IDs to customers without one
+    // Second pass: assign IDs to nodes without one
     return nodes.map(node => {
       if (node.type === 'customer' && node.addressId === undefined) {
-        // Find the lowest available ID
+        // Find the lowest available customer ID
         let nextId = 1
-        while (usedIds.has(nextId)) {
+        while (usedCustomerIds.has(nextId)) {
           nextId++
         }
-        usedIds.add(nextId)
+        usedCustomerIds.add(nextId)
         return {
           ...node,
           addressId: nextId,
-          label: `Address ID: ${nextId}`,
+        }
+      } else if (node.type !== 'customer' && node.flightNodeId === undefined) {
+        // Find the lowest available flight node ID
+        let nextId = 1
+        while (usedFlightNodeIds.has(nextId)) {
+          nextId++
+        }
+        usedFlightNodeIds.add(nextId)
+        return {
+          ...node,
+          flightNodeId: nextId,
         }
       }
       return node
@@ -170,17 +197,28 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   // Node management
   const addNode = (node: FlightNode) => {
     setMissionConfig((prev) => {
-      // If it's a customer node, auto-assign the next available Address ID
+      // If it's a customer node, auto-assign the next available Address ID (displayed as Customer ID)
       if (node.type === 'customer' && node.addressId === undefined) {
         const addressId = getNextAvailableAddressId(prev.nodes)
         const nodeWithAddressId = {
           ...node,
           addressId,
-          label: `Address ID: ${addressId}`,
         }
         return {
           ...prev,
           nodes: [...prev.nodes, nodeWithAddressId],
+        }
+      }
+      // If it's a non-customer node, auto-assign the next available Flight Node ID
+      if (node.type !== 'customer' && node.flightNodeId === undefined) {
+        const flightNodeId = getNextAvailableFlightNodeId(prev.nodes)
+        const nodeWithFlightNodeId = {
+          ...node,
+          flightNodeId,
+        }
+        return {
+          ...prev,
+          nodes: [...prev.nodes, nodeWithFlightNodeId],
         }
       }
       return {
@@ -286,8 +324,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   }
 
   const loadMission = (mission: Mission) => {
-    // Assign missing address IDs to any customers that don't have them
-    const nodesWithIds = assignMissingAddressIds(mission.config.nodes)
+    // Assign missing IDs to any nodes that don't have them
+    const nodesWithIds = assignMissingNodeIds(mission.config.nodes)
     const configWithIds = {
       ...mission.config,
       nodes: nodesWithIds,

@@ -12,7 +12,8 @@ export interface FlightNode extends Point {
   radius?: number // For hazard nodes (meters)
   severity?: 'low' | 'medium' | 'high' // For hazard nodes
   description?: string // For hazard nodes
-  addressId?: number // For customer nodes - auto-assigned, reused when deleted
+  addressId?: number // For customer nodes - auto-assigned, reused when deleted (displayed as Customer ID)
+  flightNodeId?: number // For non-customer nodes - auto-assigned, reused when deleted
 }
 
 export type RoutingAlgorithm = 'alns' | 'custom'
