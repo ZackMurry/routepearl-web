@@ -244,6 +244,13 @@ export function BottomPanel() {
   const customerNodes = missionConfig.nodes.filter((n) => n.type === 'customer')
   const flightNodes = missionConfig.nodes.filter((n) => n.type !== 'customer')
 
+  // Stats for header display
+  const totalCustomers = customerNodes.length
+  const deliveredPackages = 0 // TODO: Track actual deliveries
+  const totalDistance = hasRoute ? '10.5km' : 'X' // TODO: Calculate actual distance
+  const coveredDistance = '0km' // TODO: Track actual distance covered
+  const estimatedTime = missionConfig.estimatedDuration ? formatDuration(missionConfig.estimatedDuration) : 'X:XX'
+
   // Simple Toast UI Component (without Radix Toast to avoid DOM conflicts with Leaflet)
   const ToastUI = () => {
     if (!toastOpen) return null
@@ -326,6 +333,20 @@ export function BottomPanel() {
                     <Badge color={getStatusColor(missionStatus)}>{missionStatus}</Badge>
                   </Flex>
                 )}
+                <Flex gap="3" align="center" className="text-gray-600">
+                  <Flex gap="1" align="center" title="Time Elapsed / Estimated">
+                    <Clock size={14} />
+                    <Text size="1">00:00/{estimatedTime}</Text>
+                  </Flex>
+                  <Flex gap="1" align="center" title="Deliveries">
+                    <Package size={14} />
+                    <Text size="1">{deliveredPackages}/{hasRoute ? totalCustomers : 'X'}</Text>
+                  </Flex>
+                  <Flex gap="1" align="center" title="Distance Covered / Total">
+                    <Route size={14} />
+                    <Text size="1">{coveredDistance}/{totalDistance}</Text>
+                  </Flex>
+                </Flex>
               </Flex>
 
               <IconButton size="1" variant="ghost" onClick={() => setBottomPanelExpanded(true)}>
@@ -404,6 +425,20 @@ export function BottomPanel() {
                     </Text>
                   </Flex>
                 )}
+                <Flex gap="3" align="center" className="text-gray-600">
+                  <Flex gap="1" align="center" title="Time Elapsed / Estimated">
+                    <Clock size={14} />
+                    <Text size="1">00:00/{estimatedTime}</Text>
+                  </Flex>
+                  <Flex gap="1" align="center" title="Deliveries">
+                    <Package size={14} />
+                    <Text size="1">{deliveredPackages}/{hasRoute ? totalCustomers : 'X'}</Text>
+                  </Flex>
+                  <Flex gap="1" align="center" title="Distance Covered / Total">
+                    <Route size={14} />
+                    <Text size="1">{coveredDistance}/{totalDistance}</Text>
+                  </Flex>
+                </Flex>
               </Flex>
 
               <IconButton size="2" variant="ghost" onClick={() => setBottomPanelExpanded(false)}>
@@ -846,9 +881,6 @@ export function BottomPanel() {
   }
 
   // Expanded state - Mission Management Mode
-  // Calculate delivery stats (mock for now - will be replaced with real-time tracking)
-  const totalCustomers = missionConfig.nodes.filter((n) => n.type === 'customer').length
-  const deliveredPackages = 0 // TODO: Track actual deliveries
   const deliveryProgress = totalCustomers > 0 ? (deliveredPackages / totalCustomers) * 100 : 0
 
   // Mock mission tracking data (TODO: Replace with real-time tracking)
@@ -912,13 +944,17 @@ export function BottomPanel() {
                   </Flex>
 
                   <Flex gap="3" align="center" className="text-gray-600">
-                    <Flex gap="1" align="center">
-                      <Package size={14} />
-                      <Text size="1">{deliveredPackages}/{totalCustomers} delivered</Text>
-                    </Flex>
-                    <Flex gap="1" align="center">
+                    <Flex gap="1" align="center" title="Time Elapsed / Estimated">
                       <Clock size={14} />
-                      <Text size="1">00:00 elapsed</Text>
+                      <Text size="1">00:00/{estimatedTime}</Text>
+                    </Flex>
+                    <Flex gap="1" align="center" title="Deliveries">
+                      <Package size={14} />
+                      <Text size="1">{deliveredPackages}/{hasRoute ? totalCustomers : 'X'}</Text>
+                    </Flex>
+                    <Flex gap="1" align="center" title="Distance Covered / Total">
+                      <Route size={14} />
+                      <Text size="1">{coveredDistance}/{totalDistance}</Text>
                     </Flex>
                   </Flex>
                 </Flex>
@@ -1185,15 +1221,18 @@ export function BottomPanel() {
               </Flex>
 
               <Flex gap="3" align="center" className="text-gray-600">
-                <Flex gap="1" align="center">
+                <Flex gap="1" align="center" title="Time Elapsed / Estimated">
                   <Clock size={14} />
-                  <Text size="1">00:00 elapsed</Text>
+                  <Text size="1">00:00/{estimatedTime}</Text>
                 </Flex>
-                {missionConfig.estimatedDuration && (
-                  <Flex gap="1" align="center">
-                    <Text size="1">/ {missionConfig.estimatedDuration}m total</Text>
-                  </Flex>
-                )}
+                <Flex gap="1" align="center" title="Deliveries">
+                  <Package size={14} />
+                  <Text size="1">{deliveredPackages}/{hasRoute ? totalCustomers : 'X'}</Text>
+                </Flex>
+                <Flex gap="1" align="center" title="Distance Covered / Total">
+                  <Route size={14} />
+                  <Text size="1">{coveredDistance}/{totalDistance}</Text>
+                </Flex>
               </Flex>
             </Flex>
 
@@ -1324,13 +1363,6 @@ function MissionStatsBar({
       <Flex gap="1" align="center" title="Algorithm">
         <Settings size={14} className="text-gray-500" />
         <Text size="1" weight="medium">{missionConfig.algorithm.toUpperCase()}</Text>
-      </Flex>
-      <Box className="w-px h-4 bg-gray-300" />
-      <Flex gap="1" align="center" title="Time Elapsed / Estimated">
-        <Clock size={14} className={missionLaunched ? 'text-green-600' : 'text-gray-500'} />
-        <Text size="1" weight="medium">
-          {elapsedTime}/{missionConfig.estimatedDuration ? formatDuration(missionConfig.estimatedDuration) : 'x:xx'}
-        </Text>
       </Flex>
     </Flex>
   )
