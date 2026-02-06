@@ -31,12 +31,14 @@ import {
   Truck,
   Plane,
   Timer,
-  Home,
+  House,
   Zap,
   AlertTriangle,
   Settings,
 } from 'lucide-react'
 import { TimelineTab } from './timeline'
+import { useTimelineGenerator } from './timeline/useTimelineGenerator'
+import { GanttChart, useGanttData, generateEmptyGanttData, GanttChartState } from './gantt'
 
 export function BottomPanel() {
   const {
@@ -76,7 +78,7 @@ export function BottomPanel() {
   const [toastOpen, setToastOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
-  const [missionTab, setMissionTab] = useState<'status' | 'customers' | 'timeline'>('status')
+  const [missionTab, setMissionTab] = useState<'gantt' | 'customers' | 'flightNodes' | 'timeline'>('gantt')
   const [nodeTab, setNodeTab] = useState<'customers' | 'flightNodes'>('customers')
   const [fleetMode, setFleetMode] = useState<'truck-drone' | 'truck-only' | 'drones-only'>('truck-drone')
   const [droneCount, setDroneCount] = useState<number>(2)
@@ -250,6 +252,23 @@ export function BottomPanel() {
   const totalDistance = hasRoute ? '10.5km' : 'X' // TODO: Calculate actual distance
   const coveredDistance = '0km' // TODO: Track actual distance covered
   const estimatedTime = missionConfig.estimatedDuration ? formatDuration(missionConfig.estimatedDuration) : 'X:XX'
+
+  // Generate timeline data for Gantt chart
+  const timelineResult = useTimelineGenerator(truckRoute, droneRoutes, missionConfig.nodes)
+
+  // Generate Gantt chart data - always call hooks unconditionally
+  const ganttDataFromHook = useGanttData(timelineResult, fleetMode, droneCount)
+  const ganttData = hasRoute ? ganttDataFromHook : generateEmptyGanttData(fleetMode, droneCount)
+
+  // Determine Gantt chart state
+  const ganttState: GanttChartState = !missionConfig.nodes.some((n) => n.type === 'depot') && customerNodes.length === 0
+    ? 'no-plan'
+    : hasRoute
+      ? 'loaded'
+      : 'empty-fleet'
+
+  // Current mission elapsed time in seconds (for live tracking)
+  const [missionElapsedTime, setMissionElapsedTime] = useState(0)
 
   // Simple Toast UI Component (without Radix Toast to avoid DOM conflicts with Leaflet)
   const ToastUI = () => {
@@ -968,15 +987,19 @@ export function BottomPanel() {
               <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} />
 
               {/* Tabs */}
-              <Tabs.Root value={missionTab} onValueChange={(v) => setMissionTab(v as 'status' | 'customers' | 'timeline')} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <Tabs.Root value={missionTab} onValueChange={(v) => setMissionTab(v as 'gantt' | 'customers' | 'flightNodes' | 'timeline')} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <Tabs.List className="px-4 pt-2">
-                  <Tabs.Trigger value="status">
-                    <Play size={16} className="mr-1" />
-                    Mission Status
+                  <Tabs.Trigger value="gantt">
+                    <Route size={16} className="mr-1" />
+                    Gantt Chart
                   </Tabs.Trigger>
                   <Tabs.Trigger value="customers">
                     <MapPin size={16} className="mr-1" />
-                    Customers
+                    Customers ({customerNodes.length})
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="flightNodes">
+                    <Plane size={16} className="mr-1" />
+                    Flight Nodes ({flightNodes.length})
                   </Tabs.Trigger>
                   <Tabs.Trigger value="timeline">
                     <Timer size={16} className="mr-1" />
@@ -984,110 +1007,15 @@ export function BottomPanel() {
                   </Tabs.Trigger>
                 </Tabs.List>
 
-                {/* Tab 1: Mission Status */}
-                <Tabs.Content value="status" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'auto' }}>
-                  <ScrollArea style={{ height: '100%' }}>
-                    <div className="space-y-4 pr-2">
-                      {/* Drone Tasks */}
-                      <Box>
-                        <Flex align="center" gap="2" className="mb-3">
-                          <Plane size={18} className="text-blue-500" />
-                          <Text size="3" weight="bold">
-                            Drone Tasks
-                          </Text>
-                        </Flex>
-
-                        <Card className="p-4">
-                          <div className="space-y-3">
-                            {/* Sortie Progress */}
-                            <Box>
-                              <Flex justify="between" align="center" className="mb-2">
-                                <Text size="2" weight="medium">Sortie Progress</Text>
-                                <Badge color={currentSortie === 0 ? 'gray' : currentSortie === totalSorties ? 'green' : 'blue'} size="2">
-                                  {currentSortie === 0 ? 'Standby' : currentSortie === totalSorties ? 'Complete' : 'In Progress'}
-                                </Badge>
-                              </Flex>
-                              <Flex justify="between" className="mb-1">
-                                <Text size="1" color="gray">Current Sortie:</Text>
-                                <Text size="1" weight="bold">{currentSortie}/{totalSorties}</Text>
-                              </Flex>
-                              <Progress value={(currentSortie / Math.max(totalSorties, 1)) * 100} />
-                            </Box>
-
-                            {/* Delivery Status */}
-                            <Box className="border-t pt-3">
-                              <Text size="2" weight="medium" className="block mb-2">Delivery Status</Text>
-                              <Flex justify="between" className="mb-1">
-                                <Text size="1" color="gray">Packages Delivered:</Text>
-                                <Text size="1" weight="bold">{deliveredPackages}/{totalCustomers}</Text>
-                              </Flex>
-                              {droneRoutes.length > 0 && (
-                                <Box className="mt-2 p-2 bg-blue-50 rounded">
-                                  <Text size="1" color="blue">
-                                    {currentSortie === 0
-                                      ? 'Drone ready for first sortie'
-                                      : currentSortie < totalSorties
-                                        ? `Currently on sortie ${currentSortie} of ${totalSorties}`
-                                        : 'All sorties completed'}
-                                  </Text>
-                                </Box>
-                              )}
-                            </Box>
-                          </div>
-                        </Card>
-                      </Box>
-
-                      {/* Truck Tasks */}
-                      <Box>
-                        <Flex align="center" gap="2" className="mb-3">
-                          <Truck size={18} className="text-purple-500" />
-                          <Text size="3" weight="bold">
-                            Truck Tasks
-                          </Text>
-                        </Flex>
-
-                        <Card className="p-4">
-                          <div className="space-y-3">
-                            {/* Route Progress */}
-                            <Box>
-                              <Flex justify="between" align="center" className="mb-2">
-                                <Text size="2" weight="medium">Route Progress</Text>
-                                <Badge color={currentTruckPoint === 0 ? 'gray' : currentTruckPoint === totalTruckPoints ? 'green' : 'blue'} size="2">
-                                  {currentTruckPoint === 0 ? 'Standby' : currentTruckPoint === totalTruckPoints ? 'Complete' : 'In Progress'}
-                                </Badge>
-                              </Flex>
-                              <Flex justify="between" className="mb-1">
-                                <Text size="1" color="gray">Points Reached:</Text>
-                                <Text size="1" weight="bold">{currentTruckPoint}/{totalTruckPoints}</Text>
-                              </Flex>
-                              <Progress value={(currentTruckPoint / Math.max(totalTruckPoints, 1)) * 100} />
-                            </Box>
-
-                            {/* Route Status */}
-                            <Box className="border-t pt-3">
-                              <Text size="2" weight="medium" className="block mb-2">Route Status</Text>
-                              {isReturningToDepot ? (
-                                <Box className="p-2 bg-purple-50 rounded">
-                                  <Flex align="center" gap="2">
-                                    <Badge color="purple">Returning</Badge>
-                                    <Text size="1" color="purple">Truck is on return route to depot</Text>
-                                  </Flex>
-                                </Box>
-                              ) : (
-                                <Box className="p-2 bg-blue-50 rounded">
-                                  <Text size="1" color="blue">
-                                    {currentTruckPoint === 0
-                                      ? 'Truck ready to start route'
-                                      : 'Truck is on delivery route'}
-                                  </Text>
-                                </Box>
-                              )}
-                            </Box>
-                          </div>
-                        </Card>
-                      </Box>
-                    </div>
-                  </ScrollArea>
+                {/* Tab 1: Gantt Chart */}
+                <Tabs.Content value="gantt" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
+                  <GanttChart
+                    data={ganttData}
+                    state={ganttState}
+                    currentTime={missionElapsedTime}
+                    onCreatePlan={() => setIsFlightPlannerMode(true)}
+                    onLoadPlan={() => fileInputRef.current?.click()}
+                  />
                 </Tabs.Content>
 
                 {/* Tab 2: Customers */}
@@ -1149,7 +1077,63 @@ export function BottomPanel() {
                   </Box>
                 </Tabs.Content>
 
-                {/* Tab 3: Timeline */}
+                {/* Tab 3: Flight Nodes */}
+                <Tabs.Content value="flightNodes" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'auto' }}>
+                  <ScrollArea style={{ height: '100%' }}>
+                    <div className="space-y-2 pr-2">
+                      {flightNodes.map((node) => (
+                        <Card key={node.id} className="p-3">
+                          <Flex justify="between" align="center">
+                            <Flex align="center" gap="2" className="flex-1">
+                              {node.type === 'depot' ? (
+                                <House size={16} className="text-blue-500" />
+                              ) : node.type === 'station' ? (
+                                <Zap size={16} className="text-orange-500" />
+                              ) : node.type === 'hazard' ? (
+                                <AlertTriangle size={16} className="text-red-500" />
+                              ) : (
+                                <MapPin size={16} className="text-purple-500" />
+                              )}
+                              <Box className="flex-1">
+                                <Flex align="center" gap="2">
+                                  <Text size="2" weight="medium">
+                                    {node.label || `${node.type.charAt(0).toUpperCase() + node.type.slice(1)} ${node.flightNodeId || ''}`}
+                                  </Text>
+                                  <Badge
+                                    color={
+                                      node.type === 'depot'
+                                        ? 'blue'
+                                        : node.type === 'station'
+                                          ? 'orange'
+                                          : node.type === 'hazard'
+                                            ? 'red'
+                                            : 'purple'
+                                    }
+                                    size="1"
+                                  >
+                                    {node.type}
+                                  </Badge>
+                                </Flex>
+                                <Text size="1" color="gray">
+                                  {node.lat.toFixed(6)}, {node.lng.toFixed(6)}
+                                </Text>
+                              </Box>
+                            </Flex>
+                          </Flex>
+                        </Card>
+                      ))}
+                      {flightNodes.length === 0 && (
+                        <Box className="text-center p-6 bg-gray-50 rounded">
+                          <Text size="2" color="gray">
+                            No flight nodes (depots, stations, waypoints, hazards) defined.
+                          </Text>
+                        </Box>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </Tabs.Content>
+
+                {/* Tab 4: Timeline */}
                 <Tabs.Content value="timeline" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'auto' }}>
                   <TimelineTab />
                 </Tabs.Content>
@@ -1163,12 +1147,6 @@ export function BottomPanel() {
   }
 
   // Default Mission Management Mode (not launched)
-  const mockTasks = [
-    { id: 1, name: 'Pre-flight check', status: 'pending', progress: 0 },
-    { id: 2, name: 'Route validation', status: 'pending', progress: 0 },
-    { id: 3, name: 'Equipment calibration', status: 'pending', progress: 0 },
-  ]
-
   return (
     <>
       <div
@@ -1244,64 +1222,137 @@ export function BottomPanel() {
           {/* Stats Bar */}
           <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} />
 
-          <Flex className="flex-1" style={{ minHeight: 0, backgroundColor: 'white' }}>
-            {/* Left: Current Tasks */}
-            <Box className="flex-1 p-4 border-r" style={{ overflow: 'hidden' }}>
-              <Text size="2" weight="bold" className="mb-3 block">
-                Current Tasks
-              </Text>
+          {/* Tabs */}
+          <Tabs.Root value={missionTab} onValueChange={(v) => setMissionTab(v as 'gantt' | 'customers' | 'flightNodes' | 'timeline')} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <Tabs.List className="px-4 pt-2">
+              <Tabs.Trigger value="gantt">
+                <Route size={16} className="mr-1" />
+                Gantt Chart
+              </Tabs.Trigger>
+              <Tabs.Trigger value="customers">
+                <MapPin size={16} className="mr-1" />
+                Customers ({customerNodes.length})
+              </Tabs.Trigger>
+              <Tabs.Trigger value="flightNodes">
+                <Plane size={16} className="mr-1" />
+                Flight Nodes ({flightNodes.length})
+              </Tabs.Trigger>
+              <Tabs.Trigger value="timeline">
+                <Timer size={16} className="mr-1" />
+                Timeline
+              </Tabs.Trigger>
+            </Tabs.List>
 
-              <ScrollArea style={{ height: 'calc(100% - 2rem)' }}>
+            {/* Tab 1: Gantt Chart */}
+            <Tabs.Content value="gantt" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
+              <GanttChart
+                data={ganttData}
+                state={ganttState}
+                currentTime={missionElapsedTime}
+                onCreatePlan={() => setIsFlightPlannerMode(true)}
+                onLoadPlan={() => fileInputRef.current?.click()}
+              />
+            </Tabs.Content>
+
+            {/* Tab 2: Customers */}
+            <Tabs.Content value="customers" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'auto' }}>
+              <ScrollArea style={{ height: '100%' }}>
                 <div className="space-y-2 pr-2">
-                  {mockTasks.map((task) => (
-                    <Card key={task.id} className="p-3">
-                      <Flex justify="between" align="start" className="mb-2">
-                        <Flex align="center" gap="2">
-                          {task.status === 'complete' ? (
-                            <CheckCircle size={16} className="text-green-500" />
-                          ) : task.status === 'in_progress' ? (
-                            <Clock size={16} className="text-blue-500" />
-                          ) : (
-                            <AlertCircle size={16} className="text-gray-400" />
-                          )}
-                          <Text size="2" weight="medium">
-                            {task.name}
-                          </Text>
+                  {customerNodes.map((customer) => (
+                    <Card key={customer.id} className="p-3">
+                      <Flex justify="between" align="center">
+                        <Flex align="center" gap="2" className="flex-1">
+                          <MapPin size={16} className="text-gray-400" />
+                          <Box className="flex-1">
+                            <Text size="2" weight="medium">
+                              Address ID: {customer.addressId || '?'}
+                            </Text>
+                            <Text size="1" color="gray">
+                              {customer.lat.toFixed(6)}, {customer.lng.toFixed(6)}
+                            </Text>
+                          </Box>
                         </Flex>
-                        <Badge
-                          color={
-                            task.status === 'complete'
-                              ? 'green'
-                              : task.status === 'in_progress'
-                                ? 'blue'
-                                : 'gray'
-                          }
-                          size="1"
-                        >
-                          {task.status}
+                        <Badge color="gray" size="2">
+                          <Flex align="center" gap="1">
+                            <Clock size={12} />
+                            Pending
+                          </Flex>
                         </Badge>
                       </Flex>
-                      <Box className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
-                        <Box
-                          className="h-full bg-blue-500"
-                          style={{ width: `${task.progress}%` }}
-                        />
-                      </Box>
                     </Card>
                   ))}
-
-                  {mockTasks.length === 0 && (
+                  {customerNodes.length === 0 && (
                     <Box className="text-center p-6 bg-gray-50 rounded">
                       <Text size="2" color="gray">
-                        No active tasks. Launch a mission to begin.
+                        No customers added. Create or load a flight plan to add customers.
                       </Text>
                     </Box>
                   )}
                 </div>
               </ScrollArea>
-            </Box>
+            </Tabs.Content>
 
-          </Flex>
+            {/* Tab 3: Flight Nodes */}
+            <Tabs.Content value="flightNodes" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'auto' }}>
+              <ScrollArea style={{ height: '100%' }}>
+                <div className="space-y-2 pr-2">
+                  {flightNodes.map((node) => (
+                    <Card key={node.id} className="p-3">
+                      <Flex justify="between" align="center">
+                        <Flex align="center" gap="2" className="flex-1">
+                          {node.type === 'depot' ? (
+                            <House size={16} className="text-blue-500" />
+                          ) : node.type === 'station' ? (
+                            <Zap size={16} className="text-orange-500" />
+                          ) : node.type === 'hazard' ? (
+                            <AlertTriangle size={16} className="text-red-500" />
+                          ) : (
+                            <MapPin size={16} className="text-purple-500" />
+                          )}
+                          <Box className="flex-1">
+                            <Flex align="center" gap="2">
+                              <Text size="2" weight="medium">
+                                {node.label || `${node.type.charAt(0).toUpperCase() + node.type.slice(1)} ${node.flightNodeId || ''}`}
+                              </Text>
+                              <Badge
+                                color={
+                                  node.type === 'depot'
+                                    ? 'blue'
+                                    : node.type === 'station'
+                                      ? 'orange'
+                                      : node.type === 'hazard'
+                                        ? 'red'
+                                        : 'purple'
+                                }
+                                size="1"
+                              >
+                                {node.type}
+                              </Badge>
+                            </Flex>
+                            <Text size="1" color="gray">
+                              {node.lat.toFixed(6)}, {node.lng.toFixed(6)}
+                            </Text>
+                          </Box>
+                        </Flex>
+                      </Flex>
+                    </Card>
+                  ))}
+                  {flightNodes.length === 0 && (
+                    <Box className="text-center p-6 bg-gray-50 rounded">
+                      <Text size="2" color="gray">
+                        No flight nodes defined. Create or load a flight plan.
+                      </Text>
+                    </Box>
+                  )}
+                </div>
+              </ScrollArea>
+            </Tabs.Content>
+
+            {/* Tab 4: Timeline */}
+            <Tabs.Content value="timeline" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'auto' }}>
+              <TimelineTab />
+            </Tabs.Content>
+          </Tabs.Root>
         </Flex>
       </Card>
       </div>
@@ -1348,7 +1399,7 @@ function MissionStatsBar({
         <Text size="1" weight="medium">{customerCount}</Text>
       </Flex>
       <Flex gap="1" align="center" title="Depots">
-        <Home size={14} className="text-blue-600" />
+        <House size={14} className="text-blue-600" />
         <Text size="1" weight="medium">{depotCount}</Text>
       </Flex>
       <Flex gap="1" align="center" title="Charging Stations">

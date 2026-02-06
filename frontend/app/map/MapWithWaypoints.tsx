@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, useMapEvents, Circle, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import './flight-planner.css'
@@ -17,9 +17,23 @@ import ClickHandler from './ClickHandler'
 import TruckRoutePath from './TruckRoutePath'
 
 function MapContent() {
-  const { missionConfig, addNode, truckRoute, droneRoutes, plotModeCustomer, plotModeNodes } = useFlightPlanner()
+  const { missionConfig, truckRoute, droneRoutes, plotModeNodes } = useFlightPlanner()
+  const [isMounted, setIsMounted] = useState(false)
 
-  console.log(plotModeNodes)
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  // Prevent SSR/hydration issues with Leaflet
+  if (!isMounted) {
+    return (
+      <div style={{ height: '100vh', width: '100%', position: 'relative', backgroundColor: '#f0f0f0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+          Loading map...
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
