@@ -2,6 +2,7 @@
 
 import React, { FC, useState } from 'react'
 import { GanttStop, GanttStopType, formatGanttTime, getStopColor } from './gantt.types'
+import { formatDistance } from '../timeline/timeline.types'
 import { House, Package, ArrowUp, ArrowDown, Zap, Truck } from 'lucide-react'
 
 interface Props {
@@ -115,6 +116,11 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerSecond, totalDu
             Time: {formatGanttTime(stop.time)}
             {stop.duration > 0 && ` (${formatGanttTime(stop.duration)} duration)`}
           </div>
+          {stop.distance !== undefined && stop.distance > 0 && (
+            <div style={{ color: '#34d399', marginTop: '2px' }}>
+              Distance: {formatDistance(stop.distance)}
+            </div>
+          )}
           {stop.customerName && (
             <div style={{ color: '#60a5fa', marginTop: '2px' }}>
               Customer: {stop.customerName}

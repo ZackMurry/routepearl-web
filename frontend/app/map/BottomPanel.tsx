@@ -30,15 +30,15 @@ import {
   Package,
   Truck,
   Plane,
-  Timer,
   House,
   Zap,
   AlertTriangle,
   Settings,
 } from 'lucide-react'
-import { TimelineTab } from './timeline'
 import { useTimelineGenerator } from './timeline/useTimelineGenerator'
+import { TimelineSummary, formatDistance as formatDistanceTimeline } from './timeline/timeline.types'
 import { GanttChart, useGanttData, generateEmptyGanttData, GanttChartState } from './gantt'
+import { RoutesTab, useRouteDetails, VehiclesTab, useVehicleDetails } from './routes'
 
 export function BottomPanel() {
   const {
@@ -67,6 +67,8 @@ export function BottomPanel() {
     plotModeNodes,
     setPlotModeNodes,
     selectedNodeId,
+    selectedRouteId,
+    setSelectedRouteId,
     missionLaunched,
   } = useFlightPlanner()
 
@@ -78,7 +80,8 @@ export function BottomPanel() {
   const [toastOpen, setToastOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
-  const [missionTab, setMissionTab] = useState<'gantt' | 'customers' | 'flightNodes' | 'timeline'>('gantt')
+  const [missionTab, setMissionTab] = useState<'gantt' | 'customers' | 'flightNodes' | 'routes' | 'vehicles'>('gantt')
+  const [vehicleFilter, setVehicleFilter] = useState<'all' | 'drones' | 'trucks'>('all')
   const [nodeTab, setNodeTab] = useState<'customers' | 'flightNodes'>('customers')
   const [fleetMode, setFleetMode] = useState<'truck-drone' | 'truck-only' | 'drones-only'>('truck-drone')
   const [droneCount, setDroneCount] = useState<number>(2)
@@ -260,6 +263,12 @@ export function BottomPanel() {
   const ganttDataFromHook = useGanttData(timelineResult, fleetMode, droneCount)
   const ganttData = hasRoute ? ganttDataFromHook : generateEmptyGanttData(fleetMode, droneCount)
 
+  // Generate route details for Routes tab
+  const routeDetails = useRouteDetails(timelineResult, fleetMode, droneCount, hasRoute, customerNodes)
+
+  // Generate vehicle details for Vehicles tab
+  const vehicleDetails = useVehicleDetails(timelineResult, fleetMode, droneCount, hasRoute, customerNodes)
+
   // Determine Gantt chart state
   const ganttState: GanttChartState = !missionConfig.nodes.some((n) => n.type === 'depot') && customerNodes.length === 0
     ? 'no-plan'
@@ -372,7 +381,7 @@ export function BottomPanel() {
                 <ChevronUp size={18} />
               </IconButton>
             </Flex>
-            <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} />
+            <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
           </Flex>
         </Card>
         </div>
@@ -466,7 +475,7 @@ export function BottomPanel() {
             </Flex>
 
             {/* Stats Bar */}
-            <MissionStatsBar missionConfig={missionConfig} />
+            <MissionStatsBar missionConfig={missionConfig} fleetMode={fleetMode} droneCount={droneCount} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
 
             <Flex className="flex-1" style={{ minHeight: 0, backgroundColor: 'white' }}>
               {/* Left: Nodes with Tabs */}
@@ -984,10 +993,10 @@ export function BottomPanel() {
               </Flex>
 
               {/* Stats Bar */}
-              <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} />
+              <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
 
               {/* Tabs */}
-              <Tabs.Root value={missionTab} onValueChange={(v) => setMissionTab(v as 'gantt' | 'customers' | 'flightNodes' | 'timeline')} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <Tabs.Root value={missionTab} onValueChange={(v) => setMissionTab(v as 'gantt' | 'customers' | 'flightNodes' | 'routes' | 'vehicles')} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <Tabs.List className="px-4 pt-2">
                   <Tabs.Trigger value="gantt">
                     <Route size={16} className="mr-1" />
@@ -1001,9 +1010,13 @@ export function BottomPanel() {
                     <Plane size={16} className="mr-1" />
                     Flight Nodes ({flightNodes.length})
                   </Tabs.Trigger>
-                  <Tabs.Trigger value="timeline">
-                    <Timer size={16} className="mr-1" />
-                    Timeline
+                  <Tabs.Trigger value="routes">
+                    <Route size={16} className="mr-1" />
+                    Routes ({routeDetails.length})
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="vehicles">
+                    <Truck size={16} className="mr-1" />
+                    Vehicles ({vehicleDetails.length})
                   </Tabs.Trigger>
                 </Tabs.List>
 
@@ -1015,6 +1028,8 @@ export function BottomPanel() {
                     currentTime={missionElapsedTime}
                     onCreatePlan={() => setIsFlightPlannerMode(true)}
                     onLoadPlan={() => fileInputRef.current?.click()}
+                    vehicleFilter={vehicleFilter}
+                    onVehicleFilterChange={setVehicleFilter}
                   />
                 </Tabs.Content>
 
@@ -1133,10 +1148,24 @@ export function BottomPanel() {
                   </ScrollArea>
                 </Tabs.Content>
 
-                {/* Tab 4: Timeline */}
-                <Tabs.Content value="timeline" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'auto' }}>
-                  <TimelineTab />
+                {/* Tab 4: Routes */}
+                <Tabs.Content value="routes" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
+                  <RoutesTab
+                    routes={routeDetails}
+                    selectedRouteId={selectedRouteId}
+                    onSelectRoute={setSelectedRouteId}
+                  />
                 </Tabs.Content>
+
+                {/* Tab 5: Vehicles */}
+                <Tabs.Content value="vehicles" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
+                  <VehiclesTab
+                    vehicles={vehicleDetails}
+                    selectedRouteId={selectedRouteId}
+                    onSelectRoute={setSelectedRouteId}
+                  />
+                </Tabs.Content>
+
               </Tabs.Root>
             </Flex>
           </Card>
@@ -1220,10 +1249,10 @@ export function BottomPanel() {
           </Flex>
 
           {/* Stats Bar */}
-          <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} />
+          <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
 
           {/* Tabs */}
-          <Tabs.Root value={missionTab} onValueChange={(v) => setMissionTab(v as 'gantt' | 'customers' | 'flightNodes' | 'timeline')} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <Tabs.Root value={missionTab} onValueChange={(v) => setMissionTab(v as 'gantt' | 'customers' | 'flightNodes' | 'routes' | 'vehicles')} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <Tabs.List className="px-4 pt-2">
               <Tabs.Trigger value="gantt">
                 <Route size={16} className="mr-1" />
@@ -1237,9 +1266,13 @@ export function BottomPanel() {
                 <Plane size={16} className="mr-1" />
                 Flight Nodes ({flightNodes.length})
               </Tabs.Trigger>
-              <Tabs.Trigger value="timeline">
-                <Timer size={16} className="mr-1" />
-                Timeline
+              <Tabs.Trigger value="routes">
+                <Route size={16} className="mr-1" />
+                Routes ({routeDetails.length})
+              </Tabs.Trigger>
+              <Tabs.Trigger value="vehicles">
+                <Truck size={16} className="mr-1" />
+                Vehicles ({vehicleDetails.length})
               </Tabs.Trigger>
             </Tabs.List>
 
@@ -1251,6 +1284,8 @@ export function BottomPanel() {
                 currentTime={missionElapsedTime}
                 onCreatePlan={() => setIsFlightPlannerMode(true)}
                 onLoadPlan={() => fileInputRef.current?.click()}
+                vehicleFilter={vehicleFilter}
+                onVehicleFilterChange={setVehicleFilter}
               />
             </Tabs.Content>
 
@@ -1348,10 +1383,24 @@ export function BottomPanel() {
               </ScrollArea>
             </Tabs.Content>
 
-            {/* Tab 4: Timeline */}
-            <Tabs.Content value="timeline" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'auto' }}>
-              <TimelineTab />
+            {/* Tab 4: Routes */}
+            <Tabs.Content value="routes" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
+              <RoutesTab
+                routes={routeDetails}
+                selectedRouteId={selectedRouteId}
+                onSelectRoute={setSelectedRouteId}
+              />
             </Tabs.Content>
+
+            {/* Tab 5: Vehicles */}
+            <Tabs.Content value="vehicles" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
+              <VehiclesTab
+                vehicles={vehicleDetails}
+                selectedRouteId={selectedRouteId}
+                onSelectRoute={setSelectedRouteId}
+              />
+            </Tabs.Content>
+
           </Tabs.Root>
         </Flex>
       </Card>
@@ -1366,6 +1415,9 @@ function MissionStatsBar({
   missionConfig,
   missionLaunched,
   elapsedTime = '00:00',
+  fleetMode = 'truck-drone',
+  droneCount = 2,
+  timelineSummary,
 }: {
   missionConfig: {
     nodes: { type: string }[]
@@ -1374,6 +1426,9 @@ function MissionStatsBar({
   }
   missionLaunched?: boolean
   elapsedTime?: string
+  fleetMode?: 'truck-drone' | 'truck-only' | 'drones-only'
+  droneCount?: number
+  timelineSummary?: TimelineSummary
 }) {
   const customerCount = missionConfig.nodes.filter((n) => n.type === 'customer').length
   const depotCount = missionConfig.nodes.filter((n) => n.type === 'depot').length
@@ -1381,6 +1436,8 @@ function MissionStatsBar({
   const hazardCount = missionConfig.nodes.filter((n) => n.type === 'hazard').length
 
   const totalWaypoints = missionConfig.nodes.length
+  const hasTruck = fleetMode === 'truck-drone' || fleetMode === 'truck-only'
+  const hasDrones = fleetMode === 'truck-drone' || fleetMode === 'drones-only'
 
   return (
     <Flex
@@ -1415,6 +1472,38 @@ function MissionStatsBar({
         <Settings size={14} className="text-gray-500" />
         <Text size="1" weight="medium">{missionConfig.algorithm.toUpperCase()}</Text>
       </Flex>
+      {/* Fleet display */}
+      <Flex gap="1" align="center" title={hasTruck ? 'Truck active' : 'Truck disabled'}>
+        <Truck size={14} style={{ color: hasTruck ? '#374151' : '#d1d5db' }} />
+      </Flex>
+      <Flex gap="1" align="center" title={hasDrones ? `${droneCount} drone(s)` : 'Drones disabled'}>
+        <Plane size={14} style={{ color: hasDrones ? '#3b82f6' : '#d1d5db' }} />
+        {hasDrones && <Text size="1" weight="medium">{droneCount}</Text>}
+      </Flex>
+      {/* Vehicle-specific stats from timeline summary */}
+      {timelineSummary && (
+        <>
+          <Box className="w-px h-4 bg-gray-300" />
+          {hasTruck && (
+            <Flex gap="1" align="center" title="Truck distance">
+              <Truck size={12} style={{ color: '#374151' }} />
+              <Text size="1" weight="medium">{formatDistanceTimeline(timelineSummary.truckDistance)}</Text>
+            </Flex>
+          )}
+          {hasDrones && (
+            <Flex gap="1" align="center" title="Drone distance">
+              <Plane size={12} style={{ color: '#3b82f6' }} />
+              <Text size="1" weight="medium">{formatDistanceTimeline(timelineSummary.droneDistance)}</Text>
+            </Flex>
+          )}
+          {hasTruck && hasDrones && (
+            <Flex gap="1" align="center" title="Deliveries (drone / truck)">
+              <Package size={12} className="text-gray-500" />
+              <Text size="1" weight="medium">{timelineSummary.droneDeliveries}d / {timelineSummary.truckDeliveries}t</Text>
+            </Flex>
+          )}
+        </>
+      )}
     </Flex>
   )
 }

@@ -7,7 +7,7 @@ import TextMarker from '@/components/TextMarker'
 import NumberedMarker from '@/components/NumberedMarker'
 import { useFlightPlanner } from './FlightPlannerContext'
 import { HAZARD_COLORS, NODE_COLORS } from '@/lib/constants'
-import { Circle as LucideCircle, LucideIcon, LucideProps, MapPin, Square, Zap } from 'lucide-react'
+import { Circle as LucideCircle, House, LucideIcon, LucideProps, MapPin, Zap } from 'lucide-react'
 
 interface Props {
   node: FlightNode
@@ -24,7 +24,7 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
   // Nodes are draggable only when both plot modes are OFF
 
   // Helper function: Get ALL sortie info for a node (a node can have multiple roles)
-  const { updateNode, removeNode, droneRoutes, plotModeCustomer, plotModeNodes, setSelectedNodeId } = useFlightPlanner()
+  const { updateNode, removeNode, truckRoute, droneRoutes, plotModeCustomer, plotModeNodes, setSelectedNodeId } = useFlightPlanner()
 
   const isDroneDelivery = useMemo(
     () =>
@@ -36,6 +36,15 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
       }),
     [droneRoutes, node],
   )
+
+  const isTruckDelivery = useMemo(
+    () =>
+      !isDroneDelivery && truckRoute.some(pt => pointMatchesNode(pt, node)),
+    [isDroneDelivery, truckRoute, node],
+  )
+
+  // Customer circle color: yellow=drone, blue=truck, white=unrouted
+  const customerColor = isDroneDelivery ? '#facc15' : isTruckDelivery ? '#3b82f6' : '#ffffff'
 
   const isDraggable = !plotModeCustomer && !plotModeNodes
 
@@ -62,7 +71,7 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
   const allSortieInfo = getAllSortieInfo(node)
   const marker: Marker | null = {
     depot: {
-      icon: ((props: LucideProps) => <Square fill='black' {...props} />) as LucideIcon,
+      icon: ((props: LucideProps) => <House fill='black' {...props} />) as LucideIcon,
       anchor: [0.5, 0.5] as [number, number],
       size: 16,
     },
@@ -72,8 +81,9 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
       size: 16,
     },
     station: {
-      icon: Zap,
-      anchor: [0, 0] as [number, number],
+      icon: ((props: LucideProps) => <Zap color='#f97316' {...props} />) as LucideIcon,
+      anchor: [0.5, 0.5] as [number, number],
+      size: 20,
     },
     waypoint: {
       icon: MapPin,
@@ -104,7 +114,7 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
           position={[node.lat, node.lng]}
           number={node.addressId || 0}
           size={28}
-          color="#ffffff"
+          color={customerColor}
           textColor="#000000"
           onClick={() => {
             if (!plotModeCustomer && !plotModeNodes) {

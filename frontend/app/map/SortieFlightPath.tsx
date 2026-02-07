@@ -9,13 +9,17 @@ interface Props {
 }
 
 const SortieFlightPath: FC<Props> = ({ sortie, sortieIndex }) => {
-  const { droneRoutes } = useFlightPlanner()
+  const { droneRoutes, selectedRouteId } = useFlightPlanner()
   const isFinalSortie = sortieIndex === droneRoutes.length - 1
   if (sortie.length < 3) return <></>
 
   // Each sortie gets a distinct color from the palette
   const sortieColors = ['#3b82f6', '#8b5cf6', '#ec4899', '#ef4444', '#06b6d4', '#6366f1', '#d946ef']
   const sortieColor = sortieColors[sortieIndex % sortieColors.length]
+
+  const routeId = `drone-${sortieIndex + 1}`
+  const isSelected = selectedRouteId === routeId
+  const isDimmed = selectedRouteId !== null && selectedRouteId !== routeId
 
   return (
     <>
@@ -25,9 +29,8 @@ const SortieFlightPath: FC<Props> = ({ sortie, sortieIndex }) => {
           sortie={sortie as [Point, Point, Point]}
           inboundColor={sortieColor}
           outboundColor={sortieColor}
-          // outboundLabel={`S${sortieIndex + 1} out`}
-          // inboundLabel={`S${sortieIndex + 1} in`}
-          weight={4}
+          weight={isSelected ? 6 : isDimmed ? 2 : 4}
+          opacity={isDimmed ? 0.3 : 1}
           arrowSize={isFinalSortie ? 14 : 12}
           arrowRepeat={0}
           arrowOffset='100%'

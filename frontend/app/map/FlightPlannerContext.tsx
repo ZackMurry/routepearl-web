@@ -43,6 +43,8 @@ interface FlightPlannerContextType {
   setPlotModeNodes: (mode: boolean) => void
   selectedNodeId: string | null
   setSelectedNodeId: (id: string | null) => void
+  selectedRouteId: string | null // 'truck', 'drone-1', 'drone-2', etc.
+  setSelectedRouteId: (id: string | null) => void
 
   // Mission actions
   createNewMission: () => void
@@ -91,6 +93,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [plotModeCustomer, setPlotModeCustomerInternal] = useState(false)
   const [plotModeNodes, setPlotModeNodesInternal] = useState(false)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
   const [missionLaunched, setMissionLaunched] = useState(false)
 
   // Debug logging for route changes
@@ -547,6 +550,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setPlotModeNodes,
     selectedNodeId,
     setSelectedNodeId,
+    selectedRouteId,
+    setSelectedRouteId,
     createNewMission,
     saveMission,
     loadMission,

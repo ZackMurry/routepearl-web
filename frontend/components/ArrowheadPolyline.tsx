@@ -13,6 +13,7 @@ interface ArrowheadPolylineProps {
   arrowColor?: string // Separate color for arrowheads (defaults to line color)
   arrowSize?: number
   weight?: number // Line weight/thickness
+  opacity?: number // Line opacity (0-1)
   arrowRepeat?: string | number // How often arrows appear (e.g., '50px', 100, '10%')
   arrowOffset?: string | number // Starting offset for arrows
   dashArray?: string // Dash pattern (e.g., '10, 10' for dotted lines)
@@ -24,6 +25,7 @@ export default function ArrowheadPolyline({
   arrowColor, // Defaults to line color if not specified
   arrowSize = 10,
   weight = 3,
+  opacity = 1,
   arrowRepeat = '80px', // Default: arrow every 80 pixels
   arrowOffset = '50px', // Default: start 50px from beginning
   dashArray, // e.g., '10, 5' for dashed/dotted lines
@@ -57,7 +59,7 @@ export default function ArrowheadPolyline({
     }
 
     const latlngs = positions.map(p => [p.lat, p.lng] as [number, number])
-    const polyline = L.polyline(latlngs, { color, weight, dashArray }).addTo(map)
+    const polyline = L.polyline(latlngs, { color, weight, opacity, dashArray }).addTo(map)
 
     let decorator: any = null
 
@@ -71,12 +73,13 @@ export default function ArrowheadPolyline({
             // @ts-ignore
             symbol: L_extended.Symbol.arrowHead({
               pixelSize: arrowSize,
+              headAngle: 40,
               polygon: true,
               pathOptions: {
-                color: '#000', // Black border
-                weight: 2, // Border thickness
+                color: '#000',
+                weight: 2,
                 fill: true,
-                fillColor: '#ffffff', // White fill
+                fillColor: '#ffffff',
                 fillOpacity: 1.0,
                 opacity: 1,
               },
@@ -96,7 +99,7 @@ export default function ArrowheadPolyline({
         // Ignore cleanup errors
       }
     }
-  }, [positions, color, arrowColor, effectiveArrowColor, arrowSize, weight, arrowRepeat, arrowOffset, dashArray, map, decoratorLoaded])
+  }, [positions, color, arrowColor, effectiveArrowColor, arrowSize, weight, opacity, arrowRepeat, arrowOffset, dashArray, map, decoratorLoaded])
 
   return null
 }

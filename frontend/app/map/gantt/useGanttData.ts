@@ -61,6 +61,7 @@ export function useGanttData(
         description: event.description,
         customerName: event.customerName,
         sortieNumber: event.sortieNumber,
+        distance: event.distance,
       }))
 
       vehicles.push({
@@ -114,6 +115,7 @@ export function useGanttData(
               description: event.description,
               customerName: event.customerName,
               sortieNumber: event.sortieNumber,
+              distance: event.distance,
             })
           })
         })

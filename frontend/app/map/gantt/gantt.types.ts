@@ -16,6 +16,7 @@ export interface GanttStop {
   description?: string
   customerName?: string
   sortieNumber?: number
+  distance?: number // Distance of this segment in meters
 }
 
 // Vehicle row data

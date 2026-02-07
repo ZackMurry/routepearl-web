@@ -2,11 +2,13 @@
 
 import React, { FC, useRef, useState, useEffect } from 'react'
 import { Box, Flex, Text, Button, Slider } from '@radix-ui/themes'
-import { Plus, FolderOpen, ZoomIn, ZoomOut } from 'lucide-react'
+import { Plus, FolderOpen, ZoomIn, ZoomOut, Plane, Truck } from 'lucide-react'
 import { GanttData, GanttChartState, formatGanttTime } from './gantt.types'
 import GanttTimeAxis from './GanttTimeAxis'
 import GanttRow from './GanttRow'
 import GanttCurrentTimeMarker from './GanttCurrentTimeMarker'
+
+type VehicleFilter = 'all' | 'drones' | 'trucks'
 
 interface Props {
   data: GanttData
@@ -14,6 +16,8 @@ interface Props {
   currentTime?: number // Current mission time in seconds (for live tracking)
   onCreatePlan?: () => void
   onLoadPlan?: () => void
+  vehicleFilter?: VehicleFilter
+  onVehicleFilterChange?: (filter: VehicleFilter) => void
 }
 
 const GanttChart: FC<Props> = ({
@@ -22,10 +26,44 @@ const GanttChart: FC<Props> = ({
   currentTime = 0,
   onCreatePlan,
   onLoadPlan,
+  vehicleFilter = 'all',
+  onVehicleFilterChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(800)
-  const [zoomLevel, setZoomLevel] = useState(1) // 1 = default, 0.5 = zoomed out, 2 = zoomed in
+  const [zoomLevel, setZoomLevel] = useState(1) // 1 = default, 0.5 = zoomed out, 3 = zoomed in
+  const [editingZoom, setEditingZoom] = useState(false)
+  const [zoomInputValue, setZoomInputValue] = useState('')
+  const zoomInputRef = useRef<HTMLInputElement>(null)
+
+  const ZOOM_MIN = 0.5
+  const ZOOM_MAX = 3
+  const ZOOM_STEP = 0.25
+
+  const clampZoom = (value: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value))
+
+  const zoomIn = () => setZoomLevel((prev) => clampZoom(prev + ZOOM_STEP))
+  const zoomOut = () => setZoomLevel((prev) => clampZoom(prev - ZOOM_STEP))
+
+  const handleZoomTextClick = () => {
+    setZoomInputValue(String(Math.round(zoomLevel * 100)))
+    setEditingZoom(true)
+  }
+
+  const commitZoomInput = () => {
+    const parsed = parseFloat(zoomInputValue)
+    if (!isNaN(parsed)) {
+      setZoomLevel(clampZoom(parsed / 100))
+    }
+    setEditingZoom(false)
+  }
+
+  useEffect(() => {
+    if (editingZoom && zoomInputRef.current) {
+      zoomInputRef.current.focus()
+      zoomInputRef.current.select()
+    }
+  }, [editingZoom])
 
   // Update container width on resize
   useEffect(() => {
@@ -57,10 +95,17 @@ const GanttChart: FC<Props> = ({
   // Pixels per second
   const pixelsPerSecond = timelineWidth / Math.max(data.totalDuration, 1)
 
+  // Filter vehicles based on active filter
+  const filteredVehicles = data.vehicles.filter((v) => {
+    if (vehicleFilter === 'all') return true
+    if (vehicleFilter === 'drones') return v.type === 'drone'
+    return v.type === 'truck'
+  })
+
   // Row height for calculating current time marker height
   const rowHeight = 48
   const headerHeight = 28
-  const totalContentHeight = headerHeight + data.vehicles.length * rowHeight
+  const totalContentHeight = headerHeight + filteredVehicles.length * rowHeight
 
   // Format current date
   const dateString = data.startTime.toLocaleDateString('en-US', {
@@ -136,21 +181,122 @@ const GanttChart: FC<Props> = ({
       >
         {/* Zoom control */}
         <Flex align="center" gap="2">
-          <ZoomOut size={14} style={{ color: '#6b7280' }} />
+          <ZoomOut
+            size={14}
+            style={{
+              color: zoomLevel <= ZOOM_MIN ? '#d1d5db' : '#6b7280',
+              cursor: zoomLevel <= ZOOM_MIN ? 'default' : 'pointer',
+            }}
+            onClick={zoomOut}
+          />
           <input
             type="range"
-            min="0.5"
-            max="3"
+            min={ZOOM_MIN}
+            max={ZOOM_MAX}
             step="0.1"
             value={zoomLevel}
             onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
             style={{ width: '100px' }}
           />
-          <ZoomIn size={14} style={{ color: '#6b7280' }} />
-          <Text size="1" style={{ color: '#6b7280', marginLeft: '8px' }}>
-            {Math.round(zoomLevel * 100)}%
-          </Text>
+          <ZoomIn
+            size={14}
+            style={{
+              color: zoomLevel >= ZOOM_MAX ? '#d1d5db' : '#6b7280',
+              cursor: zoomLevel >= ZOOM_MAX ? 'default' : 'pointer',
+            }}
+            onClick={zoomIn}
+          />
+          {editingZoom ? (
+            <input
+              ref={zoomInputRef}
+              type="text"
+              value={zoomInputValue}
+              onChange={(e) => setZoomInputValue(e.target.value)}
+              onBlur={commitZoomInput}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitZoomInput()
+                if (e.key === 'Escape') setEditingZoom(false)
+              }}
+              style={{
+                width: '48px',
+                marginLeft: '8px',
+                fontSize: '12px',
+                textAlign: 'center',
+                border: '1px solid #9ca3af',
+                borderRadius: '4px',
+                padding: '1px 4px',
+                outline: 'none',
+              }}
+            />
+          ) : (
+            <Text
+              size="1"
+              style={{
+                color: '#6b7280',
+                marginLeft: '8px',
+                cursor: 'pointer',
+                userSelect: 'none',
+                padding: '1px 4px',
+                borderRadius: '4px',
+                border: '1px solid transparent',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#d1d5db')}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'transparent')}
+              onClick={handleZoomTextClick}
+            >
+              {Math.round(zoomLevel * 100)}%
+            </Text>
+          )}
         </Flex>
+
+        {/* Vehicle filter toggle */}
+        {onVehicleFilterChange && (
+          <Flex
+            align="center"
+            gap="0"
+            style={{
+              backgroundColor: '#e5e7eb',
+              borderRadius: '6px',
+              padding: '2px',
+            }}
+          >
+            {([
+              { key: 'all' as VehicleFilter, label: 'All', icon: null },
+              { key: 'drones' as VehicleFilter, label: 'Drones', icon: <Plane size={12} /> },
+              { key: 'trucks' as VehicleFilter, label: 'Trucks', icon: <Truck size={12} /> },
+            ]).map((option) => {
+              const isActive = vehicleFilter === option.key
+              return (
+                <button
+                  key={option.key}
+                  onClick={() => onVehicleFilterChange(option.key)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '3px 10px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: isActive ? 500 : 400,
+                    backgroundColor: isActive ? 'white' : 'transparent',
+                    color: isActive ? '#2563eb' : '#6b7280',
+                    boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {option.icon && (
+                    <span style={{ color: isActive ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
+                      {option.icon}
+                    </span>
+                  )}
+                  {option.label}
+                </button>
+              )
+            })}
+          </Flex>
+        )}
 
         {/* Date display */}
         <Text size="1" style={{ color: '#6b7280' }}>
@@ -182,7 +328,7 @@ const GanttChart: FC<Props> = ({
 
           {/* Vehicle rows */}
           <Box style={{ position: 'relative' }}>
-            {data.vehicles.map((vehicle) => (
+            {filteredVehicles.map((vehicle) => (
               <GanttRow
                 key={vehicle.id}
                 vehicle={vehicle}
@@ -198,7 +344,7 @@ const GanttChart: FC<Props> = ({
                 <GanttCurrentTimeMarker
                   currentTime={currentTime}
                   pixelsPerSecond={pixelsPerSecond}
-                  height={data.vehicles.length * rowHeight}
+                  height={filteredVehicles.length * rowHeight}
                 />
               </Box>
             )}

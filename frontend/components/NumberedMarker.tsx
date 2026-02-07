@@ -30,39 +30,35 @@ export default function NumberedMarker({
   const [icon, setIcon] = useState<L.DivIcon | null>(null)
 
   useEffect(() => {
-    // Create a teardrop/pin-shaped marker with number
+    // Create a circle marker with number in the center
+    const fontSize = number > 99 ? size * 0.38 : size * 0.48
     const html = `
       <div style="
-        position: relative;
         width: ${size}px;
-        height: ${size * 1.4}px;
+        height: ${size}px;
+        border-radius: 50%;
+        background-color: ${color};
+        border: 2px solid #000000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
       ">
-        <svg width="${size}" height="${size * 1.4}" viewBox="0 0 24 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 1C5.925 1 1 5.925 1 12c0 8.5 11 20.5 11 20.5s11-12 11-20.5c0-6.075-4.925-11-11-11z" fill="${color}" stroke="#000000" stroke-width="2"/>
-          <circle cx="12" cy="12" r="8" fill="${color}" stroke="#000000" stroke-width="1.5"/>
-        </svg>
-        <div style="
-          position: absolute;
-          top: ${size * 0.15}px;
-          left: 0;
-          width: ${size}px;
-          height: ${size * 0.7}px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: ${number > 99 ? size * 0.35 : size * 0.45}px;
+        <span style="
+          font-size: ${fontSize}px;
           font-weight: bold;
           color: ${textColor};
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        ">${number}</div>
+          line-height: 1;
+        ">${number}</span>
       </div>
     `
 
     const leafletIcon = L.divIcon({
       html,
       className: '',
-      iconSize: [size, size * 1.4] as PointTuple,
-      iconAnchor: [size / 2, size * 1.4] as PointTuple,
+      iconSize: [size, size] as PointTuple,
+      iconAnchor: [size / 2, size / 2] as PointTuple,
     })
 
     setIcon(leafletIcon)

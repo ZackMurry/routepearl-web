@@ -17,6 +17,7 @@ interface SortieArcPathsProps {
   inboundColor?: string
 
   weight?: number
+  opacity?: number
   curvature?: number
 
   arrowSize?: number
@@ -179,6 +180,7 @@ export default function SortieArcPaths({
   inboundColor = '#f97316',
 
   weight = 4,
+  opacity = 1,
   curvature = 0.22,
 
   arrowSize = 12,
@@ -296,6 +298,7 @@ export default function SortieArcPaths({
         const strokeLine = L.polyline(leg.stroke, {
           color,
           weight,
+          opacity,
           dashArray: dashed ? dashArray ?? '8 8' : undefined,
           dashOffset,
         }).addTo(map)
@@ -314,12 +317,13 @@ export default function SortieArcPaths({
         // Arrow style configuration
         const arrowStyle = {
           pixelSize: arrowSize,
+          headAngle: 40,
           polygon: true,
           pathOptions: {
-            color: '#000', // Black border
-            weight: 2, // Border thickness
+            color: '#000',
+            weight: 2,
             fill: true,
-            fillColor: '#ffffff', // White fill
+            fillColor: '#ffffff',
             fillOpacity: 1.0,
             opacity: 1,
           },
@@ -380,6 +384,7 @@ export default function SortieArcPaths({
     arrowOffset,
     arrowRepeat,
     arrowSize,
+    opacity,
   ])
 
   const defaultLabelStyle: React.CSSProperties = {
