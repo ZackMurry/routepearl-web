@@ -34,4 +34,27 @@ declare module 'lucide-react' {
   export const Heading1: LucideIcon
   export const Heading2: LucideIcon
   export const FlagTriangleRight: LucideIcon
+  export const Hash: LucideIcon
+  export const MapPinned: LucideIcon
+  export const Lock: LucideIcon
+  export const Route: LucideIcon
+  export const LogOut: LucideIcon
+  export const ArrowUp: LucideIcon
+  export const ArrowDown: LucideIcon
+  export const MousePointer2: LucideIcon
+  export const Package: LucideIcon
+  export const Truck: LucideIcon
+  export const Plane: LucideIcon
+  export const House: LucideIcon
+  export const Zap: LucideIcon
+  export const FolderOpen: LucideIcon
+  export const Search: LucideIcon
+  export const Circle: LucideIcon
+  export const ZoomIn: LucideIcon
+  export const ZoomOut: LucideIcon
+  export const Home: LucideIcon
+  export const Navigation: LucideIcon
+  export const Battery: LucideIcon
+  export const Send: LucideIcon
+  export const Info: LucideIcon
 }

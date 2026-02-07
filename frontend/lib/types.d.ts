@@ -14,6 +14,7 @@ export interface FlightNode extends Point {
   description?: string // For hazard nodes
   addressId?: number // For customer nodes - auto-assigned, reused when deleted (displayed as Customer ID)
   flightNodeId?: number // For non-customer nodes - auto-assigned, reused when deleted
+  address?: string // Cached reverse-geocoded street address
 }
 
 export type RoutingAlgorithm = 'alns' | 'custom'

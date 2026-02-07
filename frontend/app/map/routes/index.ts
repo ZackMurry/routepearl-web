@@ -1,0 +1,6 @@
+export { default as RoutesTab } from './RoutesTab'
+export { useRouteDetails } from './useRouteDetails'
+export type { RouteDetail } from './useRouteDetails'
+export { default as VehiclesTab } from './VehiclesTab'
+export { useVehicleDetails } from './useVehicleDetails'
+export type { VehicleDetail, VehicleEventBreakdown } from './useVehicleDetails'

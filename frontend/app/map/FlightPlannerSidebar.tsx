@@ -161,8 +161,8 @@ export function FlightPlannerSidebar() {
   if (sidebarCollapsed) {
     return (
       <div className='absolute left-0 top-0 h-full z-[1000] pointer-events-auto'>
-        <Button onClick={() => setSidebarCollapsed(false)} className='mt-4 ml-2 bg-white shadow-lg hover:shadow-xl' size='2'>
-          <ChevronRight size={20} />
+        <Button onClick={() => setSidebarCollapsed(false)} className='mt-4 ml-2 bg-white shadow-lg hover:shadow-xl' size='3' style={{ cursor: 'pointer', padding: '10px' }}>
+          <ChevronRight size={24} />
         </Button>
       </div>
     )
@@ -343,8 +343,8 @@ export function FlightPlannerSidebar() {
                 Flight Planner
               </Text>
             </Flex>
-            <IconButton onClick={() => setSidebarCollapsed(true)} size='2' variant='ghost'>
-              <ChevronLeft size={20} />
+            <IconButton onClick={() => setSidebarCollapsed(true)} size='3' variant='ghost' style={{ cursor: 'pointer' }}>
+              <ChevronLeft size={24} />
             </IconButton>
           </Flex>
 

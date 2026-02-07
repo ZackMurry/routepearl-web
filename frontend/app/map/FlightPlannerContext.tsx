@@ -53,6 +53,12 @@ interface FlightPlannerContextType {
   exportMission: () => void
   importMission: (data: string) => void
 
+  // Fleet configuration
+  fleetMode: 'truck-drone' | 'truck-only' | 'drones-only'
+  setFleetMode: (mode: 'truck-drone' | 'truck-only' | 'drones-only') => void
+  droneCount: number
+  setDroneCount: (count: number) => void
+
   // Route generation
   generateRoute: () => Promise<void>
   isGeneratingRoute: boolean
@@ -94,6 +100,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [plotModeNodes, setPlotModeNodesInternal] = useState(false)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
+  const [fleetMode, setFleetMode] = useState<'truck-drone' | 'truck-only' | 'drones-only'>('truck-drone')
+  const [droneCount, setDroneCount] = useState<number>(2)
   const [missionLaunched, setMissionLaunched] = useState(false)
 
   // Debug logging for route changes
@@ -552,6 +560,10 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setSelectedNodeId,
     selectedRouteId,
     setSelectedRouteId,
+    fleetMode,
+    setFleetMode,
+    droneCount,
+    setDroneCount,
     createNewMission,
     saveMission,
     loadMission,
