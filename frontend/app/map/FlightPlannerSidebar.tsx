@@ -43,6 +43,7 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { FlightNode, HazardZone, RoutingAlgorithm } from '@/lib/types'
+import { forwardGeocode, seedAddressCache, parseCSVLine, isLatLng, csvTagToNodeType, nodeTypeToCsvTag, csvQuote } from '@/lib/geocoding'
 import { useMap } from 'react-leaflet'
 
 export function FlightPlannerSidebar() {
@@ -77,6 +78,7 @@ export function FlightPlannerSidebar() {
 
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const csvInputRef = React.useRef<HTMLInputElement>(null)
+  const [csvImporting, setCsvImporting] = useState(false)
 
   const handleImportCSV = () => {
     csvInputRef.current?.click()
@@ -84,49 +86,99 @@ export function FlightPlannerSidebar() {
 
   const handleCSVImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const content = e.target?.result as string
-        const lines = content.split('\n').slice(1) // Skip header
-        lines.forEach((line) => {
-          if (line.trim()) {
-            const [type, label, lat, lng, action, radius, severity] = line.split(',')
-            if (lat && lng) {
-              addNode({
-                type: (type as 'depot' | 'customer' | 'station' | 'waypoint' | 'hazard') || 'customer',
-                label: label || undefined,
-                lat: parseFloat(lat),
-                lng: parseFloat(lng),
-                action: action || undefined,
-                radius: radius ? parseFloat(radius) : undefined,
-                severity: (severity as 'low' | 'medium' | 'high') || undefined,
-              })
-            }
+    if (!file) return
+    if (event.target) event.target.value = ''
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      const content = e.target?.result as string
+      const lines = content.split('\n').filter(l => l.trim())
+      if (lines.length === 0) return
+
+      // Validate header
+      const header = parseCSVLine(lines[0]).map(h => h.toLowerCase())
+      const addrIdx = header.indexOf('address')
+      const tagIdx = header.indexOf('node-tag')
+      const radiusIdx = header.indexOf('radius')
+      if (addrIdx === -1 || tagIdx === -1) return
+
+      setCsvImporting(true)
+      let imported = 0
+
+      for (let i = 1; i < lines.length; i++) {
+        const fields = parseCSVLine(lines[i])
+        const addressVal = fields[addrIdx] || ''
+        const tagVal = fields[tagIdx] || ''
+        const radiusVal = radiusIdx >= 0 ? fields[radiusIdx] || '' : ''
+
+        if (!addressVal || !tagVal) continue
+
+        const nodeType = csvTagToNodeType(tagVal)
+        if (!nodeType) continue
+
+        if (nodeType === 'hazard') {
+          const r = parseFloat(radiusVal)
+          if (!radiusVal || isNaN(r) || r <= 0) continue
+        }
+
+        let lat: number, lng: number
+        let addressStr: string | undefined
+        if (isLatLng(addressVal)) {
+          const parts = addressVal.split(',').map(s => s.trim())
+          lat = parseFloat(parts[0])
+          lng = parseFloat(parts[1])
+        } else {
+          try {
+            const result = await forwardGeocode(addressVal)
+            if (!result) continue
+            lat = result.lat
+            lng = result.lng
+            addressStr = result.displayName
+          } catch {
+            continue
           }
-        })
+        }
+
+        const newNode: FlightNode = {
+          id: `node-${Date.now()}-${Math.random()}`,
+          type: nodeType,
+          lat,
+          lng,
+          address: addressStr,
+        }
+
+        if (nodeType === 'hazard') {
+          newNode.radius = parseFloat(radiusVal)
+          newNode.severity = 'medium'
+        }
+
+        addNode(newNode)
+        if (addressStr) seedAddressCache(lat, lng, addressStr)
+        imported++
       }
-      reader.readAsText(file)
+
+      setCsvImporting(false)
     }
-    // Reset input so same file can be imported again
-    if (event.target) {
-      event.target.value = ''
-    }
+    reader.readAsText(file)
   }
 
   const handleExportCSV = () => {
-    const csvContent = [
-      'Type,Label,Latitude,Longitude,Action,Radius,Severity',
-      ...missionConfig.nodes.map(
-        (node) => `${node.type},${node.label || node.addressId || ''},${node.lat},${node.lng},${node.action || ''},${node.radius || ''},${node.severity || ''}`
-      ),
-    ].join('\n')
+    const rows: string[] = ['address,node-tag,radius']
 
-    const blob = new Blob([csvContent], { type: 'text/csv' })
+    for (const node of missionConfig.nodes) {
+      const tag = nodeTypeToCsvTag(node.type)
+      if (!tag) continue
+
+      const addr = node.address || `${node.lat},${node.lng}`
+      const radius = node.type === 'hazard' && node.radius ? String(node.radius) : ''
+      rows.push(`${csvQuote(addr)},${tag},${radius}`)
+    }
+
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `${missionConfig.missionName || 'addresses'}.csv`
+    link.download = `${(missionConfig.missionName || 'addresses').replace(/\s+/g, '_')}_addresses.csv`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -468,8 +520,8 @@ export function FlightPlannerSidebar() {
                     Import/Export Addresses
                   </Text>
                   <Flex direction='column' align='center' gap='4'>
-                    <Button size='2' variant='soft' onClick={handleImportCSV}>
-                      <Upload size={16} /> Import Addresses (CSV)
+                    <Button size='2' variant='soft' onClick={handleImportCSV} disabled={csvImporting}>
+                      <Upload size={16} /> {csvImporting ? 'Importing...' : 'Import Addresses (CSV)'}
                     </Button>
                     <Button size='2' variant='soft' onClick={handleExportCSV} disabled={missionConfig.nodes.length === 0}>
                       <Download size={16} /> Export Addresses (CSV)

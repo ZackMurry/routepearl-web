@@ -121,6 +121,83 @@ export function seedAddressCache(lat: number, lng: number, address: string): voi
   }
 }
 
+// ---------- CSV Helpers ----------
+
+/** Parse a single CSV line, respecting quoted fields (handles commas inside quotes) */
+export function parseCSVLine(line: string): string[] {
+  const fields: string[] = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          current += '"'
+          i++ // skip escaped quote
+        } else {
+          inQuotes = false
+        }
+      } else {
+        current += ch
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true
+      } else if (ch === ',') {
+        fields.push(current.trim())
+        current = ''
+      } else {
+        current += ch
+      }
+    }
+  }
+  fields.push(current.trim())
+  return fields
+}
+
+/** Check if a string looks like a lat,lng coordinate pair */
+export function isLatLng(value: string): boolean {
+  const parts = value.split(',').map(s => s.trim())
+  if (parts.length !== 2) return false
+  const lat = parseFloat(parts[0])
+  const lng = parseFloat(parts[1])
+  return !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+}
+
+/** Map CSV node-tag values to internal FlightNode types */
+export function csvTagToNodeType(tag: string): 'customer' | 'depot' | 'station' | 'hazard' | null {
+  const normalized = tag.trim().toLowerCase()
+  switch (normalized) {
+    case 'customer': return 'customer'
+    case 'depot': return 'depot'
+    case 'charging station': return 'station'
+    case 'hazard': return 'hazard'
+    default: return null
+  }
+}
+
+/** Map internal FlightNode type to CSV node-tag */
+export function nodeTypeToCsvTag(type: string): string | null {
+  switch (type) {
+    case 'customer': return 'customer'
+    case 'depot': return 'depot'
+    case 'station': return 'charging station'
+    case 'hazard': return 'hazard'
+    case 'waypoint': return null // waypoints not exported
+    default: return null
+  }
+}
+
+/** Quote a CSV field if it contains commas */
+export function csvQuote(value: string): string {
+  if (value.includes(',') || value.includes('"')) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+  return value
+}
+
 /** Shorten verbose Nominatim addresses to first 3 parts */
 function shortenAddress(displayName: string): string {
   const parts = displayName.split(',').map(p => p.trim())

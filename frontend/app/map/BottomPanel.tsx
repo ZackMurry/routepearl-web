@@ -44,7 +44,7 @@ import { TimelineSummary, formatDistance as formatDistanceTimeline } from './tim
 import { GanttChart, useGanttData, generateEmptyGanttData, GanttChartState } from './gantt'
 import { RoutesTab, useRouteDetails, VehiclesTab, useVehicleDetails } from './routes'
 import { pointMatchesNode } from '@/lib/util'
-import { reverseGeocode, forwardGeocode, seedAddressCache } from '@/lib/geocoding'
+import { reverseGeocode, forwardGeocode, seedAddressCache, parseCSVLine, isLatLng, csvTagToNodeType, nodeTypeToCsvTag, csvQuote } from '@/lib/geocoding'
 
 export function BottomPanel() {
   const {
@@ -93,6 +93,8 @@ export function BottomPanel() {
   const [missionTab, setMissionTab] = useState<'gantt' | 'customers' | 'flightNodes' | 'routes' | 'vehicles'>('gantt')
   const [vehicleFilter, setVehicleFilter] = useState<'all' | 'drones' | 'trucks'>('all')
   const [nodeTab, setNodeTab] = useState<'customers' | 'flightNodes'>('customers')
+
+  const [csvImporting, setCsvImporting] = useState(false)
 
   // --- Address/Coordinate toggle state ---
   const [globalDisplayMode, setGlobalDisplayMode] = useState<'coords' | 'address'>('coords')
@@ -226,51 +228,113 @@ export function BottomPanel() {
 
   const handleCSVImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const content = e.target?.result as string
-        const lines = content.split('\n').slice(1) // Skip header
+    if (!file) return
+    // Reset input so the same file can be re-imported
+    if (event.target) event.target.value = ''
 
-        lines.forEach((line) => {
-          if (!line.trim()) return
-          const [type, label, lat, lng, action, radius, severity] = line.split(',')
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      const content = e.target?.result as string
+      const lines = content.split('\n').filter(l => l.trim())
+      if (lines.length === 0) { showToast('CSV file is empty', 'error'); return }
 
-          const nodeType = (type || 'customer') as FlightNode['type']
-          const newNode: FlightNode = {
-            id: `node-${Date.now()}-${Math.random()}`,
-            type: nodeType,
-            lat: parseFloat(lat),
-            lng: parseFloat(lng),
-            label: label || undefined,
-            action: action || undefined,
-          }
-
-          if (nodeType === 'hazard') {
-            newNode.radius = parseFloat(radius) || 100
-            newNode.severity = (severity as 'low' | 'medium' | 'high') || 'medium'
-          }
-
-          addNode(newNode)
-        })
+      // Validate header
+      const header = parseCSVLine(lines[0]).map(h => h.toLowerCase())
+      const addrIdx = header.indexOf('address')
+      const tagIdx = header.indexOf('node-tag')
+      const radiusIdx = header.indexOf('radius')
+      if (addrIdx === -1 || tagIdx === -1) {
+        showToast('CSV must have "address" and "node-tag" columns', 'error')
+        return
       }
-      reader.readAsText(file)
+
+      setCsvImporting(true)
+      let imported = 0
+      let skipped = 0
+
+      for (let i = 1; i < lines.length; i++) {
+        const fields = parseCSVLine(lines[i])
+        const addressVal = fields[addrIdx] || ''
+        const tagVal = fields[tagIdx] || ''
+        const radiusVal = radiusIdx >= 0 ? fields[radiusIdx] || '' : ''
+
+        if (!addressVal || !tagVal) { skipped++; continue }
+
+        const nodeType = csvTagToNodeType(tagVal)
+        if (!nodeType) { skipped++; continue }
+
+        // Validate radius for hazard
+        if (nodeType === 'hazard') {
+          const r = parseFloat(radiusVal)
+          if (!radiusVal || isNaN(r) || r <= 0) { skipped++; continue }
+        }
+
+        // Resolve address to lat/lng
+        let lat: number, lng: number
+        let addressStr: string | undefined
+        if (isLatLng(addressVal)) {
+          const parts = addressVal.split(',').map(s => s.trim())
+          lat = parseFloat(parts[0])
+          lng = parseFloat(parts[1])
+        } else {
+          // Forward geocode street address
+          try {
+            const result = await forwardGeocode(addressVal)
+            if (!result) { skipped++; continue }
+            lat = result.lat
+            lng = result.lng
+            addressStr = result.displayName
+          } catch {
+            skipped++; continue
+          }
+        }
+
+        const newNode: FlightNode = {
+          id: `node-${Date.now()}-${Math.random()}`,
+          type: nodeType,
+          lat,
+          lng,
+          address: addressStr,
+        }
+
+        if (nodeType === 'hazard') {
+          newNode.radius = parseFloat(radiusVal)
+          newNode.severity = 'medium'
+        }
+
+        addNode(newNode)
+        if (addressStr) seedAddressCache(lat, lng, addressStr)
+        imported++
+      }
+
+      setCsvImporting(false)
+      if (skipped > 0) {
+        showToast(`Imported ${imported} node(s), ${skipped} row(s) skipped`, imported > 0 ? 'success' : 'error')
+      } else {
+        showToast(`Imported ${imported} node(s) successfully!`, 'success')
+      }
     }
+    reader.readAsText(file)
   }
 
   const handleExportCSV = () => {
-    const csvContent = [
-      'Type,Label,Latitude,Longitude,Action,Radius,Severity',
-      ...missionConfig.nodes.map(
-        (node) => `${node.type},${node.label || node.addressId || ''},${node.lat},${node.lng},${node.action || ''},${node.radius || ''},${node.severity || ''}`
-      ),
-    ].join('\n')
+    const rows: string[] = ['address,node-tag,radius']
 
-    const blob = new Blob([csvContent], { type: 'text/csv' })
+    for (const node of missionConfig.nodes) {
+      const tag = nodeTypeToCsvTag(node.type)
+      if (!tag) continue // skip waypoints
+
+      // Use cached street address if available, otherwise fall back to lat,lng
+      const addr = node.address || `${node.lat},${node.lng}`
+      const radius = node.type === 'hazard' && node.radius ? String(node.radius) : ''
+      rows.push(`${csvQuote(addr)},${tag},${radius}`)
+    }
+
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `${missionConfig.missionName.replace(/\s+/g, '_')}_addresses.csv`
+    link.download = `${(missionConfig.missionName || 'addresses').replace(/\s+/g, '_')}_addresses.csv`
     link.click()
     URL.revokeObjectURL(url)
   }
@@ -479,7 +543,7 @@ export function BottomPanel() {
                 <ChevronUp size={24} />
               </IconButton>
             </Flex>
-            <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
+            <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
           </Flex>
         </Card>
         </div>
@@ -573,7 +637,7 @@ export function BottomPanel() {
             </Flex>
 
             {/* Stats Bar */}
-            <MissionStatsBar missionConfig={missionConfig} fleetMode={fleetMode} droneCount={droneCount} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
+            <MissionStatsBar missionConfig={missionConfig} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
 
             <Flex className="flex-1" style={{ minHeight: 0, backgroundColor: 'white' }}>
               {/* Left: Nodes with Tabs */}
@@ -1166,11 +1230,11 @@ export function BottomPanel() {
               </Flex>
 
               {/* Stats Bar */}
-              <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
+              <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
 
               {/* Tabs */}
-              <Tabs.Root value={missionTab} onValueChange={(v: string) => setMissionTab(v as 'gantt' | 'customers' | 'flightNodes' | 'routes' | 'vehicles')} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                <Tabs.List className="px-4 pt-2">
+              <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'customers' | 'flightNodes' | 'routes' | 'vehicles'); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <Tabs.List className="px-4 pt-2" style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
                   <Tabs.Trigger value="gantt">
                     <Route size={16} className="mr-1" />
                     Gantt Chart
@@ -1473,11 +1537,11 @@ export function BottomPanel() {
           </Flex>
 
           {/* Stats Bar */}
-          <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
+          <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
 
           {/* Tabs */}
-          <Tabs.Root value={missionTab} onValueChange={(v: string) => setMissionTab(v as 'gantt' | 'customers' | 'flightNodes' | 'routes' | 'vehicles')} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            <Tabs.List className="px-4 pt-2">
+          <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'customers' | 'flightNodes' | 'routes' | 'vehicles'); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <Tabs.List className="px-4 pt-2" style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
               <Tabs.Trigger value="gantt">
                 <Route size={16} className="mr-1" />
                 Gantt Chart
@@ -1713,6 +1777,7 @@ function MissionStatsBar({
   elapsedTime = '00:00',
   fleetMode = 'truck-drone',
   droneCount = 2,
+  hasRoute = false,
   timelineSummary,
 }: {
   missionConfig: {
@@ -1724,6 +1789,7 @@ function MissionStatsBar({
   elapsedTime?: string
   fleetMode?: 'truck-drone' | 'truck-only' | 'drones-only'
   droneCount?: number
+  hasRoute?: boolean
   timelineSummary?: TimelineSummary
 }) {
   const customerCount = missionConfig.nodes.filter((n) => n.type === 'customer').length
@@ -1774,7 +1840,7 @@ function MissionStatsBar({
       </Flex>
       <Flex gap="1" align="center" title={hasDrones ? `${droneCount} drone(s)` : 'Drones disabled'}>
         <Plane size={14} style={{ color: hasDrones ? '#3b82f6' : '#d1d5db' }} />
-        {hasDrones && <Text size="1" weight="medium">{droneCount}</Text>}
+        {hasDrones && <Text size="1" weight="medium">{hasRoute ? droneCount : 'X'}</Text>}
       </Flex>
       {/* Vehicle-specific stats from timeline summary */}
       {timelineSummary && (
