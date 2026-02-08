@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { MapContainer, TileLayer, useMapEvents, Circle, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import './flight-planner.css'
@@ -15,6 +15,8 @@ import SortieFlightPath from './SortieFlightPath'
 import classNames from 'classnames'
 import ClickHandler from './ClickHandler'
 import TruckRoutePath from './TruckRoutePath'
+import { forwardGeocode } from '@/lib/geocoding'
+import { Search, Crosshair, MapPin, Type } from 'lucide-react'
 
 function ZoomControl() {
   const map = useMap()
@@ -148,6 +150,211 @@ function ZoomControl() {
   )
 }
 
+type LocationMode = 'coords' | 'address'
+
+function LocationJump() {
+  const map = useMap()
+  const [mode, setMode] = useState<LocationMode>('address')
+  const [lat, setLat] = useState('')
+  const [lng, setLng] = useState('')
+  const [address, setAddress] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [error, setError] = useState('')
+  const latRef = useRef<HTMLInputElement>(null)
+  const addressRef = useRef<HTMLInputElement>(null)
+
+  const jumpToCoords = useCallback(() => {
+    const latVal = parseFloat(lat)
+    const lngVal = parseFloat(lng)
+    if (isNaN(latVal) || isNaN(lngVal) || latVal < -90 || latVal > 90 || lngVal < -180 || lngVal > 180) {
+      setError('Invalid coordinates')
+      return
+    }
+    setError('')
+    map.flyTo([latVal, lngVal], Math.max(map.getZoom(), 14))
+  }, [lat, lng, map])
+
+  const jumpToAddress = useCallback(async () => {
+    if (!address.trim()) return
+    setSearching(true)
+    setError('')
+    try {
+      const result = await forwardGeocode(address.trim())
+      if (result) {
+        map.flyTo([result.lat, result.lng], Math.max(map.getZoom(), 14))
+        setAddress(result.displayName)
+      } else {
+        setError('Location not found')
+      }
+    } catch {
+      setError('Search failed')
+    } finally {
+      setSearching(false)
+    }
+  }, [address, map])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      if (mode === 'coords') jumpToCoords()
+      else jumpToAddress()
+    }
+  }
+
+  const toggleMode = () => {
+    setError('')
+    setMode((prev) => (prev === 'coords' ? 'address' : 'coords'))
+  }
+
+  // Button style helper
+  const btnStyle: React.CSSProperties = {
+    width: 32,
+    height: 32,
+    border: 'none',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#374151',
+  }
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 12,
+        right: 130,
+        zIndex: 1000,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0,
+          backgroundColor: 'white',
+          borderRadius: 8,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          overflow: 'hidden',
+          border: '1px solid #e0e0e0',
+        }}
+      >
+        {/* Mode toggle */}
+        <button
+          onClick={toggleMode}
+          title={mode === 'coords' ? 'Switch to address search' : 'Switch to coordinates'}
+          style={{ ...btnStyle, borderRight: '1px solid #e5e7eb' }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+        >
+          {mode === 'coords' ? <Crosshair size={14} /> : <Type size={14} />}
+        </button>
+
+        {mode === 'coords' ? (
+          <>
+            <input
+              ref={latRef}
+              type="text"
+              placeholder="Lat"
+              value={lat}
+              onChange={(e) => setLat(e.target.value)}
+              onKeyDown={handleKeyDown}
+              style={{
+                width: 72,
+                height: 32,
+                border: 'none',
+                borderRight: '1px solid #e5e7eb',
+                textAlign: 'center',
+                fontSize: 12,
+                color: '#374151',
+                outline: 'none',
+                padding: '0 4px',
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Lng"
+              value={lng}
+              onChange={(e) => setLng(e.target.value)}
+              onKeyDown={handleKeyDown}
+              style={{
+                width: 72,
+                height: 32,
+                border: 'none',
+                textAlign: 'center',
+                fontSize: 12,
+                color: '#374151',
+                outline: 'none',
+                padding: '0 4px',
+              }}
+            />
+          </>
+        ) : (
+          <input
+            ref={addressRef}
+            type="text"
+            placeholder="Search address..."
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            onKeyDown={handleKeyDown}
+            style={{
+              width: 160,
+              height: 32,
+              border: 'none',
+              fontSize: 12,
+              color: '#374151',
+              outline: 'none',
+              padding: '0 8px',
+            }}
+          />
+        )}
+
+        {/* Go button */}
+        <button
+          onClick={mode === 'coords' ? jumpToCoords : jumpToAddress}
+          disabled={searching}
+          title="Jump to location"
+          style={{
+            ...btnStyle,
+            borderLeft: '1px solid #e5e7eb',
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            opacity: searching ? 0.6 : 1,
+          }}
+          onMouseEnter={(e) => { if (!searching) e.currentTarget.style.backgroundColor = '#2563eb' }}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#3b82f6')}
+        >
+          {searching ? (
+            <span style={{ fontSize: 11, fontWeight: 500 }}>...</span>
+          ) : (
+            <Search size={14} />
+          )}
+        </button>
+      </div>
+
+      {/* Error message */}
+      {error && (
+        <div
+          style={{
+            backgroundColor: '#fef2f2',
+            color: '#dc2626',
+            fontSize: 11,
+            padding: '4px 8px',
+            borderRadius: 6,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+            border: '1px solid #fecaca',
+          }}
+        >
+          {error}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function MapCenterTracker() {
   const map = useMap()
   const { setMapCenter } = useFlightPlanner()
@@ -206,6 +413,7 @@ function MapContent() {
 
           <ClickHandler />
           <ZoomControl />
+          <LocationJump />
           <MapCenterTracker />
 
           {/* Render flight nodes */}

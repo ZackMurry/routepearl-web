@@ -59,4 +59,6 @@ declare module 'lucide-react' {
   export const Info: LucideIcon
   export const LayoutGrid: LucideIcon
   export const Table2: LucideIcon
+  export const Crosshair: LucideIcon
+  export const Type: LucideIcon
 }
