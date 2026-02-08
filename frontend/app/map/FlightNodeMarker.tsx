@@ -87,7 +87,7 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
     },
     waypoint: {
       icon: MapPin,
-      anchor: [0, 0] as [number, number],
+      anchor: [0.5, 1.0] as [number, number],
     },
     hazard: null,
   }[node.type]
@@ -114,8 +114,8 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
           position={[node.lat, node.lng]}
           number={node.orderId || 0}
           size={24}
-          color="#ffffff"
-          textColor="#000000"
+          color={orderColor}
+          textColor={isTruckDelivery ? '#ffffff' : '#000000'}
           selected={selectedNodeId === node.id}
           onClick={() => {
             if (!plotModeOrder && !plotModeNodes) {

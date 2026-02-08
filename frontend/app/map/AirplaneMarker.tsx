@@ -6,7 +6,8 @@ import airplaneIcon from './airplane.png'
 
 const icon = L.icon({
   iconSize: [45, 45],
-  popupAnchor: [2, -20],
+  iconAnchor: [22.5, 22.5],
+  popupAnchor: [0, -22.5],
   iconUrl: 'https://mysql-backup-base.s3.amazonaws.com/New%20Project%20%281%29.png',
 })
 

@@ -6,6 +6,9 @@ export type GanttStopType = 'depot' | 'delivery' | 'launch' | 'return' | 'chargi
 // Vehicle type
 export type GanttVehicleType = 'truck' | 'drone'
 
+// Axis mode for toggling between duration and distance
+export type GanttAxisMode = 'duration' | 'distance'
+
 // Individual stop on the Gantt chart
 export interface GanttStop {
   id: string
@@ -17,6 +20,7 @@ export interface GanttStop {
   orderName?: string
   sortieNumber?: number
   distance?: number // Distance of this segment in meters
+  cumulativeDistance?: number // Cumulative distance from mission start in meters
 }
 
 // Vehicle row data
@@ -33,6 +37,7 @@ export interface GanttVehicle {
 export interface GanttData {
   vehicles: GanttVehicle[]
   totalDuration: number // Total mission duration in seconds
+  totalDistance?: number // Total mission distance in meters
   startTime: Date
 }
 
@@ -81,4 +86,12 @@ export function formatGanttTime(seconds: number): string {
     return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
   return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+// Format distance in meters to human readable (e.g. "500 m", "1.2 km")
+export function formatGanttDistance(meters: number): string {
+  if (meters < 1000) {
+    return `${Math.round(meters)} m`
+  }
+  return `${(meters / 1000).toFixed(1)} km`
 }

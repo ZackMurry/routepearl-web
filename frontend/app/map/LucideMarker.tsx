@@ -42,15 +42,19 @@ export default function LucideMarker({
     const effectiveSize = size * scale
     const iconMarkup = renderToStaticMarkup(<LucideIcon size={effectiveSize} color={color} />)
 
-    // Wrap with a highlight ring when selected
+    // Padding added around the icon when selected (for the highlight ring)
+    const pad = selected ? 6 : 0
+    const outerSize = effectiveSize + pad * 2
+
+    // When selected, center the icon inside a larger container with a highlight ring
     const html = selected
-      ? `<div style="position:relative;display:inline-block;">
+      ? `<div style="width:${outerSize}px;height:${outerSize}px;position:relative;">
            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${effectiveSize + 10}px;height:${effectiveSize + 10}px;border-radius:50%;background:rgba(37,99,235,0.15);border:2px solid #2563eb;"></div>
-           ${iconMarkup}
+           <div style="position:absolute;left:${pad}px;top:${pad}px;">${iconMarkup}</div>
          </div>`
       : iconMarkup
 
-    // Map alignment strings to iconAnchor coordinates
+    // Compute base anchor relative to the icon SVG
     const anchors: Record<Align, [number, number]> = {
       center: [effectiveSize / 2, effectiveSize / 2],
       bottom: [effectiveSize / 2, effectiveSize],
@@ -63,16 +67,20 @@ export default function LucideMarker({
       'top-right': [effectiveSize, 0],
     }
 
-    const outerSize = selected ? effectiveSize + 12 : effectiveSize
+    // Base anchor is always relative to the icon SVG content
+    const baseAnchor: PointTuple = anchor
+      ? (anchor.map(it => it * effectiveSize) as PointTuple)
+      : anchors[align]
+
+    // When selected, offset the anchor by the padding so it still points to the
+    // same spot on the icon SVG (which is now inset by `pad` within the container)
+    const finalAnchor: PointTuple = [baseAnchor[0] + pad, baseAnchor[1] + pad]
+
     const leafletIcon = L.divIcon({
       html,
       className: '',
       iconSize: [outerSize, outerSize],
-      iconAnchor: anchor
-        ? (anchor.map(it => it * effectiveSize) as PointTuple)
-        : selected
-          ? [outerSize / 2, outerSize / 2]
-          : anchors[align],
+      iconAnchor: finalAnchor,
     })
 
     setIcon(leafletIcon)

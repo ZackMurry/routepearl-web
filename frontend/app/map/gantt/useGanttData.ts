@@ -64,6 +64,13 @@ export function useGanttData(
         distance: event.distance,
       }))
 
+      // Compute cumulative distance for truck stops
+      let truckCumDist = 0
+      truckStops.forEach((stop) => {
+        truckCumDist += stop.distance || 0
+        stop.cumulativeDistance = truckCumDist
+      })
+
       vehicles.push({
         id: 'truck-1',
         name: 'Truck',
@@ -123,6 +130,13 @@ export function useGanttData(
         // Sort stops by time
         droneStops.sort((a, b) => a.time - b.time)
 
+        // Compute cumulative distance for drone stops
+        let droneCumDist = 0
+        droneStops.forEach((stop) => {
+          droneCumDist += stop.distance || 0
+          stop.cumulativeDistance = droneCumDist
+        })
+
         vehicles.push({
           id: `drone-${droneNum}`,
           name: `Drone ${droneNum}`,
@@ -137,6 +151,7 @@ export function useGanttData(
     return {
       vehicles,
       totalDuration: summary.totalDuration,
+      totalDistance: summary.totalDistance,
       startTime: new Date(),
     }
   }, [timelineResult, fleetMode, droneCount])

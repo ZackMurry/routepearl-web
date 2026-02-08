@@ -1,9 +1,9 @@
 'use client'
 
 import React, { FC, useRef, useState, useEffect } from 'react'
-import { Box, Flex, Text, Button, Slider } from '@radix-ui/themes'
-import { Plus, FolderOpen, ZoomIn, ZoomOut, Plane, Truck } from 'lucide-react'
-import { GanttData, GanttChartState, formatGanttTime } from './gantt.types'
+import { Box, Flex, Text, Button } from '@radix-ui/themes'
+import { Plus, FolderOpen, ZoomIn, ZoomOut, Plane, Truck, Clock, Route } from 'lucide-react'
+import { GanttData, GanttChartState, GanttAxisMode, formatGanttTime, formatGanttDistance } from './gantt.types'
 import GanttTimeAxis from './GanttTimeAxis'
 import GanttRow from './GanttRow'
 import GanttCurrentTimeMarker from './GanttCurrentTimeMarker'
@@ -20,6 +20,16 @@ interface Props {
   onVehicleFilterChange?: (filter: VehicleFilter) => void
 }
 
+// Pick a "nice" grid interval in pixels for distance mode
+function niceDistanceGridInterval(totalMeters: number, zoomLevel: number): number {
+  const target = totalMeters / (5 * zoomLevel)
+  const niceSteps = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000]
+  for (const step of niceSteps) {
+    if (step >= target) return step
+  }
+  return 50000
+}
+
 const GanttChart: FC<Props> = ({
   data,
   state,
@@ -31,9 +41,10 @@ const GanttChart: FC<Props> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(800)
-  const [zoomLevel, setZoomLevel] = useState(1) // 1 = default, 0.5 = zoomed out, 3 = zoomed in
+  const [zoomLevel, setZoomLevel] = useState(1)
   const [editingZoom, setEditingZoom] = useState(false)
   const [zoomInputValue, setZoomInputValue] = useState('')
+  const [axisMode, setAxisMode] = useState<GanttAxisMode>('duration')
   const zoomInputRef = useRef<HTMLInputElement>(null)
 
   const ZOOM_MIN = 0.5
@@ -69,7 +80,6 @@ const GanttChart: FC<Props> = ({
   useEffect(() => {
     const updateWidth = () => {
       if (containerRef.current) {
-        // Subtract label width (150px) from total width
         setContainerWidth(containerRef.current.offsetWidth - 150)
       }
     }
@@ -77,7 +87,6 @@ const GanttChart: FC<Props> = ({
     updateWidth()
     window.addEventListener('resize', updateWidth)
 
-    // Also observe container size changes
     const observer = new ResizeObserver(updateWidth)
     if (containerRef.current) {
       observer.observe(containerRef.current)
@@ -92,8 +101,17 @@ const GanttChart: FC<Props> = ({
   // Calculate timeline width based on zoom
   const timelineWidth = containerWidth * zoomLevel
 
-  // Pixels per second
-  const pixelsPerSecond = timelineWidth / Math.max(data.totalDuration, 1)
+  // Compute pixels per unit based on axis mode
+  const isDistanceMode = axisMode === 'distance'
+  const totalUnits = isDistanceMode
+    ? Math.max(data.totalDistance || 1, 1)
+    : Math.max(data.totalDuration, 1)
+  const pixelsPerUnit = timelineWidth / totalUnits
+
+  // Grid interval in pixels (for row grid lines)
+  const gridIntervalPx = isDistanceMode
+    ? niceDistanceGridInterval(totalUnits, zoomLevel) * pixelsPerUnit
+    : 300 * pixelsPerUnit // 5 minutes
 
   // Filter vehicles based on active filter
   const filteredVehicles = data.vehicles.filter((v) => {
@@ -115,7 +133,7 @@ const GanttChart: FC<Props> = ({
     year: 'numeric',
   })
 
-  // No plan state - show placeholder with CTAs
+  // No plan state
   if (state === 'no-plan') {
     return (
       <Box
@@ -131,12 +149,7 @@ const GanttChart: FC<Props> = ({
           padding: '24px',
         }}
       >
-        <Box
-          style={{
-            textAlign: 'center',
-            maxWidth: '400px',
-          }}
-        >
+        <Box style={{ textAlign: 'center', maxWidth: '400px' }}>
           <Text size="4" weight="bold" style={{ color: '#6b7280', display: 'block', marginBottom: '8px' }}>
             No Flight Plan Loaded
           </Text>
@@ -158,6 +171,23 @@ const GanttChart: FC<Props> = ({
     )
   }
 
+  // Segmented toggle button style helper
+  const segBtn = (isActive: boolean) => ({
+    display: 'flex' as const,
+    alignItems: 'center' as const,
+    gap: '4px',
+    padding: '3px 10px',
+    borderRadius: '4px',
+    border: 'none' as const,
+    cursor: 'pointer' as const,
+    fontSize: '11px',
+    fontWeight: isActive ? 500 : 400,
+    backgroundColor: isActive ? 'white' : 'transparent',
+    color: isActive ? '#2563eb' : '#6b7280',
+    boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+    transition: 'all 0.15s ease',
+  })
+
   return (
     <Box
       ref={containerRef}
@@ -175,8 +205,8 @@ const GanttChart: FC<Props> = ({
         align="center"
         style={{
           padding: '8px 12px',
-          borderBottom: '1px solid #e5e7eb',
-          backgroundColor: '#f9fafb',
+          borderBottom: '1px solid #d1d5db',
+          backgroundColor: '#f3f4f6',
         }}
       >
         {/* Zoom control */}
@@ -240,13 +270,37 @@ const GanttChart: FC<Props> = ({
                 borderRadius: '4px',
                 border: '1px solid transparent',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#d1d5db')}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'transparent')}
+              onMouseEnter={(e: React.MouseEvent<HTMLSpanElement>) => (e.currentTarget.style.borderColor = '#d1d5db')}
+              onMouseLeave={(e: React.MouseEvent<HTMLSpanElement>) => (e.currentTarget.style.borderColor = 'transparent')}
               onClick={handleZoomTextClick}
             >
               {Math.round(zoomLevel * 100)}%
             </Text>
           )}
+        </Flex>
+
+        {/* Axis mode toggle */}
+        <Flex
+          align="center"
+          gap="0"
+          style={{
+            backgroundColor: '#e5e7eb',
+            borderRadius: '6px',
+            padding: '2px',
+          }}
+        >
+          <button style={segBtn(axisMode === 'duration')} onClick={() => setAxisMode('duration')}>
+            <span style={{ color: axisMode === 'duration' ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
+              <Clock size={12} />
+            </span>
+            Duration
+          </button>
+          <button style={segBtn(axisMode === 'distance')} onClick={() => setAxisMode('distance')}>
+            <span style={{ color: axisMode === 'distance' ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
+              <Route size={12} />
+            </span>
+            Distance
+          </button>
         </Flex>
 
         {/* Vehicle filter toggle */}
@@ -270,21 +324,7 @@ const GanttChart: FC<Props> = ({
                 <button
                   key={option.key}
                   onClick={() => onVehicleFilterChange(option.key)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '3px 10px',
-                    borderRadius: '4px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '11px',
-                    fontWeight: isActive ? 500 : 400,
-                    backgroundColor: isActive ? 'white' : 'transparent',
-                    color: isActive ? '#2563eb' : '#6b7280',
-                    boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                    transition: 'all 0.15s ease',
-                  }}
+                  style={segBtn(isActive)}
                 >
                   {option.icon && (
                     <span style={{ color: isActive ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
@@ -303,23 +343,27 @@ const GanttChart: FC<Props> = ({
           {dateString}
         </Text>
 
-        {/* Duration info */}
+        {/* Duration / Distance info */}
         <Text size="1" style={{ color: '#6b7280' }}>
-          Duration: {formatGanttTime(data.totalDuration)}
+          {isDistanceMode
+            ? `Distance: ${formatGanttDistance(data.totalDistance || 0)}`
+            : `Duration: ${formatGanttTime(data.totalDuration)}`}
         </Text>
       </Flex>
 
       {/* Scrollable timeline content */}
       <Box style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
         <Box style={{ minWidth: `${timelineWidth + 150}px` }}>
-          {/* Time axis */}
+          {/* Time/Distance axis */}
           <Flex>
             {/* Empty space for label column */}
-            <Box style={{ width: '150px', minWidth: '150px', backgroundColor: '#f9fafb', borderRight: '1px solid #e5e7eb' }} />
-            {/* Time axis */}
+            <Box style={{ width: '150px', minWidth: '150px', backgroundColor: '#f3f4f6', borderRight: '1px solid #d1d5db' }} />
+            {/* Axis */}
             <Box style={{ flex: 1, position: 'relative' }}>
               <GanttTimeAxis
                 totalDuration={data.totalDuration}
+                totalDistance={data.totalDistance}
+                axisMode={axisMode}
                 zoomLevel={zoomLevel}
                 width={timelineWidth}
               />
@@ -328,23 +372,28 @@ const GanttChart: FC<Props> = ({
 
           {/* Vehicle rows */}
           <Box style={{ position: 'relative' }}>
-            {filteredVehicles.map((vehicle) => (
+            {filteredVehicles.map((vehicle, index) => (
               <GanttRow
                 key={vehicle.id}
                 vehicle={vehicle}
-                pixelsPerSecond={pixelsPerSecond}
+                pixelsPerUnit={pixelsPerUnit}
                 totalDuration={data.totalDuration}
+                totalDistance={data.totalDistance}
+                axisMode={axisMode}
+                rowIndex={index}
                 isGreyed={state === 'empty-fleet'}
+                gridIntervalPx={gridIntervalPx}
               />
             ))}
 
-            {/* Current time marker - only show during mission */}
+            {/* Current time marker - only show during mission in duration mode */}
             {currentTime > 0 && (
               <Box style={{ position: 'absolute', top: 0, left: '150px', right: 0, height: '100%', pointerEvents: 'none' }}>
                 <GanttCurrentTimeMarker
                   currentTime={currentTime}
-                  pixelsPerSecond={pixelsPerSecond}
+                  pixelsPerSecond={isDistanceMode ? 0 : pixelsPerUnit}
                   height={filteredVehicles.length * rowHeight}
+                  axisMode={axisMode}
                 />
               </Box>
             )}

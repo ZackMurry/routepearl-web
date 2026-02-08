@@ -1,15 +1,19 @@
 'use client'
 
 import React, { FC } from 'react'
-import { formatGanttTime } from './gantt.types'
+import { GanttAxisMode, formatGanttTime } from './gantt.types'
 
 interface Props {
   currentTime: number // in seconds from mission start
   pixelsPerSecond: number
   height: number // container height in pixels
+  axisMode: GanttAxisMode
 }
 
-const GanttCurrentTimeMarker: FC<Props> = ({ currentTime, pixelsPerSecond, height }) => {
+const GanttCurrentTimeMarker: FC<Props> = ({ currentTime, pixelsPerSecond, height, axisMode }) => {
+  // Hide in distance mode — no concept of "current distance"
+  if (axisMode === 'distance') return null
+
   const leftPosition = currentTime * pixelsPerSecond + 16
 
   return (

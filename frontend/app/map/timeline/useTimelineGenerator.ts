@@ -85,6 +85,7 @@ interface SignificantPoint {
   type: 'depot' | 'order' | 'station' | 'drone_launch' | 'drone_recover'
   node?: FlightNode
   sortieNumber?: number
+  orderNode?: FlightNode // The order being delivered (for drone launch/recover)
 }
 
 /**
@@ -283,11 +284,15 @@ export function useTimelineGenerator(
         )
         if (sortieIdx >= 0) {
           matchedLaunches.add(sortieIdx)
+          // Look up the order at this sortie's delivery point
+          const deliveryPoint = droneRoutes[sortieIdx][1]
+          const orderAtDelivery = findOrderAtLocation(deliveryPoint, nodes)
           significantPoints.push({
             index: i,
             point,
             type: 'drone_launch',
             sortieNumber: sortieIdx + 1,
+            orderNode: orderAtDelivery,
           })
         }
       }
@@ -302,11 +307,14 @@ export function useTimelineGenerator(
         )
         if (sortieIdx >= 0) {
           matchedRecovers.add(sortieIdx)
+          const deliveryPoint = droneRoutes[sortieIdx][1]
+          const orderAtDelivery = findOrderAtLocation(deliveryPoint, nodes)
           significantPoints.push({
             index: i,
             point,
             type: 'drone_recover',
-            sortieNumber: sortieIdx >= 0 ? sortieIdx + 1 : undefined,
+            sortieNumber: sortieIdx + 1,
+            orderNode: orderAtDelivery,
           })
         }
       }
@@ -341,6 +349,44 @@ export function useTimelineGenerator(
         })
       }
     }
+
+    // Ensure all truck-delivered orders are included as significant points.
+    // The point-by-point scan above may miss orders whose coordinates don't
+    // exactly match a truck route point (e.g. road-snapped routes). For each
+    // order that is NOT drone-served and NOT already found, find the closest
+    // truck route point and inject it.
+    const matchedOrderIds = new Set(
+      significantPoints.filter((sp) => sp.type === 'order').map((sp) => sp.node?.id)
+    )
+    const truckDeliveredOrders = nodes.filter(
+      (n) => n.type === 'order' && !pointMatchesAny({ lat: n.lat, lng: n.lng }, droneDeliveryPoints)
+    )
+    for (const order of truckDeliveredOrders) {
+      if (matchedOrderIds.has(order.id)) continue
+
+      // Find the closest truck route point to this order
+      let closestIdx = -1
+      let closestDist = Infinity
+      for (let i = 1; i < truckRoute.length; i++) {
+        const d = calculateDistance(truckRoute[i], { lat: order.lat, lng: order.lng })
+        if (d < closestDist) {
+          closestDist = d
+          closestIdx = i
+        }
+      }
+
+      if (closestIdx >= 0) {
+        significantPoints.push({
+          index: closestIdx,
+          point: truckRoute[closestIdx],
+          type: 'order',
+          node: order,
+        })
+      }
+    }
+
+    // Re-sort significant points by route index so events are in order
+    significantPoints.sort((a, b) => a.index - b.index)
 
     // Add final point if it's not already included and is significant
     const lastIdx = truckRoute.length - 1
@@ -413,7 +459,8 @@ export function useTimelineGenerator(
           truckCumulativeTime += config.truckDeliveryTimeSeconds
           break
 
-        case 'drone_launch':
+        case 'drone_launch': {
+          const launchOrderName = currSig.orderNode?.label
           truckEvents.push({
             id: nextId(),
             type: 'truck_drone_launch',
@@ -421,16 +468,19 @@ export function useTimelineGenerator(
             waypointIndex: currSig.index,
             sortieNumber: currSig.sortieNumber,
             location: currSig.point,
-            label: `Launch Drone${currSig.sortieNumber ? ` (Sortie ${currSig.sortieNumber})` : ''}`,
-            description: 'Truck stops to launch drone',
+            label: `Launch Drone → ${launchOrderName || 'Delivery'}`,
+            orderName: launchOrderName,
+            description: `Truck stops to launch drone for ${launchOrderName || 'delivery'}`,
             estimatedDuration: config.droneLoadTimeSeconds,
             cumulativeTime: truckCumulativeTime,
             status: 'pending',
           })
           truckCumulativeTime += config.droneLoadTimeSeconds
           break
+        }
 
-        case 'drone_recover':
+        case 'drone_recover': {
+          const recoverOrderName = currSig.orderNode?.label
           truckEvents.push({
             id: nextId(),
             type: 'truck_drone_recover',
@@ -438,14 +488,16 @@ export function useTimelineGenerator(
             waypointIndex: currSig.index,
             sortieNumber: currSig.sortieNumber,
             location: currSig.point,
-            label: `Recover Drone${currSig.sortieNumber ? ` (Sortie ${currSig.sortieNumber})` : ''}`,
-            description: 'Truck stops to recover drone',
-            estimatedDuration: config.droneLoadTimeSeconds, // Recovery takes similar time
+            label: `Recover Drone ← ${recoverOrderName || 'Delivery'}`,
+            orderName: recoverOrderName,
+            description: `Truck stops to recover drone after ${recoverOrderName || 'delivery'}`,
+            estimatedDuration: config.droneLoadTimeSeconds,
             cumulativeTime: truckCumulativeTime,
             status: 'pending',
           })
           truckCumulativeTime += config.droneLoadTimeSeconds
           break
+        }
 
         case 'station':
           truckEvents.push({
@@ -489,9 +541,9 @@ export function useTimelineGenerator(
         case 'order':
           return sig.node?.label || 'Order'
         case 'drone_launch':
-          return `Launch Point${sig.sortieNumber ? ` #${sig.sortieNumber}` : ''}`
+          return sig.orderNode?.label ? `Launch → ${sig.orderNode.label}` : `Launch Point${sig.sortieNumber ? ` #${sig.sortieNumber}` : ''}`
         case 'drone_recover':
-          return `Recovery Point${sig.sortieNumber ? ` #${sig.sortieNumber}` : ''}`
+          return sig.orderNode?.label ? `Recover ← ${sig.orderNode.label}` : `Recovery Point${sig.sortieNumber ? ` #${sig.sortieNumber}` : ''}`
         case 'station':
           return sig.node?.label || 'Charging Station'
         case 'depot':

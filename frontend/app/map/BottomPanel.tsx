@@ -224,10 +224,6 @@ export function BottomPanel() {
         const content = e.target?.result as string
         console.log('File content loaded, importing mission...')
         importMission(content)
-        // Show success toast after a brief delay to ensure state is updated
-        setTimeout(() => {
-          showToast(`Mission imported successfully!`, 'success')
-        }, 100)
       }
       reader.readAsText(file)
     }
@@ -402,6 +398,26 @@ export function BottomPanel() {
   const hasRoute = truckRoute.length > 0 || droneRoutes.length > 0
   const orderNodes = missionConfig.nodes.filter((n) => n.type === 'order')
   const flightNodes = missionConfig.nodes.filter((n) => n.type !== 'order')
+
+  // When a node is selected (e.g. by clicking a map marker), switch to the correct tab
+  useEffect(() => {
+    if (!selectedNodeId) return
+    const node = missionConfig.nodes.find((n) => n.id === selectedNodeId)
+    if (!node) return
+
+    const targetTab = node.type === 'order' ? 'orders' : 'flightNodes'
+
+    if (isFlightPlannerMode) {
+      setNodeTab(targetTab)
+    } else {
+      setMissionTab(targetTab)
+    }
+
+    // Also expand the bottom panel if collapsed
+    if (!bottomPanelExpanded) {
+      setBottomPanelExpanded(true)
+    }
+  }, [selectedNodeId])
 
   // Compute delivery vehicle for each order: 'drone' | 'truck' | 'unrouted'
   const orderDeliveryMap = useMemo(() => {
@@ -1658,6 +1674,7 @@ export function BottomPanel() {
             </Flex>
           </Card>
         </div>
+        <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
         <ToastUI />
       </>
     )
@@ -2042,6 +2059,7 @@ export function BottomPanel() {
         </Flex>
       </Card>
       </div>
+      <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
       <ToastUI />
     </>
   )

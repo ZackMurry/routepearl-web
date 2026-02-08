@@ -98,7 +98,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [activePanelTab, setActivePanelTab] = useState<'overview' | 'nodes' | 'advanced'>('overview')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [bottomPanelExpanded, setBottomPanelExpanded] = useState(false)
-  const [bottomPanelHeight, setBottomPanelHeight] = useState(330) // Default height increased to show Save Plan section
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(390) // Default height increased for better visibility
   const [isFlightPlannerMode, setIsFlightPlannerMode] = useState(false) // Default to mission management mode
   const [isGeneratingRoute, setIsGeneratingRoute] = useState(false)
   const [plotModeOrder, setPlotModeOrderInternal] = useState(false)

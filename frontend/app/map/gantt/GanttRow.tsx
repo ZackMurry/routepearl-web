@@ -1,19 +1,24 @@
 'use client'
 
 import React, { FC } from 'react'
-import { GanttVehicle } from './gantt.types'
+import { GanttVehicle, GanttAxisMode } from './gantt.types'
 import GanttStopIcon from './GanttStopIcon'
 import { Truck, Plane } from 'lucide-react'
 
 interface Props {
   vehicle: GanttVehicle
-  pixelsPerSecond: number
+  pixelsPerUnit: number
   totalDuration: number
+  totalDistance?: number
+  axisMode: GanttAxisMode
+  rowIndex: number
   isGreyed?: boolean // For empty fleet state
+  gridIntervalPx: number // Pixel spacing for grid lines
 }
 
-const GanttRow: FC<Props> = ({ vehicle, pixelsPerSecond, totalDuration, isGreyed = false }) => {
+const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDistance, axisMode, rowIndex, isGreyed = false, gridIntervalPx }) => {
   const rowHeight = 48
+  const isEven = rowIndex % 2 === 0
 
   return (
     <div
@@ -21,7 +26,7 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerSecond, totalDuration, isGreyed
       style={{
         display: 'flex',
         height: `${rowHeight}px`,
-        borderBottom: '1px solid #e5e7eb',
+        borderBottom: '1px solid #d1d5db',
         opacity: isGreyed ? 0.4 : 1,
       }}
     >
@@ -34,8 +39,9 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerSecond, totalDuration, isGreyed
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          borderRight: '1px solid #e5e7eb',
-          backgroundColor: '#f9fafb',
+          borderRight: '1px solid #d1d5db',
+          backgroundColor: '#f3f4f6',
+          borderLeft: `3px solid ${vehicle.color}`,
         }}
       >
         {/* Vehicle icon */}
@@ -73,10 +79,10 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerSecond, totalDuration, isGreyed
         style={{
           flex: 1,
           position: 'relative',
-          backgroundColor: isGreyed ? '#f3f4f6' : 'white',
+          backgroundColor: isGreyed ? '#f3f4f6' : isEven ? 'rgba(249,250,251,0.5)' : 'white',
         }}
       >
-        {/* Grid lines (optional subtle background) */}
+        {/* Grid lines */}
         <div
           style={{
             position: 'absolute',
@@ -84,8 +90,8 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerSecond, totalDuration, isGreyed
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundImage: 'linear-gradient(90deg, #f3f4f6 1px, transparent 1px)',
-            backgroundSize: `${300 * pixelsPerSecond}px 100%`, // Grid every 5 minutes
+            backgroundImage: 'linear-gradient(90deg, #e5e7eb 1px, transparent 1px)',
+            backgroundSize: `${gridIntervalPx}px 100%`,
             backgroundPositionX: '16px',
             pointerEvents: 'none',
           }}
@@ -98,8 +104,9 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerSecond, totalDuration, isGreyed
               key={`${vehicle.id}-${stop.id}-${index}`}
               stop={stop}
               vehicleColor={vehicle.color}
-              pixelsPerSecond={pixelsPerSecond}
+              pixelsPerUnit={pixelsPerUnit}
               totalDuration={totalDuration}
+              axisMode={axisMode}
             />
           ))}
 
