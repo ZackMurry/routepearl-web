@@ -44,10 +44,12 @@ export interface TimelineSummary {
   completedEvents: number
   droneEvents: number
   truckEvents: number
-  totalDuration: number // Total mission duration in seconds
+  totalDuration: number // Wall-clock mission duration in seconds (max of truck, drone)
   totalDistance: number // Total distance in meters
   droneDistance: number // Drone-only distance in meters
   truckDistance: number // Truck-only distance in meters
+  truckDuration: number // Truck timeline duration in seconds
+  droneDuration: number // Drone timeline duration in seconds (all sorties)
   deliveryCount: number // Number of deliveries
   droneDeliveries: number
   truckDeliveries: number

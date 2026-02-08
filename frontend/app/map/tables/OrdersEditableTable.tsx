@@ -2,7 +2,7 @@
 
 import React, { FC } from 'react'
 import { Badge, Flex, IconButton, TextField, Button, ScrollArea } from '@radix-ui/themes'
-import { Trash2, Search } from 'lucide-react'
+import { Trash2, Search, ChevronUp, ChevronDown } from 'lucide-react'
 import { MissionSite } from '@/lib/types'
 
 interface Props {
@@ -62,30 +62,66 @@ const OrdersEditableTable: FC<Props> = ({
                 {displayMode === 'coords' ? (
                   <>
                     <td>
-                      <TextField.Root
-                        value={order.lat}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          updateNode(order.id, { lat: parseFloat(e.target.value) || 0, address: undefined })
-                        }
-                        placeholder="Latitude"
-                        size="1"
-                        type="number"
-                        step="0.0001"
-                        style={{ width: '100%' }}
-                      />
+                      <Flex align="center" gap="1">
+                        <TextField.Root
+                          value={order.lat}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            updateNode(order.id, { lat: parseFloat(e.target.value) || 0, address: undefined })
+                          }
+                          placeholder="Latitude"
+                          size="1"
+                          type="number"
+                          step="0.0001"
+                          style={{ flex: 1, minWidth: 0 }}
+                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            className="coord-spinner"
+                            onClick={(e: React.MouseEvent) => { e.stopPropagation(); updateNode(order.id, { lat: Math.round((order.lat + 0.0001) * 10000) / 10000, address: undefined }) }}
+                          >
+                            <ChevronUp size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            className="coord-spinner"
+                            onClick={(e: React.MouseEvent) => { e.stopPropagation(); updateNode(order.id, { lat: Math.round((order.lat - 0.0001) * 10000) / 10000, address: undefined }) }}
+                          >
+                            <ChevronDown size={12} />
+                          </button>
+                        </div>
+                      </Flex>
                     </td>
                     <td>
-                      <TextField.Root
-                        value={order.lng}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          updateNode(order.id, { lng: parseFloat(e.target.value) || 0, address: undefined })
-                        }
-                        placeholder="Longitude"
-                        size="1"
-                        type="number"
-                        step="0.0001"
-                        style={{ width: '100%' }}
-                      />
+                      <Flex align="center" gap="1">
+                        <TextField.Root
+                          value={order.lng}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            updateNode(order.id, { lng: parseFloat(e.target.value) || 0, address: undefined })
+                          }
+                          placeholder="Longitude"
+                          size="1"
+                          type="number"
+                          step="0.0001"
+                          style={{ flex: 1, minWidth: 0 }}
+                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            className="coord-spinner"
+                            onClick={(e: React.MouseEvent) => { e.stopPropagation(); updateNode(order.id, { lng: Math.round((order.lng + 0.0001) * 10000) / 10000, address: undefined }) }}
+                          >
+                            <ChevronUp size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            className="coord-spinner"
+                            onClick={(e: React.MouseEvent) => { e.stopPropagation(); updateNode(order.id, { lng: Math.round((order.lng - 0.0001) * 10000) / 10000, address: undefined }) }}
+                          >
+                            <ChevronDown size={12} />
+                          </button>
+                        </div>
+                      </Flex>
                     </td>
                   </>
                 ) : (

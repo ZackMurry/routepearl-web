@@ -334,7 +334,7 @@ const GanttChart: FC<Props> = ({
         <Text size="1" style={{ color: '#6b7280' }}>
           {isDistanceMode
             ? `Distance: ${formatGanttDistance(data.totalDistance || 0)}`
-            : `Duration: ${formatGanttTime(data.totalDuration)}`}
+            : `Duration: ${formatGanttTime(data.wallClockDuration ?? data.totalDuration)}`}
         </Text>
       </Flex>
 

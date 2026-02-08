@@ -141,6 +141,8 @@ export function useTimelineGenerator(
           totalDistance: 0,
           droneDistance: 0,
           truckDistance: 0,
+          truckDuration: 0,
+          droneDuration: 0,
           deliveryCount: 0,
           droneDeliveries: 0,
           truckDeliveries: 0,
@@ -553,6 +555,10 @@ export function useTimelineGenerator(
       }
     }
 
+    // Capture per-vehicle end times for wall-clock duration calculation
+    const truckEndTime = truckCumulativeTime
+    const droneEndTime = droneCumulativeTime
+
     // 5. Merge events and recalculate cumulative times
     // For simplicity, we'll show truck events first, then interleave drone events
     // based on when they would occur during the truck route
@@ -564,7 +570,7 @@ export function useTimelineGenerator(
     // Sort by cumulative time to interleave properly
     events.sort((a, b) => a.cumulativeTime - b.cumulativeTime)
 
-    // Recalculate cumulative times sequentially
+    // Recalculate cumulative times sequentially (for Gantt chart event positioning)
     cumulativeTime = 0
     for (const event of events) {
       event.cumulativeTime = cumulativeTime
@@ -574,6 +580,8 @@ export function useTimelineGenerator(
     totalDistance = droneDistance + truckDistance
 
     // 6. Calculate summary
+    // Wall-clock duration = max of per-vehicle end times (truck and drone operate in parallel)
+    const wallClockDuration = Math.max(truckEndTime, droneEndTime) || cumulativeTime
     const droneDeliveries = events.filter((e) => e.type === 'drone_delivery').length
     const truckDeliveries = events.filter((e) => e.type === 'truck_delivery').length
 
@@ -582,10 +590,12 @@ export function useTimelineGenerator(
       completedEvents: events.filter((e) => e.status === 'completed').length,
       droneEvents: events.filter((e) => e.vehicle === 'drone').length,
       truckEvents: events.filter((e) => e.vehicle === 'truck').length,
-      totalDuration: cumulativeTime,
+      totalDuration: wallClockDuration,
       totalDistance: totalDistance,
       droneDistance: droneDistance,
       truckDistance: truckDistance,
+      truckDuration: truckEndTime,
+      droneDuration: droneEndTime,
       deliveryCount: droneDeliveries + truckDeliveries,
       droneDeliveries,
       truckDeliveries,

@@ -44,7 +44,7 @@ import {
   Layers,
 } from 'lucide-react'
 import { useTimelineGenerator } from './timeline/useTimelineGenerator'
-import { TimelineSummary, formatDistance as formatDistanceTimeline, formatDuration as formatDurationTimeline } from './timeline/timeline.types'
+import { TimelineSummary, formatDistance as formatDistanceTimeline, formatDuration as formatDurationTimeline, DEFAULT_TIMELINE_CONFIG } from './timeline/timeline.types'
 import { GanttChart, useGanttData, generateEmptyGanttData, GanttChartState } from './gantt'
 import { RoutesTab, useRouteDetails, VehiclesTab, useVehicleDetails } from './routes'
 import { pointMatchesNode } from '@/lib/util'
@@ -489,19 +489,19 @@ export function BottomPanel() {
     return map
   }, [orderNodes, droneRoutes, truckRoute, hasRoute])
 
-  // Stats for header display
-  const totalOrders = orderNodes.length
-  const deliveredPackages = 0 // TODO: Track actual deliveries
-  const totalDistance = hasRoute ? '10.5km' : 'X' // TODO: Calculate actual distance
-  const coveredDistance = '0km' // TODO: Track actual distance covered
-  const estimatedTime = missionConfig.estimatedDuration ? formatDuration(missionConfig.estimatedDuration) : 'X:XX'
-
   // Delivery counts from route matching (more reliable than timeline for truck deliveries)
   const droneDeliveryCount = useMemo(() => Array.from(orderDeliveryMap.values()).filter((v) => v === 'drone').length, [orderDeliveryMap])
   const truckDeliveryCount = useMemo(() => Array.from(orderDeliveryMap.values()).filter((v) => v === 'truck').length, [orderDeliveryMap])
 
   // Generate timeline data for Gantt chart
   const timelineResult = useTimelineGenerator(truckRoute, droneRoutes, missionConfig.nodes)
+
+  // Stats for header display — sourced from timeline summary for consistency
+  const totalOrders = orderNodes.length
+  const deliveredPackages = hasRoute ? (droneDeliveryCount + truckDeliveryCount) : 0
+  const totalDistance = hasRoute ? formatDistanceTimeline(timelineResult.summary.totalDistance) : '--'
+  const coveredDistance = '0km' // Live tracking - future feature
+  const estimatedTime = hasRoute ? formatDurationTimeline(timelineResult.summary.totalDuration) : '--:--'
 
   // Compute ETA and distance for each order directly from route data
   const orderEtaMap = useMemo(() => {
@@ -518,8 +518,8 @@ export function BottomPanel() {
       return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
     }
 
-    const TRUCK_SPEED_MS = (40 * 1000) / 3600 // 40 km/h
-    const DRONE_SPEED_MS = (60 * 1000) / 3600 // 60 km/h
+    const TRUCK_SPEED_MS = (DEFAULT_TIMELINE_CONFIG.truckSpeedKmh * 1000) / 3600
+    const DRONE_SPEED_MS = (DEFAULT_TIMELINE_CONFIG.droneSpeedKmh * 1000) / 3600
 
     // Pre-compute cumulative truck distances for each route index
     const truckCumDist: number[] = [0]
@@ -535,7 +535,8 @@ export function BottomPanel() {
         for (const sortie of droneRoutes) {
           if (sortie.length >= 2 && pointMatchesNode(sortie[1], order)) {
             const dist = haversine(sortie[0], sortie[1])
-            const eta = dist / DRONE_SPEED_MS
+            const travelTime = dist / DRONE_SPEED_MS
+            const eta = DEFAULT_TIMELINE_CONFIG.droneLoadTimeSeconds + travelTime + DEFAULT_TIMELINE_CONFIG.droneUnloadTimeSeconds
             map.set(order.id, { eta, distance: dist })
             break
           }
@@ -545,7 +546,8 @@ export function BottomPanel() {
         for (let i = 1; i < truckRoute.length; i++) {
           if (pointMatchesNode(truckRoute[i], order)) {
             const dist = truckCumDist[i]
-            const eta = dist / TRUCK_SPEED_MS
+            const travelTime = dist / TRUCK_SPEED_MS
+            const eta = travelTime + DEFAULT_TIMELINE_CONFIG.truckDeliveryTimeSeconds
             map.set(order.id, { eta, distance: dist })
             break
           }
@@ -580,7 +582,7 @@ export function BottomPanel() {
       const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2
       return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
     }
-    const TRUCK_SPEED_MS = (40 * 1000) / 3600
+    const TRUCK_SPEED_MS = (DEFAULT_TIMELINE_CONFIG.truckSpeedKmh * 1000) / 3600
 
     const truckCumDist: number[] = [0]
     for (let i = 1; i < truckRoute.length; i++) {
@@ -591,7 +593,13 @@ export function BottomPanel() {
       for (let i = 0; i < truckRoute.length; i++) {
         if (pointMatchesNode(truckRoute[i], node)) {
           const dist = truckCumDist[i]
-          const eta = dist / TRUCK_SPEED_MS
+          const travelTime = dist / TRUCK_SPEED_MS
+          // Add service time based on node type
+          let serviceTime = 0
+          if (node.type === 'station') serviceTime = 600 // 10 min charging
+          else if (node.type === 'depot') serviceTime = 0
+          else serviceTime = DEFAULT_TIMELINE_CONFIG.truckDeliveryTimeSeconds
+          const eta = travelTime + serviceTime
           map.set(node.id, { eta, distance: dist })
           break
         }
@@ -723,7 +731,7 @@ export function BottomPanel() {
                   </Flex>
                   <Flex gap="1" align="center" title="Deliveries">
                     <Package size={14} />
-                    <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : 'X'}</Text>
+                    <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
                   </Flex>
                   <Flex gap="1" align="center" title="Distance Covered / Total">
                     <Route size={14} />
@@ -816,7 +824,7 @@ export function BottomPanel() {
                   </Flex>
                   <Flex gap="1" align="center" title="Deliveries">
                     <Package size={14} />
-                    <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : 'X'}</Text>
+                    <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
                   </Flex>
                   <Flex gap="1" align="center" title="Distance Covered / Total">
                     <Route size={14} />
@@ -1409,7 +1417,7 @@ export function BottomPanel() {
                     </Flex>
                     <Flex gap="1" align="center" title="Deliveries">
                       <Package size={14} />
-                      <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : 'X'}</Text>
+                      <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
                     </Flex>
                     <Flex gap="1" align="center" title="Distance Covered / Total">
                       <Route size={14} />
@@ -1795,7 +1803,7 @@ export function BottomPanel() {
                 </Flex>
                 <Flex gap="1" align="center" title="Deliveries">
                   <Package size={14} />
-                  <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : 'X'}</Text>
+                  <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
                 </Flex>
                 <Flex gap="1" align="center" title="Distance Covered / Total">
                   <Route size={14} />
@@ -2190,17 +2198,23 @@ function MissionStatsBar({
         <Text size="1" weight="medium">{missionConfig.algorithm.toUpperCase()}</Text>
       </Flex>
       {/* Fleet display */}
-      <Flex gap="1" align="center" title={hasTruck ? 'Truck active' : 'Truck disabled'}>
-        <Truck size={14} style={{ color: hasTruck ? '#374151' : '#d1d5db' }} />
+      <Flex gap="1" align="center" title={!hasRoute ? 'No route generated' : hasTruck ? 'Truck active' : 'Truck disabled'} style={{ opacity: !hasRoute || !hasTruck ? 0.35 : 1 }}>
+        <Truck size={14} style={{ color: hasRoute && hasTruck ? '#374151' : '#9ca3af' }} />
       </Flex>
-      <Flex gap="1" align="center" title={hasDrones ? `${droneCount} drone(s)` : 'Drones disabled'}>
-        <Plane size={14} style={{ color: hasDrones ? '#3b82f6' : '#d1d5db' }} />
-        {hasDrones && <Text size="1" weight="medium">{hasRoute ? droneCount : 'X'}</Text>}
+      <Flex gap="1" align="center" title={!hasRoute ? 'No route generated' : hasDrones ? `${droneCount} drone(s)` : 'Drones disabled'} style={{ opacity: !hasRoute || !hasDrones ? 0.35 : 1 }}>
+        <Plane size={14} style={{ color: hasRoute && hasDrones ? '#3b82f6' : '#9ca3af' }} />
+        <Text size="1" weight="medium" style={{ color: hasRoute && hasDrones ? undefined : '#9ca3af' }}>
+          {hasRoute && hasDrones ? droneCount : '-'}
+        </Text>
       </Flex>
       {/* Vehicle-specific stats from timeline summary */}
       {timelineSummary && (
         <>
           <Box className="w-px h-4 bg-gray-300" />
+          <Flex gap="1" align="center" title="Total distance">
+            <Route size={12} className="text-gray-500" />
+            <Text size="1" weight="medium">{formatDistanceTimeline(timelineSummary.totalDistance)}</Text>
+          </Flex>
           {hasTruck && (
             <Flex gap="1" align="center" title="Truck distance">
               <Truck size={12} style={{ color: '#374151' }} />
@@ -2274,11 +2288,6 @@ function StatusItem({
   )
 }
 
-function formatDuration(minutes: number): string {
-  const mins = Math.floor(minutes)
-  const secs = Math.round((minutes - mins) * 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
 
 function getStatusColor(status: string): 'gray' | 'blue' | 'green' | 'orange' | 'red' {
   const colors: Record<string, 'gray' | 'blue' | 'green' | 'orange' | 'red'> = {

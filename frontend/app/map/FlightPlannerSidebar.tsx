@@ -468,25 +468,82 @@ export function FlightPlannerSidebar() {
                     </Button>
                   </Flex>
 
-                  <Box className={`mt-3 p-3 rounded ${missionLaunched ? 'bg-green-50' : 'bg-blue-50'}`}>
-                    <Text size='2' color={missionLaunched ? 'green' : 'blue'}>
-                      <strong>Status:</strong>{' '}
-                      {missionLaunched
-                        ? 'Mission Active'
-                        : !missionConfig.nodes.length
-                        ? 'No waypoints'
-                        : truckRoute.length === 0 && droneRoutes.length === 0
-                        ? 'Route not generated'
-                        : 'Ready to launch'}
-                      <br />
-                      {missionLaunched
-                        ? 'The mission is currently running. Click Stop to end the mission.'
-                        : !missionConfig.nodes.length
-                        ? 'Add waypoints to create a flight plan.'
-                        : truckRoute.length === 0 && droneRoutes.length === 0
-                        ? 'Generate a route before launching the mission.'
-                        : 'Mission is ready to launch.'}
-                    </Text>
+                  {/* Status Table */}
+                  <Box
+                    className='mt-10'
+                    style={{
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {/* Flight Plan row */}
+                    <Flex
+                      align='center'
+                      justify='between'
+                      style={{
+                        padding: '8px 12px',
+                        borderBottom: '1px solid #e5e7eb',
+                        backgroundColor: '#f9fafb',
+                      }}
+                    >
+                      <Flex align='center' gap='2'>
+                        <Layers size={14} style={{ color: '#6b7280' }} />
+                        <Text size='2' style={{ color: '#374151' }}>Flight Plan</Text>
+                      </Flex>
+                      <Badge
+                        size='1'
+                        color={missionConfig.nodes.length > 0 ? 'green' : 'gray'}
+                        variant={missionConfig.nodes.length > 0 ? 'soft' : 'outline'}
+                      >
+                        {missionConfig.nodes.length > 0 ? 'Loaded' : 'None'}
+                      </Badge>
+                    </Flex>
+
+                    {/* Route row */}
+                    <Flex
+                      align='center'
+                      justify='between'
+                      style={{
+                        padding: '8px 12px',
+                        borderBottom: '1px solid #e5e7eb',
+                        backgroundColor: 'white',
+                      }}
+                    >
+                      <Flex align='center' gap='2'>
+                        <Route size={14} style={{ color: '#6b7280' }} />
+                        <Text size='2' style={{ color: '#374151' }}>Route</Text>
+                      </Flex>
+                      <Badge
+                        size='1'
+                        color={truckRoute.length > 0 || droneRoutes.length > 0 ? 'green' : missionConfig.nodes.length > 0 ? 'orange' : 'gray'}
+                        variant={truckRoute.length > 0 || droneRoutes.length > 0 ? 'soft' : 'outline'}
+                      >
+                        {truckRoute.length > 0 || droneRoutes.length > 0 ? 'Generated' : missionConfig.nodes.length > 0 ? 'Required' : 'N/A'}
+                      </Badge>
+                    </Flex>
+
+                    {/* Mission row */}
+                    <Flex
+                      align='center'
+                      justify='between'
+                      style={{
+                        padding: '8px 12px',
+                        backgroundColor: missionLaunched ? 'rgba(16, 185, 129, 0.05)' : '#f9fafb',
+                      }}
+                    >
+                      <Flex align='center' gap='2'>
+                        <Play size={14} style={{ color: missionLaunched ? '#10b981' : '#6b7280' }} />
+                        <Text size='2' style={{ color: '#374151' }}>Mission</Text>
+                      </Flex>
+                      <Badge
+                        size='1'
+                        color={missionLaunched ? 'green' : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'blue' : 'gray'}
+                        variant={missionLaunched ? 'solid' : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'soft' : 'outline'}
+                      >
+                        {missionLaunched ? 'Active' : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'Ready' : 'Not Ready'}
+                      </Badge>
+                    </Flex>
                   </Box>
                 </Box>
 
@@ -553,7 +610,7 @@ export function FlightPlannerSidebar() {
               {/* Actions Tab */}
               <Tabs.Content value='overview' className='p-4 space-y-4'>
                 <Box>
-                  <div className='space-y-4'>
+                  <div className='space-y-10'>
                     <Flex gap='4' justify='center'>
                       <Button
                         size='2'
@@ -591,57 +648,128 @@ export function FlightPlannerSidebar() {
                       </Button>
                     </Flex>
 
-                    {/* Waypoint warning */}
-                    {hasUnassignedWaypoints && (
-                      <Box className='bg-red-50 p-3 rounded'>
-                        <Flex align='center' gap='2' className='mb-1'>
-                          <AlertCircle size={16} className='text-red-600' />
-                          <Text size='2' weight='bold' color='red'>
-                            Unassigned Waypoints
-                          </Text>
+                    {/* Route Status Table */}
+                    <Box
+                      style={{
+                        border: `1px solid ${hasUnassignedWaypoints ? '#fca5a5' : '#e5e7eb'}`,
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {/* Route status header */}
+                      <Flex
+                        align='center'
+                        justify='between'
+                        style={{
+                          padding: '8px 12px',
+                          borderBottom: '1px solid #e5e7eb',
+                          backgroundColor: hasUnassignedWaypoints ? '#fef2f2' : '#f9fafb',
+                        }}
+                      >
+                        <Flex align='center' gap='2'>
+                          <Route size={14} style={{ color: hasUnassignedWaypoints ? '#ef4444' : '#6b7280' }} />
+                          <Text size='2' weight='medium' style={{ color: '#374151' }}>Route Status</Text>
                         </Flex>
-                        <Text size='1' color='gray'>
-                          All mission sites must be assigned a type (depot, order, station, or hazard) before generating a route.
-                        </Text>
-                      </Box>
-                    )}
+                        <Badge
+                          size='1'
+                          color={hasUnassignedWaypoints ? 'red' : truckRoute.length > 0 || droneRoutes.length > 0 ? 'green' : missionConfig.nodes.filter(n => n.type === 'order').length > 0 ? 'orange' : 'gray'}
+                          variant={truckRoute.length > 0 || droneRoutes.length > 0 ? 'soft' : 'outline'}
+                        >
+                          {hasUnassignedWaypoints ? 'Blocked' : truckRoute.length > 0 || droneRoutes.length > 0 ? 'Generated' : missionConfig.nodes.filter(n => n.type === 'order').length > 0 ? 'Required' : 'Pending'}
+                        </Badge>
+                      </Flex>
 
-                    {/* Route Status Messages */}
-                    {!hasUnassignedWaypoints && missionConfig.nodes.filter(n => n.type === 'order').length > 0 && truckRoute.length === 0 && droneRoutes.length === 0 && (
-                      <Box className='bg-orange-50 p-3 rounded'>
-                        <Flex align='center' gap='2' className='mb-1'>
-                          <AlertCircle size={16} className='text-orange-600' />
-                          <Text size='2' weight='bold' color='orange'>
-                            Route Required
-                          </Text>
+                      {/* Unassigned waypoints row */}
+                      {hasUnassignedWaypoints && (
+                        <Flex
+                          align='center'
+                          justify='between'
+                          style={{
+                            padding: '6px 12px',
+                            borderBottom: '1px solid #f3f4f6',
+                            backgroundColor: '#fef2f2',
+                          }}
+                        >
+                          <Flex align='center' gap='2'>
+                            <div className='pulse-dot' style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ef4444' }} />
+                            <Text size='1' style={{ color: '#991b1b' }}>Unassigned Waypoints</Text>
+                          </Flex>
+                          <Badge size='1' color='red' variant='soft'>
+                            {missionConfig.nodes.filter(n => n.type === 'waypoint').length}
+                          </Badge>
                         </Flex>
-                        <Text size='1' color='gray'>
-                          Generate a route before you can launch the mission.
-                        </Text>
-                      </Box>
-                    )}
+                      )}
 
-                    {(truckRoute.length > 0 || droneRoutes.length > 0) && (
-                      <Box className='bg-green-50 p-3 rounded'>
-                        <Flex align='center' gap='2' className='mb-2'>
-                          <CheckCircle size={16} className='text-green-600' />
-                          <Text size='2' weight='bold' color='green'>
-                            Route Generated
-                          </Text>
+                      {/* Truck route row */}
+                      <Flex
+                        align='center'
+                        justify='between'
+                        style={{
+                          padding: '6px 12px',
+                          borderBottom: '1px solid #f3f4f6',
+                          backgroundColor: 'white',
+                        }}
+                      >
+                        <Flex align='center' gap='2'>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: truckRoute.length > 0 ? '#374151' : '#d1d5db' }} />
+                          <Text size='1' style={{ color: '#6b7280' }}>Truck Route</Text>
                         </Flex>
-                        <Text size='1' color='gray'>
-                          Route is ready for review. Check the map for the optimized path.
+                        <Text size='1' weight='medium' style={{ color: truckRoute.length > 0 ? '#374151' : '#9ca3af' }}>
+                          {truckRoute.length > 0 ? `${truckRoute.length} pts` : '--'}
                         </Text>
-                        <Flex gap='2' className='mt-2 text-xs'>
-                          <Text size='1' color='gray'>
-                            Truck: {truckRoute.length} pts
-                          </Text>
-                          <Text size='1' color='gray'>
-                            Drones: {droneRoutes.length} paths
-                          </Text>
+                      </Flex>
+
+                      {/* Drone paths row */}
+                      <Flex
+                        align='center'
+                        justify='between'
+                        style={{
+                          padding: '6px 12px',
+                          borderBottom: '1px solid #f3f4f6',
+                          backgroundColor: 'white',
+                        }}
+                      >
+                        <Flex align='center' gap='2'>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: droneRoutes.length > 0 ? '#3b82f6' : '#d1d5db' }} />
+                          <Text size='1' style={{ color: '#6b7280' }}>Drone Paths</Text>
                         </Flex>
-                      </Box>
-                    )}
+                        <Text size='1' weight='medium' style={{ color: droneRoutes.length > 0 ? '#374151' : '#9ca3af' }}>
+                          {droneRoutes.length > 0 ? `${droneRoutes.length} sorties` : '--'}
+                        </Text>
+                      </Flex>
+
+                      {/* Nodes indicator row */}
+                      <Flex
+                        align='center'
+                        justify='between'
+                        style={{
+                          padding: '6px 12px',
+                          backgroundColor: '#f9fafb',
+                        }}
+                      >
+                        <Flex align='center' gap='2'>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: missionConfig.nodes.filter(n => n.type === 'order').length > 0 ? '#10b981' : '#d1d5db' }} />
+                          <Text size='1' style={{ color: '#6b7280' }}>Order Points</Text>
+                        </Flex>
+                        <Flex align='center' gap='2'>
+                          <Text size='1' weight='medium' style={{ color: missionConfig.nodes.filter(n => n.type === 'order').length > 0 ? '#374151' : '#9ca3af' }}>
+                            {missionConfig.nodes.filter(n => n.type === 'order').length || '--'}
+                          </Text>
+                          {missionConfig.nodes.filter(n => n.type === 'order').length > 0 && truckRoute.length === 0 && droneRoutes.length === 0 && !hasUnassignedWaypoints && (
+                            <div
+                              className='pulse-dot'
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: '50%',
+                                backgroundColor: '#f97316',
+                              }}
+                              title='Nodes added — generate route'
+                            />
+                          )}
+                        </Flex>
+                      </Flex>
+                    </Box>
                   </div>
                 </Box>
               </Tabs.Content>

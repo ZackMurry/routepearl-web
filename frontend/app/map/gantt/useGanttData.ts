@@ -148,9 +148,16 @@ export function useGanttData(
       }
     }
 
+    // Use serialized event timeline for axis scaling (events are positioned sequentially)
+    const lastEvent = events.length > 0 ? events[events.length - 1] : null
+    const axisDuration = lastEvent
+      ? lastEvent.cumulativeTime + lastEvent.estimatedDuration
+      : summary.totalDuration
+
     return {
       vehicles,
-      totalDuration: summary.totalDuration,
+      totalDuration: axisDuration,
+      wallClockDuration: summary.totalDuration,
       totalDistance: summary.totalDistance,
       startTime: new Date(),
     }

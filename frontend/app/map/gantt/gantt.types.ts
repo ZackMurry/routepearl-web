@@ -36,7 +36,8 @@ export interface GanttVehicle {
 // Gantt chart data
 export interface GanttData {
   vehicles: GanttVehicle[]
-  totalDuration: number // Total mission duration in seconds
+  totalDuration: number // Serialized timeline duration in seconds (for axis scaling)
+  wallClockDuration?: number // Wall-clock mission duration in seconds (for display)
   totalDistance?: number // Total mission distance in meters
   startTime: Date
 }

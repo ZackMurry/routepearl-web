@@ -100,13 +100,13 @@
 }
 
 .data-table .col-id {
-  width: 56px;
-  min-width: 56px;
+  width: 100px;
+  min-width: 100px;
 }
 
 .data-table .col-type {
-  width: 100px;
-  min-width: 100px;
+  width: 120px;
+  min-width: 120px;
 }
 
 .data-table .col-stat {
@@ -140,6 +140,50 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Coordinate spinner buttons for lat/lng inputs */
+.coord-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 14px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  color: #6b7280;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.coord-spinner:first-child {
+  border-radius: 3px 3px 0 0;
+  border-bottom: none;
+}
+
+.coord-spinner:last-child {
+  border-radius: 0 0 3px 3px;
+}
+
+.coord-spinner:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.coord-spinner:active {
+  background: #d1d5db;
+}
+
+/* Route required indicator pulse */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
 }
 
 /* Floating button */
