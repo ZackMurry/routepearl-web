@@ -41,6 +41,9 @@ import {
   Route,
   CheckCircle,
   AlertCircle,
+  Package,
+  Truck,
+  Plane,
 } from 'lucide-react'
 import { MissionSite, HazardZone, RoutingAlgorithm } from '@/lib/types'
 import { forwardGeocode, seedAddressCache, parseCSVLine, isLatLng, csvTagToNodeType, nodeTypeToCsvTag, csvQuote } from '@/lib/geocoding'
@@ -295,6 +298,95 @@ export function FlightPlannerSidebar() {
               >
                 <Route size={20} />
               </IconButton>
+
+              <div style={{ borderTop: '1px solid #e5e7eb', margin: '4px 0' }} />
+
+              {/* Compact status indicators */}
+              <Flex direction='column' gap='2' style={{ alignItems: 'center' }}>
+                {/* Route status */}
+                <div
+                  title={`Route: ${hasUnassignedWaypoints ? 'Blocked' : truckRoute.length > 0 || droneRoutes.length > 0 ? 'Generated' : missionConfig.nodes.filter(n => n.type === 'order').length > 0 ? 'Required' : 'Pending'}`}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: hasUnassignedWaypoints ? 'rgba(239, 68, 68, 0.1)' : truckRoute.length > 0 || droneRoutes.length > 0 ? 'rgba(34, 197, 94, 0.1)' : missionConfig.nodes.filter(n => n.type === 'order').length > 0 ? 'rgba(249, 115, 22, 0.1)' : '#f3f4f6',
+                    border: `1.5px solid ${hasUnassignedWaypoints ? '#ef4444' : truckRoute.length > 0 || droneRoutes.length > 0 ? '#22c55e' : missionConfig.nodes.filter(n => n.type === 'order').length > 0 ? '#f97316' : '#d1d5db'}`,
+                  }}
+                >
+                  <Route size={14} style={{ color: hasUnassignedWaypoints ? '#ef4444' : truckRoute.length > 0 || droneRoutes.length > 0 ? '#22c55e' : missionConfig.nodes.filter(n => n.type === 'order').length > 0 ? '#f97316' : '#9ca3af' }} />
+                </div>
+                {/* Truck route */}
+                <div
+                  title={`Truck Route: ${truckRoute.length > 0 ? `${truckRoute.length} pts` : '--'}`}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: truckRoute.length > 0 ? 'rgba(55, 65, 81, 0.08)' : '#f3f4f6',
+                    border: `1.5px solid ${truckRoute.length > 0 ? '#374151' : '#d1d5db'}`,
+                  }}
+                >
+                  <Truck size={14} style={{ color: truckRoute.length > 0 ? '#374151' : '#9ca3af' }} />
+                </div>
+                {/* Drone paths */}
+                <div
+                  title={`Drone Paths: ${droneRoutes.length > 0 ? `${droneRoutes.length} sorties` : '--'}`}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: droneRoutes.length > 0 ? 'rgba(59, 130, 246, 0.1)' : '#f3f4f6',
+                    border: `1.5px solid ${droneRoutes.length > 0 ? '#3b82f6' : '#d1d5db'}`,
+                  }}
+                >
+                  <Plane size={14} style={{ color: droneRoutes.length > 0 ? '#3b82f6' : '#9ca3af' }} />
+                </div>
+                {/* Order points */}
+                <div
+                  title={`Order Points: ${missionConfig.nodes.filter(n => n.type === 'order').length || '--'}`}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: missionConfig.nodes.filter(n => n.type === 'order').length > 0 ? 'rgba(16, 185, 129, 0.1)' : '#f3f4f6',
+                    border: `1.5px solid ${missionConfig.nodes.filter(n => n.type === 'order').length > 0 ? '#10b981' : '#d1d5db'}`,
+                  }}
+                >
+                  <Package size={14} style={{ color: missionConfig.nodes.filter(n => n.type === 'order').length > 0 ? '#10b981' : '#9ca3af' }} />
+                </div>
+                {/* Unassigned waypoints warning */}
+                {hasUnassignedWaypoints && (
+                  <div
+                    className='pulse-dot'
+                    title={`Unassigned Waypoints: ${missionConfig.nodes.filter(n => n.type === 'waypoint').length}`}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                      border: '1.5px solid #ef4444',
+                    }}
+                  >
+                    <AlertTriangle size={14} style={{ color: '#ef4444' }} />
+                  </div>
+                )}
+              </Flex>
             </>
           ) : (
             <>
@@ -336,6 +428,17 @@ export function FlightPlannerSidebar() {
               <IconButton
                 size='3'
                 variant='soft'
+                color='orange'
+                disabled={!missionLaunched}
+                onClick={pauseMission}
+                title={missionPaused ? 'Resume Mission' : 'Pause Mission'}
+                style={{ cursor: 'pointer' }}
+              >
+                <Pause size={20} />
+              </IconButton>
+              <IconButton
+                size='3'
+                variant='soft'
                 color='red'
                 disabled={!missionLaunched}
                 onClick={stopMission}
@@ -344,6 +447,57 @@ export function FlightPlannerSidebar() {
               >
                 <Square size={20} />
               </IconButton>
+
+              <div style={{ borderTop: '1px solid #e5e7eb', margin: '4px 0' }} />
+
+              {/* Compact status indicators */}
+              <Flex direction='column' gap='2' style={{ alignItems: 'center' }}>
+                <div
+                  title={`Flight Plan: ${missionConfig.nodes.length > 0 ? 'Loaded' : 'None'}`}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: missionConfig.nodes.length > 0 ? 'rgba(34, 197, 94, 0.1)' : '#f3f4f6',
+                    border: `1.5px solid ${missionConfig.nodes.length > 0 ? '#22c55e' : '#d1d5db'}`,
+                  }}
+                >
+                  <Layers size={14} style={{ color: missionConfig.nodes.length > 0 ? '#22c55e' : '#9ca3af' }} />
+                </div>
+                <div
+                  title={`Route: ${truckRoute.length > 0 || droneRoutes.length > 0 ? 'Generated' : missionConfig.nodes.length > 0 ? 'Required' : 'N/A'}`}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: truckRoute.length > 0 || droneRoutes.length > 0 ? 'rgba(34, 197, 94, 0.1)' : missionConfig.nodes.length > 0 ? 'rgba(249, 115, 22, 0.1)' : '#f3f4f6',
+                    border: `1.5px solid ${truckRoute.length > 0 || droneRoutes.length > 0 ? '#22c55e' : missionConfig.nodes.length > 0 ? '#f97316' : '#d1d5db'}`,
+                  }}
+                >
+                  <Route size={14} style={{ color: truckRoute.length > 0 || droneRoutes.length > 0 ? '#22c55e' : missionConfig.nodes.length > 0 ? '#f97316' : '#9ca3af' }} />
+                </div>
+                <div
+                  title={`Mission: ${missionLaunched ? (missionPaused ? 'Paused' : 'Active') : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'Ready' : 'Not Ready'}`}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: missionLaunched ? (missionPaused ? 'rgba(249, 115, 22, 0.1)' : 'rgba(34, 197, 94, 0.1)') : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'rgba(59, 130, 246, 0.1)' : '#f3f4f6',
+                    border: `1.5px solid ${missionLaunched ? (missionPaused ? '#f97316' : '#22c55e') : (truckRoute.length > 0 || droneRoutes.length > 0) ? '#3b82f6' : '#d1d5db'}`,
+                  }}
+                >
+                  <Play size={14} style={{ color: missionLaunched ? (missionPaused ? '#f97316' : '#22c55e') : (truckRoute.length > 0 || droneRoutes.length > 0) ? '#3b82f6' : '#9ca3af' }} />
+                </div>
+              </Flex>
             </>
           )}
         </Card>
