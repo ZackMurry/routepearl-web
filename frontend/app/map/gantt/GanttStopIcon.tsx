@@ -15,8 +15,8 @@ interface Props {
 const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerSecond, totalDuration }) => {
   const [showTooltip, setShowTooltip] = useState(false)
 
-  // Position based on time
-  const leftPosition = stop.time * pixelsPerSecond
+  // Position based on time, with small offset so first icon doesn't overlap the label column
+  const leftPosition = stop.time * pixelsPerSecond + 16
 
   // Icon size
   const iconSize = 16

@@ -69,8 +69,8 @@ const GanttChart: FC<Props> = ({
   useEffect(() => {
     const updateWidth = () => {
       if (containerRef.current) {
-        // Subtract label width (100px) from total width
-        setContainerWidth(containerRef.current.offsetWidth - 100)
+        // Subtract label width (150px) from total width
+        setContainerWidth(containerRef.current.offsetWidth - 150)
       }
     }
 
@@ -311,11 +311,11 @@ const GanttChart: FC<Props> = ({
 
       {/* Scrollable timeline content */}
       <Box style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
-        <Box style={{ minWidth: `${timelineWidth + 100}px` }}>
+        <Box style={{ minWidth: `${timelineWidth + 150}px` }}>
           {/* Time axis */}
           <Flex>
             {/* Empty space for label column */}
-            <Box style={{ width: '100px', minWidth: '100px', backgroundColor: '#f9fafb', borderRight: '1px solid #e5e7eb' }} />
+            <Box style={{ width: '150px', minWidth: '150px', backgroundColor: '#f9fafb', borderRight: '1px solid #e5e7eb' }} />
             {/* Time axis */}
             <Box style={{ flex: 1, position: 'relative' }}>
               <GanttTimeAxis
@@ -340,7 +340,7 @@ const GanttChart: FC<Props> = ({
 
             {/* Current time marker - only show during mission */}
             {currentTime > 0 && (
-              <Box style={{ position: 'absolute', top: 0, left: '100px', right: 0, height: '100%', pointerEvents: 'none' }}>
+              <Box style={{ position: 'absolute', top: 0, left: '150px', right: 0, height: '100%', pointerEvents: 'none' }}>
                 <GanttCurrentTimeMarker
                   currentTime={currentTime}
                   pixelsPerSecond={pixelsPerSecond}

@@ -28,8 +28,8 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerSecond, totalDuration, isGreyed
       {/* Vehicle label */}
       <div
         style={{
-          width: '100px',
-          minWidth: '100px',
+          width: '150px',
+          minWidth: '150px',
           padding: '8px 12px',
           display: 'flex',
           alignItems: 'center',
@@ -86,6 +86,7 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerSecond, totalDuration, isGreyed
             bottom: 0,
             backgroundImage: 'linear-gradient(90deg, #f3f4f6 1px, transparent 1px)',
             backgroundSize: `${300 * pixelsPerSecond}px 100%`, // Grid every 5 minutes
+            backgroundPositionX: '16px',
             pointerEvents: 'none',
           }}
         />

@@ -253,6 +253,11 @@ export function useTimelineGenerator(
     // Find all significant points along the truck route
     const significantPoints: SignificantPoint[] = []
 
+    // Track which sortie launches/recovers have already been matched
+    // to avoid duplicates from consecutive close route points
+    const matchedLaunches = new Set<number>()
+    const matchedRecovers = new Set<number>()
+
     // First point is always depot/start
     significantPoints.push({
       index: 0,
@@ -268,34 +273,42 @@ export function useTimelineGenerator(
 
       // Check if this is a drone launch point
       if (pointMatchesAny(point, droneLaunchPoints)) {
-        // Find which sortie this launch belongs to
+        // Find the first unmatched sortie that launches from this point
         const sortieIdx = droneRoutes.findIndex(
-          (s) =>
+          (s, idx) =>
+            !matchedLaunches.has(idx) &&
             s.length === 3 &&
             Math.abs(s[0].lat - point.lat) < 0.0001 &&
             Math.abs(s[0].lng - point.lng) < 0.0001
         )
-        significantPoints.push({
-          index: i,
-          point,
-          type: 'drone_launch',
-          sortieNumber: sortieIdx >= 0 ? sortieIdx + 1 : undefined,
-        })
+        if (sortieIdx >= 0) {
+          matchedLaunches.add(sortieIdx)
+          significantPoints.push({
+            index: i,
+            point,
+            type: 'drone_launch',
+            sortieNumber: sortieIdx + 1,
+          })
+        }
       }
       // Check if this is a drone recovery point
       else if (pointMatchesAny(point, droneRecoverPoints)) {
         const sortieIdx = droneRoutes.findIndex(
-          (s) =>
+          (s, idx) =>
+            !matchedRecovers.has(idx) &&
             s.length === 3 &&
             Math.abs(s[2].lat - point.lat) < 0.0001 &&
             Math.abs(s[2].lng - point.lng) < 0.0001
         )
-        significantPoints.push({
-          index: i,
-          point,
-          type: 'drone_recover',
-          sortieNumber: sortieIdx >= 0 ? sortieIdx + 1 : undefined,
-        })
+        if (sortieIdx >= 0) {
+          matchedRecovers.add(sortieIdx)
+          significantPoints.push({
+            index: i,
+            point,
+            type: 'drone_recover',
+            sortieNumber: sortieIdx >= 0 ? sortieIdx + 1 : undefined,
+          })
+        }
       }
       // Check if this is an order (truck delivery)
       else if (node?.type === 'order') {

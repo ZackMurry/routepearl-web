@@ -47,7 +47,7 @@ const GanttTimeAxis: FC<Props> = ({ totalDuration, zoomLevel, width }) => {
           key={index}
           style={{
             position: 'absolute',
-            left: `${tick.time * pixelsPerSecond}px`,
+            left: `${tick.time * pixelsPerSecond + 16}px`,
             top: 0,
             height: '100%',
             display: 'flex',

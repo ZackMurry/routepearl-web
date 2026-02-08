@@ -10,7 +10,7 @@ interface Props {
 }
 
 const GanttCurrentTimeMarker: FC<Props> = ({ currentTime, pixelsPerSecond, height }) => {
-  const leftPosition = currentTime * pixelsPerSecond
+  const leftPosition = currentTime * pixelsPerSecond + 16
 
   return (
     <div
