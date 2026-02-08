@@ -74,6 +74,7 @@ export function FlightPlannerSidebar() {
     exportMission,
     generateRoute,
     isGeneratingRoute,
+    hasUnassignedWaypoints,
   } = useFlightPlanner()
 
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -212,10 +213,142 @@ export function FlightPlannerSidebar() {
 
   if (sidebarCollapsed) {
     return (
-      <div className='absolute left-0 top-0 h-full z-[1000] pointer-events-auto'>
-        <Button onClick={() => setSidebarCollapsed(false)} className='mt-4 ml-2 bg-white shadow-lg hover:shadow-xl' size='3' style={{ cursor: 'pointer', padding: '10px' }}>
-          <ChevronRight size={24} />
-        </Button>
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          height: '100vh',
+          zIndex: 1000,
+          pointerEvents: 'auto',
+          display: 'flex',
+        }}
+      >
+        <Card
+          className='rounded-none rounded-r-lg shadow-xl'
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '12px 14px',
+            gap: '8px',
+          }}
+        >
+          {/* Expand button */}
+          <IconButton
+            size='3'
+            variant='ghost'
+            onClick={() => setSidebarCollapsed(false)}
+            style={{ cursor: 'pointer', marginBottom: '4px' }}
+            title='Expand sidebar'
+          >
+            <ChevronRight size={24} />
+          </IconButton>
+
+          {isFlightPlannerMode ? (
+            <>
+              {/* Flight planner collapsed: action buttons only */}
+              <IconButton
+                size='3'
+                variant='soft'
+                color='gray'
+                onClick={() => { setSidebarCollapsed(false); setIsFlightPlannerMode(false) }}
+                title='Exit Flight Planner'
+                style={{ cursor: 'pointer' }}
+              >
+                <LogOut size={20} />
+              </IconButton>
+              <IconButton
+                size='3'
+                variant='soft'
+                color='green'
+                onClick={() => { exportMission(); setIsFlightPlannerMode(false) }}
+                title='Save & Exit'
+                style={{ cursor: 'pointer' }}
+              >
+                <Save size={20} />
+              </IconButton>
+              <IconButton
+                size='3'
+                variant='soft'
+                color='blue'
+                onClick={() => exportMission()}
+                title='Save'
+                style={{ cursor: 'pointer' }}
+              >
+                <Download size={20} />
+              </IconButton>
+
+              <div style={{ borderTop: '1px solid #e5e7eb', margin: '4px 0' }} />
+
+              <IconButton
+                size='3'
+                variant='solid'
+                color='blue'
+                onClick={generateRoute}
+                disabled={isGeneratingRoute || hasUnassignedWaypoints}
+                title={hasUnassignedWaypoints ? 'Assign all waypoints a type first' : 'Generate Optimal Route'}
+                style={{ cursor: 'pointer' }}
+              >
+                <Route size={20} />
+              </IconButton>
+            </>
+          ) : (
+            <>
+              {/* Mission control collapsed: main actions */}
+              <IconButton
+                size='3'
+                variant='soft'
+                onClick={() => { setSidebarCollapsed(false); handleMakeFlightPlan() }}
+                disabled={missionLaunched}
+                title={missionConfig.nodes.length > 0 ? 'Edit Flight Plan' : 'Make Flight Plan'}
+                style={{ cursor: 'pointer' }}
+              >
+                {missionConfig.nodes.length > 0 ? <Settings size={20} /> : <Plus size={20} />}
+              </IconButton>
+              <IconButton
+                size='3'
+                variant='soft'
+                onClick={() => { setSidebarCollapsed(false); handleImportFlightPlan() }}
+                disabled={missionLaunched}
+                title='Load Flight Plan'
+                style={{ cursor: 'pointer' }}
+              >
+                <Upload size={20} />
+              </IconButton>
+
+              <div style={{ borderTop: '1px solid #e5e7eb', margin: '4px 0' }} />
+
+              <IconButton
+                size='3'
+                variant='soft'
+                color='green'
+                disabled={!missionConfig.nodes.length || (truckRoute.length === 0 && droneRoutes.length === 0) || missionLaunched}
+                onClick={launchMission}
+                title='Launch Mission'
+                style={{ cursor: 'pointer' }}
+              >
+                <Play size={20} />
+              </IconButton>
+              <IconButton
+                size='3'
+                variant='soft'
+                color='red'
+                disabled={!missionLaunched}
+                onClick={stopMission}
+                title='Stop Mission'
+                style={{ cursor: 'pointer' }}
+              >
+                <Square size={20} />
+              </IconButton>
+            </>
+          )}
+        </Card>
+
+        {/* Hidden file inputs still need to be rendered */}
+        <input ref={fileInputRef} type='file' accept='.json' onChange={handleFileImport} className='hidden' />
+        <input ref={csvInputRef} type='file' accept='.csv' onChange={handleCSVImport} className='hidden' />
       </div>
     )
   }
@@ -452,13 +585,29 @@ export function FlightPlannerSidebar() {
                         color='blue'
                         onClick={generateRoute}
                         loading={isGeneratingRoute}
+                        disabled={hasUnassignedWaypoints}
                       >
                         <Route size={16} /> Generate Optimal Route
                       </Button>
                     </Flex>
 
+                    {/* Waypoint warning */}
+                    {hasUnassignedWaypoints && (
+                      <Box className='bg-red-50 p-3 rounded'>
+                        <Flex align='center' gap='2' className='mb-1'>
+                          <AlertCircle size={16} className='text-red-600' />
+                          <Text size='2' weight='bold' color='red'>
+                            Unassigned Waypoints
+                          </Text>
+                        </Flex>
+                        <Text size='1' color='gray'>
+                          All flight nodes must be assigned a type (depot, order, station, or hazard) before generating a route.
+                        </Text>
+                      </Box>
+                    )}
+
                     {/* Route Status Messages */}
-                    {missionConfig.nodes.filter(n => n.type === 'order').length > 0 && truckRoute.length === 0 && droneRoutes.length === 0 && (
+                    {!hasUnassignedWaypoints && missionConfig.nodes.filter(n => n.type === 'order').length > 0 && truckRoute.length === 0 && droneRoutes.length === 0 && (
                       <Box className='bg-orange-50 p-3 rounded'>
                         <Flex align='center' gap='2' className='mb-1'>
                           <AlertCircle size={16} className='text-orange-600' />
