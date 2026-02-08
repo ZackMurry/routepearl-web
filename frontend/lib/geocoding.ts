@@ -167,10 +167,10 @@ export function isLatLng(value: string): boolean {
 }
 
 /** Map CSV node-tag values to internal FlightNode types */
-export function csvTagToNodeType(tag: string): 'customer' | 'depot' | 'station' | 'hazard' | null {
+export function csvTagToNodeType(tag: string): 'order' | 'depot' | 'station' | 'hazard' | null {
   const normalized = tag.trim().toLowerCase()
   switch (normalized) {
-    case 'customer': return 'customer'
+    case 'order': return 'order'
     case 'depot': return 'depot'
     case 'charging station': return 'station'
     case 'hazard': return 'hazard'
@@ -181,7 +181,7 @@ export function csvTagToNodeType(tag: string): 'customer' | 'depot' | 'station' 
 /** Map internal FlightNode type to CSV node-tag */
 export function nodeTypeToCsvTag(type: string): string | null {
   switch (type) {
-    case 'customer': return 'customer'
+    case 'order': return 'order'
     case 'depot': return 'depot'
     case 'station': return 'charging station'
     case 'hazard': return 'hazard'

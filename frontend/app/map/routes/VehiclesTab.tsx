@@ -162,12 +162,12 @@ const VehiclesTab: FC<Props> = ({ vehicles, selectedRouteId, onSelectRoute }) =>
                     )}
                   </Flex>
 
-                  {/* Customer IDs */}
-                  {vehicle.customerIds.length > 0 && (
+                  {/* Order IDs */}
+                  {vehicle.orderIds.length > 0 && (
                     <Flex align="center" gap="1" style={{ marginTop: '6px' }}>
                       <MapPin size={12} className="text-gray-400" />
                       <Text size="1" color="gray">
-                        Customers: {vehicle.customerIds.join(', ')}
+                        Orders: {vehicle.orderIds.join(', ')}
                       </Text>
                     </Flex>
                   )}

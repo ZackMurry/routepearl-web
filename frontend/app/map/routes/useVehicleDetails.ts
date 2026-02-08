@@ -22,7 +22,7 @@ export interface VehicleDetail {
   totalEvents: number
   eventBreakdown: VehicleEventBreakdown
   sortiesHandled: number[] // sortie numbers this vehicle handled (drones only)
-  customerIds: number[]    // addressIds served
+  orderIds: number[]       // orderIds served
 }
 
 export function useVehicleDetails(
@@ -30,7 +30,7 @@ export function useVehicleDetails(
   fleetMode: 'truck-drone' | 'truck-only' | 'drones-only',
   droneCount: number,
   hasRoute: boolean,
-  customerNodes: { addressId?: number; id: string }[]
+  orderNodes: { orderId?: number; id: string }[]
 ): VehicleDetail[] {
   return useMemo(() => {
     if (!hasRoute) return []
@@ -57,10 +57,10 @@ export function useVehicleDetails(
         : 0
 
       const truckDeliveryEvents = truckEvents.filter((e) => e.type === 'truck_delivery')
-      const customerIds: number[] = truckDeliveryEvents
+      const orderIds: number[] = truckDeliveryEvents
         .map((e) => {
-          const match = customerNodes.find((c) => c.id === e.id || e.customerName === String(c.addressId))
-          return match?.addressId
+          const match = orderNodes.find((c) => c.id === e.id || e.orderName === String(c.orderId))
+          return match?.orderId
         })
         .filter((id): id is number => id !== undefined)
 
@@ -74,7 +74,7 @@ export function useVehicleDetails(
         totalEvents: truckEvents.length,
         eventBreakdown: breakdown,
         sortiesHandled: [],
-        customerIds,
+        orderIds,
       })
     }
 
@@ -122,10 +122,10 @@ export function useVehicleDetails(
           : 0
 
         const deliveryEvents = vehicleEvents.filter((e) => e.type === 'drone_delivery')
-        const customerIds: number[] = deliveryEvents
+        const orderIds: number[] = deliveryEvents
           .map((e) => {
-            const match = customerNodes.find((c) => c.id === e.id || e.customerName === String(c.addressId))
-            return match?.addressId
+            const match = orderNodes.find((c) => c.id === e.id || e.orderName === String(c.orderId))
+            return match?.orderId
           })
           .filter((id): id is number => id !== undefined)
 
@@ -139,11 +139,11 @@ export function useVehicleDetails(
           totalEvents: vehicleEvents.length,
           eventBreakdown: breakdown,
           sortiesHandled: assignedSorties,
-          customerIds,
+          orderIds,
         })
       }
     }
 
     return details
-  }, [timelineResult, fleetMode, droneCount, hasRoute, customerNodes])
+  }, [timelineResult, fleetMode, droneCount, hasRoute, orderNodes])
 }

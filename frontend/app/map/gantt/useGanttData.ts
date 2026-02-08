@@ -59,7 +59,7 @@ export function useGanttData(
         duration: event.estimatedDuration,
         label: event.label,
         description: event.description,
-        customerName: event.customerName,
+        orderName: event.orderName,
         sortieNumber: event.sortieNumber,
         distance: event.distance,
       }))
@@ -113,7 +113,7 @@ export function useGanttData(
               duration: event.estimatedDuration,
               label: event.label,
               description: event.description,
-              customerName: event.customerName,
+              orderName: event.orderName,
               sortieNumber: event.sortieNumber,
               distance: event.distance,
             })

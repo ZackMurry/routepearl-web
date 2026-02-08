@@ -42,15 +42,15 @@ function findNodeAtLocation(
   )
 }
 
-// Find customer node at location
-function findCustomerAtLocation(
+// Find order node at location
+function findOrderAtLocation(
   location: Point,
   nodes: FlightNode[],
   tolerance: number = 0.0001
 ): FlightNode | undefined {
   return nodes.find(
     (node) =>
-      node.type === 'customer' &&
+      node.type === 'order' &&
       Math.abs(node.lat - location.lat) < tolerance &&
       Math.abs(node.lng - location.lng) < tolerance
   )
@@ -82,7 +82,7 @@ function pointMatchesAny(
 interface SignificantPoint {
   index: number
   point: Point
-  type: 'depot' | 'customer' | 'station' | 'drone_launch' | 'drone_recover'
+  type: 'depot' | 'order' | 'station' | 'drone_launch' | 'drone_recover'
   node?: FlightNode
   sortieNumber?: number
 }
@@ -98,7 +98,7 @@ interface SignificantPoint {
  *
  * @param truckRoute - Array of truck route points
  * @param droneRoutes - Array of drone sorties (each sortie: [launch, delivery, return])
- * @param nodes - Flight nodes with customer/depot information
+ * @param nodes - Flight nodes with order/depot information
  * @param config - Timeline configuration (speeds, service times)
  * @returns TimelineResult with events, summary, and data source indicator
  */
@@ -171,8 +171,8 @@ export function useTimelineGenerator(
       const [launchPoint, deliveryPoint, returnPoint] = sortie
       const sortieNum = sortieIndex + 1
 
-      // Find customer at delivery point
-      const customer = findCustomerAtLocation(deliveryPoint, nodes)
+      // Find order at delivery point
+      const order = findOrderAtLocation(deliveryPoint, nodes)
 
       // Drone launch
       droneEvents.push({
@@ -182,7 +182,7 @@ export function useTimelineGenerator(
         sortieNumber: sortieNum,
         location: launchPoint,
         label: `Sortie ${sortieNum}: Drone Launch`,
-        description: `Launching for ${customer?.label || 'Customer'}`,
+        description: `Launching for ${order?.label || 'Order'}`,
         estimatedDuration: config.droneLoadTimeSeconds,
         cumulativeTime: droneCumulativeTime,
         status: 'pending',
@@ -204,7 +204,7 @@ export function useTimelineGenerator(
         sortieNumber: sortieNum,
         location: deliveryPoint,
         label: `Sortie ${sortieNum}: Drone Delivery`,
-        customerName: customer?.label,
+        orderName: order?.label,
         estimatedDuration: launchToDeliveryTime + config.droneUnloadTimeSeconds,
         cumulativeTime: droneCumulativeTime,
         status: 'pending',
@@ -297,14 +297,14 @@ export function useTimelineGenerator(
           sortieNumber: sortieIdx >= 0 ? sortieIdx + 1 : undefined,
         })
       }
-      // Check if this is a customer (truck delivery)
-      else if (node?.type === 'customer') {
+      // Check if this is an order (truck delivery)
+      else if (node?.type === 'order') {
         const isDroneServed = pointMatchesAny(point, droneDeliveryPoints)
         if (!isDroneServed) {
           significantPoints.push({
             index: i,
             point,
-            type: 'customer',
+            type: 'order',
             node,
           })
         }
@@ -383,7 +383,7 @@ export function useTimelineGenerator(
 
       // Add action event at the significant point
       switch (currSig.type) {
-        case 'customer':
+        case 'order':
           truckEvents.push({
             id: nextId(),
             type: 'truck_delivery',
@@ -391,8 +391,8 @@ export function useTimelineGenerator(
             waypointIndex: currSig.index,
             location: currSig.point,
             label: 'Truck Delivery',
-            customerName: currSig.node?.label,
-            description: `Delivering to ${currSig.node?.label || 'customer'}`,
+            orderName: currSig.node?.label,
+            description: `Delivering to ${currSig.node?.label || 'order'}`,
             estimatedDuration: config.truckDeliveryTimeSeconds,
             cumulativeTime: truckCumulativeTime,
             status: 'pending',
@@ -473,8 +473,8 @@ export function useTimelineGenerator(
     // Helper function to get destination label
     function getDestinationLabel(sig: SignificantPoint): string {
       switch (sig.type) {
-        case 'customer':
-          return sig.node?.label || 'Customer'
+        case 'order':
+          return sig.node?.label || 'Order'
         case 'drone_launch':
           return `Launch Point${sig.sortieNumber ? ` #${sig.sortieNumber}` : ''}`
         case 'drone_recover':

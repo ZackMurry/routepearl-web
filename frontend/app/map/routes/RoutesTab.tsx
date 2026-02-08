@@ -120,12 +120,12 @@ const RoutesTab: FC<Props> = ({ routes, selectedRouteId, onSelectRoute }) => {
                     </Flex>
                   </div>
 
-                  {/* Customer IDs */}
-                  {route.customerIds.length > 0 && (
+                  {/* Order IDs */}
+                  {route.orderIds.length > 0 && (
                     <Flex align="center" gap="1" style={{ marginTop: '6px' }}>
                       <MapPin size={12} className="text-gray-400" />
                       <Text size="1" color="gray">
-                        Customers: {route.customerIds.join(', ')}
+                        Orders: {route.orderIds.join(', ')}
                       </Text>
                     </Flex>
                   )}

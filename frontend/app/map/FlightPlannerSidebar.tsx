@@ -458,7 +458,7 @@ export function FlightPlannerSidebar() {
                     </Flex>
 
                     {/* Route Status Messages */}
-                    {missionConfig.nodes.filter(n => n.type === 'customer').length > 0 && truckRoute.length === 0 && droneRoutes.length === 0 && (
+                    {missionConfig.nodes.filter(n => n.type === 'order').length > 0 && truckRoute.length === 0 && droneRoutes.length === 0 && (
                       <Box className='bg-orange-50 p-3 rounded'>
                         <Flex align='center' gap='2' className='mb-1'>
                           <AlertCircle size={16} className='text-orange-600' />
@@ -560,7 +560,7 @@ export function FlightPlannerSidebar() {
 function getNodeTypeColor(type: string): 'blue' | 'green' | 'orange' | 'purple' | 'red' {
   const colors = {
     depot: 'blue' as const,
-    customer: 'green' as const,
+    order: 'green' as const,
     station: 'orange' as const,
     waypoint: 'purple' as const,
     hazard: 'red' as const,

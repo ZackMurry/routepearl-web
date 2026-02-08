@@ -1,6 +1,6 @@
 export const NODE_COLORS = {
   depot: '#3b82f6', // blue
-  customer: '#10b981', // green
+  order: '#10b981', // green
   station: '#f97316', // orange
   waypoint: '#8b5cf6', // purple
   hazard: '#ef4444', // red

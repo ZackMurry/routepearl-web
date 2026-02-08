@@ -57,4 +57,6 @@ declare module 'lucide-react' {
   export const Battery: LucideIcon
   export const Send: LucideIcon
   export const Info: LucideIcon
+  export const LayoutGrid: LucideIcon
+  export const Table2: LucideIcon
 }

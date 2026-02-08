@@ -38,13 +38,16 @@ import {
   Hash,
   MapPinned,
   Search,
+  LayoutGrid,
+  Table2,
 } from 'lucide-react'
 import { useTimelineGenerator } from './timeline/useTimelineGenerator'
-import { TimelineSummary, formatDistance as formatDistanceTimeline } from './timeline/timeline.types'
+import { TimelineSummary, formatDistance as formatDistanceTimeline, formatDuration as formatDurationTimeline } from './timeline/timeline.types'
 import { GanttChart, useGanttData, generateEmptyGanttData, GanttChartState } from './gantt'
 import { RoutesTab, useRouteDetails, VehiclesTab, useVehicleDetails } from './routes'
 import { pointMatchesNode } from '@/lib/util'
 import { reverseGeocode, forwardGeocode, seedAddressCache, parseCSVLine, isLatLng, csvTagToNodeType, nodeTypeToCsvTag, csvQuote } from '@/lib/geocoding'
+import { ViewToggle, OrdersTable, OrdersEditableTable, FlightNodesTable, FlightNodesEditableTable, RoutesTable, VehiclesTable } from './tables'
 
 export function BottomPanel() {
   const {
@@ -68,8 +71,8 @@ export function BottomPanel() {
     removeNode,
     generateRoute,
     isGeneratingRoute,
-    plotModeCustomer,
-    setPlotModeCustomer,
+    plotModeOrder,
+    setPlotModeOrder,
     plotModeNodes,
     setPlotModeNodes,
     selectedNodeId,
@@ -80,6 +83,7 @@ export function BottomPanel() {
     droneCount,
     setDroneCount,
     missionLaunched,
+    mapCenter,
   } = useFlightPlanner()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -90,11 +94,17 @@ export function BottomPanel() {
   const [toastOpen, setToastOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
-  const [missionTab, setMissionTab] = useState<'gantt' | 'customers' | 'flightNodes' | 'routes' | 'vehicles'>('gantt')
+  const [missionTab, setMissionTab] = useState<'gantt' | 'orders' | 'flightNodes' | 'routes' | 'vehicles'>('gantt')
   const [vehicleFilter, setVehicleFilter] = useState<'all' | 'drones' | 'trucks'>('all')
-  const [nodeTab, setNodeTab] = useState<'customers' | 'flightNodes'>('customers')
+  const [nodeTab, setNodeTab] = useState<'orders' | 'flightNodes'>('orders')
 
   const [csvImporting, setCsvImporting] = useState(false)
+
+  // --- Grid / Table view toggle (single global toggle) ---
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
+  const toggleViewMode = () => {
+    setViewMode(prev => prev === 'grid' ? 'table' : 'grid')
+  }
 
   // --- Address/Coordinate toggle state ---
   const [globalDisplayMode, setGlobalDisplayMode] = useState<'coords' | 'address'>('coords')
@@ -339,13 +349,12 @@ export function BottomPanel() {
     URL.revokeObjectURL(url)
   }
 
-  const handleAddCustomer = () => {
-    // Label and addressId will be auto-assigned by FlightPlannerContext
+  const handleAddOrder = () => {
     const newNode: FlightNode = {
       id: `node-${Date.now()}`,
-      type: 'customer',
-      lat: 26.4619, // Default FGCU coordinates
-      lng: -81.7726,
+      type: 'order',
+      lat: mapCenter.lat,
+      lng: mapCenter.lng,
     }
     addNode(newNode)
   }
@@ -354,8 +363,8 @@ export function BottomPanel() {
     const newNode: FlightNode = {
       id: `node-${Date.now()}`,
       type: 'waypoint',
-      lat: 26.4619, // Default FGCU coordinates
-      lng: -81.7726,
+      lat: mapCenter.lat,
+      lng: mapCenter.lng,
     }
     addNode(newNode)
   }
@@ -390,49 +399,163 @@ export function BottomPanel() {
 
   const missionStatus = currentMission?.status || 'Idle'
   const hasRoute = truckRoute.length > 0 || droneRoutes.length > 0
-  const customerNodes = missionConfig.nodes.filter((n) => n.type === 'customer')
-  const flightNodes = missionConfig.nodes.filter((n) => n.type !== 'customer')
+  const orderNodes = missionConfig.nodes.filter((n) => n.type === 'order')
+  const flightNodes = missionConfig.nodes.filter((n) => n.type !== 'order')
 
-  // Compute delivery vehicle for each customer: 'drone' | 'truck' | 'unrouted'
-  const customerDeliveryMap = useMemo(() => {
+  // Compute delivery vehicle for each order: 'drone' | 'truck' | 'unrouted'
+  const orderDeliveryMap = useMemo(() => {
     const map = new Map<string, 'drone' | 'truck' | 'unrouted'>()
-    customerNodes.forEach((customer) => {
+    orderNodes.forEach((order) => {
       const isDrone = droneRoutes.some((sortie) =>
-        sortie.length >= 2 && pointMatchesNode(sortie[1], customer)
+        sortie.length >= 2 && pointMatchesNode(sortie[1], order)
       )
       if (isDrone) {
-        map.set(customer.id, 'drone')
-      } else if (hasRoute && truckRoute.some((pt) => pointMatchesNode(pt, customer))) {
-        map.set(customer.id, 'truck')
+        map.set(order.id, 'drone')
+      } else if (hasRoute && truckRoute.some((pt) => pointMatchesNode(pt, order))) {
+        map.set(order.id, 'truck')
       } else {
-        map.set(customer.id, 'unrouted')
+        map.set(order.id, 'unrouted')
       }
     })
     return map
-  }, [customerNodes, droneRoutes, truckRoute, hasRoute])
+  }, [orderNodes, droneRoutes, truckRoute, hasRoute])
 
   // Stats for header display
-  const totalCustomers = customerNodes.length
+  const totalOrders = orderNodes.length
   const deliveredPackages = 0 // TODO: Track actual deliveries
   const totalDistance = hasRoute ? '10.5km' : 'X' // TODO: Calculate actual distance
   const coveredDistance = '0km' // TODO: Track actual distance covered
   const estimatedTime = missionConfig.estimatedDuration ? formatDuration(missionConfig.estimatedDuration) : 'X:XX'
 
+  // Delivery counts from route matching (more reliable than timeline for truck deliveries)
+  const droneDeliveryCount = useMemo(() => Array.from(orderDeliveryMap.values()).filter((v) => v === 'drone').length, [orderDeliveryMap])
+  const truckDeliveryCount = useMemo(() => Array.from(orderDeliveryMap.values()).filter((v) => v === 'truck').length, [orderDeliveryMap])
+
   // Generate timeline data for Gantt chart
   const timelineResult = useTimelineGenerator(truckRoute, droneRoutes, missionConfig.nodes)
+
+  // Compute ETA and distance for each order directly from route data
+  const orderEtaMap = useMemo(() => {
+    const map = new Map<string, { eta: number; distance: number }>()
+    if (!hasRoute) return map
+
+    // Haversine distance in meters
+    const haversine = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+      const R = 6371000
+      const toRad = (d: number) => (d * Math.PI) / 180
+      const dLat = toRad(b.lat - a.lat)
+      const dLon = toRad(b.lng - a.lng)
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2
+      return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
+    }
+
+    const TRUCK_SPEED_MS = (40 * 1000) / 3600 // 40 km/h
+    const DRONE_SPEED_MS = (60 * 1000) / 3600 // 60 km/h
+
+    // Pre-compute cumulative truck distances for each route index
+    const truckCumDist: number[] = [0]
+    for (let i = 1; i < truckRoute.length; i++) {
+      truckCumDist.push(truckCumDist[i - 1] + haversine(truckRoute[i - 1], truckRoute[i]))
+    }
+
+    for (const order of orderNodes) {
+      const vehicle = orderDeliveryMap.get(order.id) || 'unrouted'
+
+      if (vehicle === 'drone') {
+        // Find the sortie delivering to this order
+        for (const sortie of droneRoutes) {
+          if (sortie.length >= 2 && pointMatchesNode(sortie[1], order)) {
+            const dist = haversine(sortie[0], sortie[1])
+            const eta = dist / DRONE_SPEED_MS
+            map.set(order.id, { eta, distance: dist })
+            break
+          }
+        }
+      } else if (vehicle === 'truck') {
+        // Walk truck route to find the matching point
+        for (let i = 1; i < truckRoute.length; i++) {
+          if (pointMatchesNode(truckRoute[i], order)) {
+            const dist = truckCumDist[i]
+            const eta = dist / TRUCK_SPEED_MS
+            map.set(order.id, { eta, distance: dist })
+            break
+          }
+        }
+      }
+    }
+
+    return map
+  }, [hasRoute, orderNodes, orderDeliveryMap, droneRoutes, truckRoute])
+
+  // Compute per-type numbering for flight nodes (e.g., Depot 1, Station 2)
+  const nodeTypeNumberMap = useMemo(() => {
+    const map = new Map<string, number>()
+    const counters: Record<string, number> = {}
+    for (const node of flightNodes) {
+      counters[node.type] = (counters[node.type] || 0) + 1
+      map.set(node.id, counters[node.type])
+    }
+    return map
+  }, [flightNodes])
+
+  // Compute ETA (cumulative time) and distance-on-route for each flight node on the truck route
+  const nodeEtaMap = useMemo(() => {
+    const map = new Map<string, { eta: number; distance: number }>()
+    if (!hasRoute || truckRoute.length < 2) return map
+
+    const haversine = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+      const R = 6371000
+      const toRad = (d: number) => (d * Math.PI) / 180
+      const dLat = toRad(b.lat - a.lat)
+      const dLon = toRad(b.lng - a.lng)
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2
+      return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
+    }
+    const TRUCK_SPEED_MS = (40 * 1000) / 3600
+
+    const truckCumDist: number[] = [0]
+    for (let i = 1; i < truckRoute.length; i++) {
+      truckCumDist.push(truckCumDist[i - 1] + haversine(truckRoute[i - 1], truckRoute[i]))
+    }
+
+    for (const node of flightNodes) {
+      for (let i = 0; i < truckRoute.length; i++) {
+        if (pointMatchesNode(truckRoute[i], node)) {
+          const dist = truckCumDist[i]
+          const eta = dist / TRUCK_SPEED_MS
+          map.set(node.id, { eta, distance: dist })
+          break
+        }
+      }
+    }
+    return map
+  }, [hasRoute, truckRoute, flightNodes])
+
+  // Count timeline events per flight node location
+  const nodeEventCountMap = useMemo(() => {
+    const map = new Map<string, number>()
+    if (!hasRoute) return map
+    for (const node of flightNodes) {
+      const count = timelineResult.events.filter(
+        (e) => Math.abs(e.location.lat - node.lat) < 0.0001 && Math.abs(e.location.lng - node.lng) < 0.0001
+      ).length
+      if (count > 0) map.set(node.id, count)
+    }
+    return map
+  }, [hasRoute, flightNodes, timelineResult.events])
 
   // Generate Gantt chart data - always call hooks unconditionally
   const ganttDataFromHook = useGanttData(timelineResult, fleetMode, droneCount)
   const ganttData = hasRoute ? ganttDataFromHook : generateEmptyGanttData(fleetMode, droneCount)
 
   // Generate route details for Routes tab
-  const routeDetails = useRouteDetails(timelineResult, fleetMode, droneCount, hasRoute, customerNodes)
+  const routeDetails = useRouteDetails(timelineResult, fleetMode, droneCount, hasRoute, orderNodes)
 
   // Generate vehicle details for Vehicles tab
-  const vehicleDetails = useVehicleDetails(timelineResult, fleetMode, droneCount, hasRoute, customerNodes)
+  const vehicleDetails = useVehicleDetails(timelineResult, fleetMode, droneCount, hasRoute, orderNodes)
 
   // Determine Gantt chart state
-  const ganttState: GanttChartState = !missionConfig.nodes.some((n) => n.type === 'depot') && customerNodes.length === 0
+  const ganttState: GanttChartState = !missionConfig.nodes.some((n) => n.type === 'depot') && orderNodes.length === 0
     ? 'no-plan'
     : hasRoute
       ? 'loaded'
@@ -530,7 +653,7 @@ export function BottomPanel() {
                   </Flex>
                   <Flex gap="1" align="center" title="Deliveries">
                     <Package size={14} />
-                    <Text size="1">{deliveredPackages}/{hasRoute ? totalCustomers : 'X'}</Text>
+                    <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : 'X'}</Text>
                   </Flex>
                   <Flex gap="1" align="center" title="Distance Covered / Total">
                     <Route size={14} />
@@ -543,7 +666,7 @@ export function BottomPanel() {
                 <ChevronUp size={24} />
               </IconButton>
             </Flex>
-            <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
+            <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} />
           </Flex>
         </Card>
         </div>
@@ -622,7 +745,7 @@ export function BottomPanel() {
                   </Flex>
                   <Flex gap="1" align="center" title="Deliveries">
                     <Package size={14} />
-                    <Text size="1">{deliveredPackages}/{hasRoute ? totalCustomers : 'X'}</Text>
+                    <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : 'X'}</Text>
                   </Flex>
                   <Flex gap="1" align="center" title="Distance Covered / Total">
                     <Route size={14} />
@@ -637,36 +760,40 @@ export function BottomPanel() {
             </Flex>
 
             {/* Stats Bar */}
-            <MissionStatsBar missionConfig={missionConfig} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
+            <MissionStatsBar missionConfig={missionConfig} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} />
 
             <Flex className="flex-1" style={{ minHeight: 0, backgroundColor: 'white' }}>
               {/* Left: Nodes with Tabs */}
               <Box className="flex-1 border-r" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                <Tabs.Root value={nodeTab} onValueChange={(v: string) => setNodeTab(v as 'customers' | 'flightNodes')} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Tabs.Root value={nodeTab} onValueChange={(v: string) => setNodeTab(v as 'orders' | 'flightNodes')} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                   <Flex justify="between" align="center" className="px-4 pt-3">
                     <Tabs.List>
-                      <Tabs.Trigger value="customers">
+                      <Tabs.Trigger value="orders">
                         <MapPin size={14} className="mr-1" />
-                        Customer Locations ({customerNodes.length})
+                        Order Locations ({orderNodes.length})
                       </Tabs.Trigger>
                       <Tabs.Trigger value="flightNodes">
                         <Plane size={14} className="mr-1" />
                         Flight Nodes ({flightNodes.length})
                       </Tabs.Trigger>
                     </Tabs.List>
-                    <Flex gap="2">
-                      {nodeTab === 'customers' ? (
+                    <Flex gap="3" align="center">
+                      <IconButton size="1" variant="ghost" color={globalDisplayMode === 'address' ? 'blue' : 'gray'} onClick={toggleGlobalDisplayMode} title={globalDisplayMode === 'coords' ? 'Show addresses' : 'Show coordinates'} style={{ cursor: 'pointer' }}>
+                        {globalDisplayMode === 'coords' ? <MapPinned size={14} /> : <Hash size={14} />}
+                      </IconButton>
+                      <ViewToggle viewMode={viewMode} onToggle={toggleViewMode} />
+                      {nodeTab === 'orders' ? (
                         <>
                           <Button
                             size="1"
-                            variant={plotModeCustomer ? 'solid' : 'soft'}
-                            color={plotModeCustomer ? 'blue' : 'gray'}
-                            onClick={() => setPlotModeCustomer(!plotModeCustomer)}
+                            variant={plotModeOrder ? 'solid' : 'soft'}
+                            color={plotModeOrder ? 'blue' : 'gray'}
+                            onClick={() => setPlotModeOrder(!plotModeOrder)}
                           >
                             <MousePointer2 size={14} /> Plot
                           </Button>
-                          <Button size="1" onClick={handleAddCustomer}>
-                            <Plus size={14} /> Add Customer
+                          <Button size="1" onClick={handleAddOrder}>
+                            <Plus size={14} /> Add Order
                           </Button>
                         </>
                       ) : (
@@ -687,8 +814,22 @@ export function BottomPanel() {
                     </Flex>
                   </Flex>
 
-                  {/* Customer Locations Tab */}
-                  <Tabs.Content value="customers" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'hidden' }}>
+                  {/* Order Locations Tab */}
+                  <Tabs.Content value="orders" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'hidden' }}>
+                    {viewMode === 'table' ? (
+                      <OrdersEditableTable
+                        orders={orderNodes}
+                        selectedNodeId={selectedNodeId}
+                        displayMode={globalDisplayMode}
+                        geocodingLoading={geocodingLoading}
+                        updateNode={updateNode}
+                        removeNode={removeNode}
+                        addressSearchInputs={addressSearchInputs}
+                        onAddressSearchInputChange={(nodeId, value) => setAddressSearchInputs(prev => new Map(prev).set(nodeId, value))}
+                        onAddressSearch={handleAddressSearch}
+
+                      />
+                    ) : (
                     <ScrollArea style={{ height: '100%' }}>
                       <div
                         style={{
@@ -698,7 +839,7 @@ export function BottomPanel() {
                           paddingRight: '8px',
                         }}
                       >
-                        {customerNodes.map((node) => {
+                        {orderNodes.map((node) => {
                           const displayMode = getDisplayMode(node.id)
                           const isLoading = geocodingLoading.get(node.id) || false
                           return (
@@ -715,7 +856,7 @@ export function BottomPanel() {
                                 <Flex align="center" gap="2">
                                   <MapPin size={14} className="text-green-600" />
                                   <Badge color="green" size="2" style={{ fontWeight: 'bold' }}>
-                                    Customer ID: {node.addressId || '?'}
+                                    Order ID: {node.orderId || '?'}
                                   </Badge>
                                   <IconButton
                                     size="1" variant="ghost"
@@ -825,25 +966,33 @@ export function BottomPanel() {
                           )
                         })}
                       </div>
-                      {customerNodes.length === 0 && (
+                      {orderNodes.length === 0 && (
                         <Box className="text-center p-6 bg-gray-50 rounded">
                           <Text size="2" color="gray">
-                            No customers added yet. Click &quot;Add Customer&quot; or click on the map.
+                            No orders added yet. Click &quot;Add Order&quot; or click on the map.
                           </Text>
                         </Box>
                       )}
-                      {customerNodes.length > 0 && (
-                        <div style={{ position: 'sticky', bottom: 8, left: 8, zIndex: 10, marginTop: '8px' }}>
-                          <IconButton size="2" variant="solid" color={globalDisplayMode === 'address' ? 'blue' : 'gray'} onClick={toggleGlobalDisplayMode} title={globalDisplayMode === 'coords' ? 'Show all as addresses' : 'Show all as coordinates'} style={{ borderRadius: '50%', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
-                            {globalDisplayMode === 'coords' ? <MapPinned size={16} /> : <Hash size={16} />}
-                          </IconButton>
-                        </div>
-                      )}
                     </ScrollArea>
+                    )}
                   </Tabs.Content>
 
                   {/* Flight Nodes Tab */}
                   <Tabs.Content value="flightNodes" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'hidden' }}>
+                    {viewMode === 'table' ? (
+                      <FlightNodesEditableTable
+                        nodes={flightNodes}
+                        selectedNodeId={selectedNodeId}
+                        displayMode={globalDisplayMode}
+                        geocodingLoading={geocodingLoading}
+                        updateNode={updateNode}
+                        removeNode={removeNode}
+                        addressSearchInputs={addressSearchInputs}
+                        onAddressSearchInputChange={(nodeId, value) => setAddressSearchInputs(prev => new Map(prev).set(nodeId, value))}
+                        onAddressSearch={handleAddressSearch}
+
+                      />
+                    ) : (
                     <ScrollArea style={{ height: '100%' }}>
                       <div
                         style={{
@@ -866,45 +1015,20 @@ export function BottomPanel() {
                             }}
                           >
                             <Flex justify="between" align="start" className="mb-2">
-                              <Flex align="center" gap="2">
-                                <MapPin size={14} />
-                                <Badge
-                                  color={
-                                    node.type === 'hazard' && node.severity
-                                      ? getHazardColor(node.severity)
-                                      : getNodeTypeColor(node.type)
-                                  }
-                                  size="1"
-                                  style={{ fontWeight: 'bold' }}
-                                >
-                                  Flight Node ID: {node.flightNodeId || '?'}
-                                </Badge>
-                                <Badge
-                                  color={
-                                    node.type === 'hazard' && node.severity
-                                      ? getHazardColor(node.severity)
-                                      : getNodeTypeColor(node.type)
-                                  }
-                                  size="1"
-                                  variant="soft"
-                                >
-                                  {node.type}
-                                </Badge>
-                                {node.type === 'hazard' && node.severity && (
-                                  <Badge size="1" variant="soft" color={getHazardColor(node.severity)}>
-                                    {node.severity}
-                                  </Badge>
-                                )}
-                                <IconButton
-                                  size="1" variant="ghost"
-                                  color={displayMode === 'address' ? 'blue' : 'gray'}
-                                  onClick={() => toggleCardDisplayMode(node.id, node)}
-                                  title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'}
-                                  style={{ minWidth: '20px', minHeight: '20px', padding: '2px' }}
-                                >
-                                  {displayMode === 'coords' ? <MapPinned size={12} /> : <Hash size={12} />}
-                                </IconButton>
-                              </Flex>
+                              <Box>
+                                <Flex align="center" gap="1">
+                                  <Text size="2" weight="bold">Flight Node {node.flightNodeId || '?'}</Text>
+                                  <Text size="2" color="gray">—</Text>
+                                  <Text size="2" weight="medium" style={{ color: node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6' }}>
+                                    {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {nodeTypeNumberMap.get(node.id) || ''}
+                                  </Text>
+                                  {node.type === 'hazard' && node.severity && (
+                                    <Badge size="1" variant="soft" color={getHazardColor(node.severity)} style={{ marginLeft: '4px' }}>
+                                      {node.severity}
+                                    </Badge>
+                                  )}
+                                </Flex>
+                              </Box>
                               <IconButton size="1" variant="ghost" color="red" onClick={() => removeNode(node.id)}>
                                 <Trash2 size={14} />
                               </IconButton>
@@ -1036,14 +1160,8 @@ export function BottomPanel() {
                           </Text>
                         </Box>
                       )}
-                      {flightNodes.length > 0 && (
-                        <div style={{ position: 'sticky', bottom: 8, left: 8, zIndex: 10, marginTop: '8px' }}>
-                          <IconButton size="2" variant="solid" color={globalDisplayMode === 'address' ? 'blue' : 'gray'} onClick={toggleGlobalDisplayMode} title={globalDisplayMode === 'coords' ? 'Show all as addresses' : 'Show all as coordinates'} style={{ borderRadius: '50%', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
-                            {globalDisplayMode === 'coords' ? <MapPinned size={16} /> : <Hash size={16} />}
-                          </IconButton>
-                        </div>
-                      )}
                     </ScrollArea>
+                    )}
                   </Tabs.Content>
                 </Tabs.Root>
               </Box>
@@ -1146,7 +1264,7 @@ export function BottomPanel() {
   }
 
   // Expanded state - Mission Management Mode
-  const deliveryProgress = totalCustomers > 0 ? (deliveredPackages / totalCustomers) * 100 : 0
+  const deliveryProgress = totalOrders > 0 ? (deliveredPackages / totalOrders) * 100 : 0
 
   // Mock mission tracking data (TODO: Replace with real-time tracking)
   const currentSortie = 0 // 0 means not started
@@ -1215,7 +1333,7 @@ export function BottomPanel() {
                     </Flex>
                     <Flex gap="1" align="center" title="Deliveries">
                       <Package size={14} />
-                      <Text size="1">{deliveredPackages}/{hasRoute ? totalCustomers : 'X'}</Text>
+                      <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : 'X'}</Text>
                     </Flex>
                     <Flex gap="1" align="center" title="Distance Covered / Total">
                       <Route size={14} />
@@ -1230,32 +1348,47 @@ export function BottomPanel() {
               </Flex>
 
               {/* Stats Bar */}
-              <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
+              <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} />
 
               {/* Tabs */}
-              <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'customers' | 'flightNodes' | 'routes' | 'vehicles'); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                <Tabs.List className="px-4 pt-2" style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
-                  <Tabs.Trigger value="gantt">
-                    <Route size={16} className="mr-1" />
-                    Gantt Chart
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="customers">
-                    <MapPin size={16} className="mr-1" />
-                    Customers ({customerNodes.length})
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="flightNodes">
-                    <Plane size={16} className="mr-1" />
-                    Flight Nodes ({flightNodes.length})
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="routes">
-                    <Route size={16} className="mr-1" />
-                    Routes ({routeDetails.length})
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="vehicles">
-                    <Truck size={16} className="mr-1" />
-                    Vehicles ({vehicleDetails.length})
-                  </Tabs.Trigger>
-                </Tabs.List>
+              <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'flightNodes' | 'routes' | 'vehicles'); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <Flex align="center" justify="between" className="px-4 pt-2">
+                  <Tabs.List style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
+                    <Tabs.Trigger value="gantt">
+                      <Route size={16} className="mr-1" />
+                      Gantt Chart
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="orders">
+                      <MapPin size={16} className="mr-1" />
+                      Orders ({orderNodes.length})
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="flightNodes">
+                      <Plane size={16} className="mr-1" />
+                      Flight Nodes ({flightNodes.length})
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="routes">
+                      <Route size={16} className="mr-1" />
+                      Routes ({routeDetails.length})
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="vehicles">
+                      <Truck size={16} className="mr-1" />
+                      Vehicles ({vehicleDetails.length})
+                    </Tabs.Trigger>
+                  </Tabs.List>
+                  {missionTab !== 'gantt' && (
+                    <Flex gap="3" align="center">
+                      {(missionTab === 'orders' || missionTab === 'flightNodes') && (
+                        <IconButton size="1" variant="ghost" color={globalDisplayMode === 'address' ? 'blue' : 'gray'} onClick={toggleGlobalDisplayMode} title={globalDisplayMode === 'coords' ? 'Show addresses' : 'Show coordinates'} style={{ cursor: 'pointer' }}>
+                          {globalDisplayMode === 'coords' ? <MapPinned size={14} /> : <Hash size={14} />}
+                        </IconButton>
+                      )}
+                      <ViewToggle
+                        viewMode={viewMode}
+                        onToggle={toggleViewMode}
+                      />
+                    </Flex>
+                  )}
+                </Flex>
 
                 {/* Tab 1: Gantt Chart */}
                 <Tabs.Content value="gantt" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
@@ -1270,8 +1403,18 @@ export function BottomPanel() {
                   />
                 </Tabs.Content>
 
-                {/* Tab 2: Customers */}
-                <Tabs.Content value="customers" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
+                {/* Tab 2: Orders */}
+                <Tabs.Content value="orders" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
+                  {viewMode === 'table' ? (
+                    <OrdersTable
+                      orders={orderNodes}
+                      orderDeliveryMap={orderDeliveryMap}
+                      orderEtaMap={orderEtaMap}
+                      displayMode={globalDisplayMode}
+                      geocodingLoading={geocodingLoading}
+
+                    />
+                  ) : (
                   <ScrollArea style={{ height: '100%' }}>
                     <div
                       style={{
@@ -1282,14 +1425,15 @@ export function BottomPanel() {
                         paddingRight: '24px',
                       }}
                     >
-                      {customerNodes.map((customer) => {
-                        const vehicle = customerDeliveryMap.get(customer.id) || 'unrouted'
+                      {orderNodes.map((order) => {
+                        const vehicle = orderDeliveryMap.get(order.id) || 'unrouted'
                         const accentColor = vehicle === 'drone' ? '#facc15' : vehicle === 'truck' ? '#3b82f6' : '#d1d5db'
-                        const displayMode = getDisplayMode(customer.id)
-                        const isLoading = geocodingLoading.get(customer.id) || false
+                        const displayMode = getDisplayMode(order.id)
+                        const isLoading = geocodingLoading.get(order.id) || false
+                        const etaInfo = orderEtaMap.get(order.id)
                         return (
                           <Card
-                            key={customer.id}
+                            key={order.id}
                             className="p-0"
                             style={{ border: '1px solid #e5e7eb', overflow: 'hidden' }}
                           >
@@ -1299,21 +1443,32 @@ export function BottomPanel() {
                                 <Flex justify="between" align="center" style={{ marginBottom: '6px' }}>
                                   <Flex align="center" gap="2">
                                     <MapPin size={14} style={{ color: accentColor === '#d1d5db' ? '#9ca3af' : accentColor }} />
-                                    <Text size="2" weight="bold">Customer {customer.addressId || '?'}</Text>
+                                    <Text size="2" weight="bold">Order {order.orderId || '?'}</Text>
                                   </Flex>
-                                  <Flex align="center" gap="1">
-                                    <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={() => toggleCardDisplayMode(customer.id, customer)} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
-                                      {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
-                                    </IconButton>
-                                    <Badge size="1" variant="soft" color="green">customer</Badge>
-                                  </Flex>
+                                  <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={() => toggleCardDisplayMode(order.id, order)} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
+                                    {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
+                                  </IconButton>
                                 </Flex>
                                 <Text size="1" color="gray" style={{ display: 'block', marginBottom: '6px' }}>
                                   {displayMode === 'coords'
-                                    ? `${customer.lat.toFixed(6)}, ${customer.lng.toFixed(6)}`
-                                    : isLoading ? 'Loading address...' : customer.address || `${customer.lat.toFixed(6)}, ${customer.lng.toFixed(6)}`
+                                    ? `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
+                                    : isLoading ? 'Loading address...' : order.address || `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
                                   }
                                 </Text>
+                                {etaInfo && (
+                                  <Flex gap="3" style={{ marginBottom: '6px' }}>
+                                    <Flex align="center" gap="1">
+                                      <Clock size={10} style={{ color: '#6b7280' }} />
+                                      <Text size="1" color="gray">ETA: <span style={{ fontWeight: 500, color: '#374151' }}>{formatDurationTimeline(etaInfo.eta)}</span></Text>
+                                    </Flex>
+                                    {etaInfo.distance > 0 && (
+                                      <Flex align="center" gap="1">
+                                        <Route size={10} style={{ color: '#6b7280' }} />
+                                        <Text size="1" color="gray">Dist: <span style={{ fontWeight: 500, color: '#374151' }}>{formatDistanceTimeline(etaInfo.distance)}</span></Text>
+                                      </Flex>
+                                    )}
+                                  </Flex>
+                                )}
                                 {vehicle !== 'unrouted' ? (
                                   <Badge
                                     size="1"
@@ -1336,26 +1491,29 @@ export function BottomPanel() {
                           </Card>
                         )
                       })}
-                      {customerNodes.length === 0 && (
+                      {orderNodes.length === 0 && (
                         <Box className="text-center p-6 bg-gray-50 rounded" style={{ gridColumn: '1 / -1' }}>
                           <Text size="2" color="gray">
-                            No customers added yet.
+                            No orders added yet.
                           </Text>
                         </Box>
                       )}
                     </div>
-                    {customerNodes.length > 0 && (
-                      <div style={{ position: 'sticky', bottom: 8, left: 16, zIndex: 10 }}>
-                        <IconButton size="2" variant="solid" color={globalDisplayMode === 'address' ? 'blue' : 'gray'} onClick={toggleGlobalDisplayMode} title={globalDisplayMode === 'coords' ? 'Show all as addresses' : 'Show all as coordinates'} style={{ borderRadius: '50%', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
-                          {globalDisplayMode === 'coords' ? <MapPinned size={16} /> : <Hash size={16} />}
-                        </IconButton>
-                      </div>
-                    )}
                   </ScrollArea>
+                  )}
                 </Tabs.Content>
 
                 {/* Tab 3: Flight Nodes */}
                 <Tabs.Content value="flightNodes" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
+                  {viewMode === 'table' ? (
+                    <FlightNodesTable
+                      nodes={flightNodes}
+                      displayMode={globalDisplayMode}
+                      geocodingLoading={geocodingLoading}
+                      nodeEtaMap={nodeEtaMap}
+                      nodeEventCountMap={nodeEventCountMap}
+                    />
+                  ) : (
                   <ScrollArea style={{ height: '100%' }}>
                     <div
                       style={{
@@ -1370,6 +1528,9 @@ export function BottomPanel() {
                         const nodeColor = node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6'
                         const displayMode = getDisplayMode(node.id)
                         const isLoading = geocodingLoading.get(node.id) || false
+                        const etaInfo = nodeEtaMap.get(node.id)
+                        const eventCount = nodeEventCountMap.get(node.id) || 0
+                        const typeNum = nodeTypeNumberMap.get(node.id) || ''
                         return (
                           <Card
                             key={node.id}
@@ -1379,40 +1540,49 @@ export function BottomPanel() {
                             <Flex>
                               <div style={{ width: '4px', minHeight: '100%', backgroundColor: nodeColor, flexShrink: 0 }} />
                               <Box style={{ padding: '10px 12px', flex: 1 }}>
-                                <Flex justify="between" align="center" style={{ marginBottom: '6px' }}>
-                                  <Flex align="center" gap="2">
-                                    {node.type === 'depot' ? (
-                                      <House size={14} style={{ color: nodeColor }} />
-                                    ) : node.type === 'station' ? (
-                                      <Zap size={14} style={{ color: nodeColor }} />
-                                    ) : node.type === 'hazard' ? (
-                                      <AlertTriangle size={14} style={{ color: nodeColor }} />
-                                    ) : (
-                                      <MapPin size={14} style={{ color: nodeColor }} />
-                                    )}
-                                    <Text size="2" weight="bold">
-                                      {node.label || `${node.type.charAt(0).toUpperCase() + node.type.slice(1)} ${node.flightNodeId || ''}`}
-                                    </Text>
-                                  </Flex>
+                                <Flex justify="between" align="start" style={{ marginBottom: '4px' }}>
                                   <Flex align="center" gap="1">
-                                    <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={() => toggleCardDisplayMode(node.id, node)} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
-                                      {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
-                                    </IconButton>
-                                    <Badge
-                                      size="1"
-                                      variant="soft"
-                                      color={node.type === 'depot' ? 'blue' : node.type === 'station' ? 'orange' : node.type === 'hazard' ? 'red' : 'purple'}
-                                    >
-                                      {node.type}
-                                    </Badge>
+                                    {node.type === 'depot' ? (
+                                      <House size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                    ) : node.type === 'station' ? (
+                                      <Zap size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                    ) : node.type === 'hazard' ? (
+                                      <AlertTriangle size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                    ) : (
+                                      <MapPin size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                    )}
+                                    <Box>
+                                      <Text size="2" weight="bold">Flight Node {node.flightNodeId || '?'}</Text>
+                                      <Text size="1" style={{ color: nodeColor, fontWeight: 500, display: 'block', marginTop: '-1px' }}>
+                                        {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {typeNum}
+                                      </Text>
+                                    </Box>
                                   </Flex>
+                                  {node.type === 'hazard' && node.severity && (
+                                    <Badge size="1" variant="soft" color={getHazardColor(node.severity)}>
+                                      {node.severity}
+                                    </Badge>
+                                  )}
                                 </Flex>
-                                <Text size="1" color="gray">
+                                <Text size="1" color="gray" style={{ display: 'block', marginBottom: '6px' }}>
                                   {displayMode === 'coords'
                                     ? `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
                                     : isLoading ? 'Loading address...' : node.address || `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
                                   }
                                 </Text>
+                                <Flex gap="3" align="center">
+                                  {etaInfo ? (
+                                    <>
+                                      <Text size="1" color="gray">Dist: <span style={{ fontWeight: 500, color: '#374151' }}>{formatDistanceTimeline(etaInfo.distance)}</span></Text>
+                                      <Text size="1" color="gray">ETA: <span style={{ fontWeight: 500, color: '#374151' }}>{formatDurationTimeline(etaInfo.eta)}</span></Text>
+                                    </>
+                                  ) : (
+                                    <Text size="1" color="gray">Dist: <span style={{ color: '#9ca3af' }}>--</span></Text>
+                                  )}
+                                  {eventCount > 0 && (
+                                    <Text size="1" color="gray">Events: <span style={{ fontWeight: 500, color: '#374151' }}>{eventCount}</span></Text>
+                                  )}
+                                </Flex>
                               </Box>
                             </Flex>
                           </Card>
@@ -1426,32 +1596,42 @@ export function BottomPanel() {
                         </Box>
                       )}
                     </div>
-                    {flightNodes.length > 0 && (
-                      <div style={{ position: 'sticky', bottom: 8, left: 16, zIndex: 10 }}>
-                        <IconButton size="2" variant="solid" color={globalDisplayMode === 'address' ? 'blue' : 'gray'} onClick={toggleGlobalDisplayMode} title={globalDisplayMode === 'coords' ? 'Show all as addresses' : 'Show all as coordinates'} style={{ borderRadius: '50%', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
-                          {globalDisplayMode === 'coords' ? <MapPinned size={16} /> : <Hash size={16} />}
-                        </IconButton>
-                      </div>
-                    )}
                   </ScrollArea>
+                  )}
                 </Tabs.Content>
 
                 {/* Tab 4: Routes */}
                 <Tabs.Content value="routes" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
-                  <RoutesTab
-                    routes={routeDetails}
-                    selectedRouteId={selectedRouteId}
-                    onSelectRoute={setSelectedRouteId}
-                  />
+                  {viewMode === 'table' ? (
+                    <RoutesTable
+                      routes={routeDetails}
+                      selectedRouteId={selectedRouteId}
+                      onSelectRoute={setSelectedRouteId}
+                    />
+                  ) : (
+                    <RoutesTab
+                      routes={routeDetails}
+                      selectedRouteId={selectedRouteId}
+                      onSelectRoute={setSelectedRouteId}
+                    />
+                  )}
                 </Tabs.Content>
 
                 {/* Tab 5: Vehicles */}
                 <Tabs.Content value="vehicles" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
-                  <VehiclesTab
-                    vehicles={vehicleDetails}
-                    selectedRouteId={selectedRouteId}
-                    onSelectRoute={setSelectedRouteId}
-                  />
+                  {viewMode === 'table' ? (
+                    <VehiclesTable
+                      vehicles={vehicleDetails}
+                      selectedRouteId={selectedRouteId}
+                      onSelectRoute={setSelectedRouteId}
+                    />
+                  ) : (
+                    <VehiclesTab
+                      vehicles={vehicleDetails}
+                      selectedRouteId={selectedRouteId}
+                      onSelectRoute={setSelectedRouteId}
+                    />
+                  )}
                 </Tabs.Content>
 
               </Tabs.Root>
@@ -1522,7 +1702,7 @@ export function BottomPanel() {
                 </Flex>
                 <Flex gap="1" align="center" title="Deliveries">
                   <Package size={14} />
-                  <Text size="1">{deliveredPackages}/{hasRoute ? totalCustomers : 'X'}</Text>
+                  <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : 'X'}</Text>
                 </Flex>
                 <Flex gap="1" align="center" title="Distance Covered / Total">
                   <Route size={14} />
@@ -1537,32 +1717,47 @@ export function BottomPanel() {
           </Flex>
 
           {/* Stats Bar */}
-          <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} />
+          <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} />
 
           {/* Tabs */}
-          <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'customers' | 'flightNodes' | 'routes' | 'vehicles'); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            <Tabs.List className="px-4 pt-2" style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
-              <Tabs.Trigger value="gantt">
-                <Route size={16} className="mr-1" />
-                Gantt Chart
-              </Tabs.Trigger>
-              <Tabs.Trigger value="customers">
-                <MapPin size={16} className="mr-1" />
-                Customers ({customerNodes.length})
-              </Tabs.Trigger>
-              <Tabs.Trigger value="flightNodes">
-                <Plane size={16} className="mr-1" />
-                Flight Nodes ({flightNodes.length})
-              </Tabs.Trigger>
-              <Tabs.Trigger value="routes">
-                <Route size={16} className="mr-1" />
-                Routes ({routeDetails.length})
-              </Tabs.Trigger>
-              <Tabs.Trigger value="vehicles">
-                <Truck size={16} className="mr-1" />
-                Vehicles ({vehicleDetails.length})
-              </Tabs.Trigger>
-            </Tabs.List>
+          <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'flightNodes' | 'routes' | 'vehicles'); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <Flex align="center" justify="between" className="px-4 pt-2">
+              <Tabs.List style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
+                <Tabs.Trigger value="gantt">
+                  <Route size={16} className="mr-1" />
+                  Gantt Chart
+                </Tabs.Trigger>
+                <Tabs.Trigger value="orders">
+                  <MapPin size={16} className="mr-1" />
+                  Orders ({orderNodes.length})
+                </Tabs.Trigger>
+                <Tabs.Trigger value="flightNodes">
+                  <Plane size={16} className="mr-1" />
+                  Flight Nodes ({flightNodes.length})
+                </Tabs.Trigger>
+                <Tabs.Trigger value="routes">
+                  <Route size={16} className="mr-1" />
+                  Routes ({routeDetails.length})
+                </Tabs.Trigger>
+                <Tabs.Trigger value="vehicles">
+                  <Truck size={16} className="mr-1" />
+                  Vehicles ({vehicleDetails.length})
+                </Tabs.Trigger>
+              </Tabs.List>
+              {missionTab !== 'gantt' && (
+                <Flex gap="3" align="center">
+                  {(missionTab === 'orders' || missionTab === 'flightNodes') && (
+                    <IconButton size="1" variant="ghost" color={globalDisplayMode === 'address' ? 'blue' : 'gray'} onClick={toggleGlobalDisplayMode} title={globalDisplayMode === 'coords' ? 'Show addresses' : 'Show coordinates'} style={{ cursor: 'pointer' }}>
+                      {globalDisplayMode === 'coords' ? <MapPinned size={14} /> : <Hash size={14} />}
+                    </IconButton>
+                  )}
+                  <ViewToggle
+                    viewMode={viewMode}
+                    onToggle={toggleViewMode}
+                  />
+                </Flex>
+              )}
+            </Flex>
 
             {/* Tab 1: Gantt Chart */}
             <Tabs.Content value="gantt" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
@@ -1577,8 +1772,18 @@ export function BottomPanel() {
               />
             </Tabs.Content>
 
-            {/* Tab 2: Customers */}
-            <Tabs.Content value="customers" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
+            {/* Tab 2: Orders */}
+            <Tabs.Content value="orders" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
+              {viewMode === 'table' ? (
+                <OrdersTable
+                  orders={orderNodes}
+                  orderDeliveryMap={orderDeliveryMap}
+                  orderEtaMap={orderEtaMap}
+                  displayMode={globalDisplayMode}
+                  geocodingLoading={geocodingLoading}
+
+                />
+              ) : (
               <ScrollArea style={{ height: '100%' }}>
                 <div
                   style={{
@@ -1589,14 +1794,15 @@ export function BottomPanel() {
                     paddingRight: '24px',
                   }}
                 >
-                  {customerNodes.map((customer) => {
-                    const vehicle = customerDeliveryMap.get(customer.id) || 'unrouted'
+                  {orderNodes.map((order) => {
+                    const vehicle = orderDeliveryMap.get(order.id) || 'unrouted'
                     const accentColor = vehicle === 'drone' ? '#facc15' : vehicle === 'truck' ? '#3b82f6' : '#d1d5db'
-                    const displayMode = getDisplayMode(customer.id)
-                    const isLoading = geocodingLoading.get(customer.id) || false
+                    const displayMode = getDisplayMode(order.id)
+                    const isLoading = geocodingLoading.get(order.id) || false
+                    const etaInfo = orderEtaMap.get(order.id)
                     return (
                       <Card
-                        key={customer.id}
+                        key={order.id}
                         className="p-0"
                         style={{ border: '1px solid #e5e7eb', overflow: 'hidden' }}
                       >
@@ -1606,21 +1812,32 @@ export function BottomPanel() {
                             <Flex justify="between" align="center" style={{ marginBottom: '6px' }}>
                               <Flex align="center" gap="2">
                                 <MapPin size={14} style={{ color: accentColor === '#d1d5db' ? '#9ca3af' : accentColor }} />
-                                <Text size="2" weight="bold">Customer {customer.addressId || '?'}</Text>
+                                <Text size="2" weight="bold">Order {order.orderId || '?'}</Text>
                               </Flex>
-                              <Flex align="center" gap="1">
-                                <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={() => toggleCardDisplayMode(customer.id, customer)} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
-                                  {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
-                                </IconButton>
-                                <Badge size="1" variant="soft" color="green">customer</Badge>
-                              </Flex>
+                              <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={() => toggleCardDisplayMode(order.id, order)} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
+                                {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
+                              </IconButton>
                             </Flex>
                             <Text size="1" color="gray" style={{ display: 'block', marginBottom: '6px' }}>
                               {displayMode === 'coords'
-                                ? `${customer.lat.toFixed(6)}, ${customer.lng.toFixed(6)}`
-                                : isLoading ? 'Loading address...' : customer.address || `${customer.lat.toFixed(6)}, ${customer.lng.toFixed(6)}`
+                                ? `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
+                                : isLoading ? 'Loading address...' : order.address || `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
                               }
                             </Text>
+                            {etaInfo && (
+                              <Flex gap="3" style={{ marginBottom: '6px' }}>
+                                <Flex align="center" gap="1">
+                                  <Clock size={10} style={{ color: '#6b7280' }} />
+                                  <Text size="1" color="gray">ETA: <span style={{ fontWeight: 500, color: '#374151' }}>{formatDurationTimeline(etaInfo.eta)}</span></Text>
+                                </Flex>
+                                {etaInfo.distance > 0 && (
+                                  <Flex align="center" gap="1">
+                                    <Route size={10} style={{ color: '#6b7280' }} />
+                                    <Text size="1" color="gray">Dist: <span style={{ fontWeight: 500, color: '#374151' }}>{formatDistanceTimeline(etaInfo.distance)}</span></Text>
+                                  </Flex>
+                                )}
+                              </Flex>
+                            )}
                             {vehicle !== 'unrouted' ? (
                               <Badge
                                 size="1"
@@ -1643,26 +1860,29 @@ export function BottomPanel() {
                       </Card>
                     )
                   })}
-                  {customerNodes.length === 0 && (
+                  {orderNodes.length === 0 && (
                     <Box className="text-center p-6 bg-gray-50 rounded" style={{ gridColumn: '1 / -1' }}>
                       <Text size="2" color="gray">
-                        No customers added. Create or load a flight plan to add customers.
+                        No orders added. Create or load a flight plan to add orders.
                       </Text>
                     </Box>
                   )}
                 </div>
-                {customerNodes.length > 0 && (
-                  <div style={{ position: 'sticky', bottom: 8, left: 16, zIndex: 10 }}>
-                    <IconButton size="2" variant="solid" color={globalDisplayMode === 'address' ? 'blue' : 'gray'} onClick={toggleGlobalDisplayMode} title={globalDisplayMode === 'coords' ? 'Show all as addresses' : 'Show all as coordinates'} style={{ borderRadius: '50%', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
-                      {globalDisplayMode === 'coords' ? <MapPinned size={16} /> : <Hash size={16} />}
-                    </IconButton>
-                  </div>
-                )}
               </ScrollArea>
+              )}
             </Tabs.Content>
 
             {/* Tab 3: Flight Nodes */}
             <Tabs.Content value="flightNodes" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
+              {viewMode === 'table' ? (
+                <FlightNodesTable
+                  nodes={flightNodes}
+                  displayMode={globalDisplayMode}
+                  geocodingLoading={geocodingLoading}
+                  nodeEtaMap={nodeEtaMap}
+                  nodeEventCountMap={nodeEventCountMap}
+                />
+              ) : (
               <ScrollArea style={{ height: '100%' }}>
                 <div
                   style={{
@@ -1677,6 +1897,9 @@ export function BottomPanel() {
                     const nodeColor = node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6'
                     const displayMode = getDisplayMode(node.id)
                     const isLoading = geocodingLoading.get(node.id) || false
+                    const etaInfo = nodeEtaMap.get(node.id)
+                    const eventCount = nodeEventCountMap.get(node.id) || 0
+                    const typeNum = nodeTypeNumberMap.get(node.id) || ''
                     return (
                       <Card
                         key={node.id}
@@ -1686,40 +1909,49 @@ export function BottomPanel() {
                         <Flex>
                           <div style={{ width: '4px', minHeight: '100%', backgroundColor: nodeColor, flexShrink: 0 }} />
                           <Box style={{ padding: '10px 12px', flex: 1 }}>
-                            <Flex justify="between" align="center" style={{ marginBottom: '6px' }}>
-                              <Flex align="center" gap="2">
-                                {node.type === 'depot' ? (
-                                  <House size={14} style={{ color: nodeColor }} />
-                                ) : node.type === 'station' ? (
-                                  <Zap size={14} style={{ color: nodeColor }} />
-                                ) : node.type === 'hazard' ? (
-                                  <AlertTriangle size={14} style={{ color: nodeColor }} />
-                                ) : (
-                                  <MapPin size={14} style={{ color: nodeColor }} />
-                                )}
-                                <Text size="2" weight="bold">
-                                  {node.label || `${node.type.charAt(0).toUpperCase() + node.type.slice(1)} ${node.flightNodeId || ''}`}
-                                </Text>
-                              </Flex>
+                            <Flex justify="between" align="start" style={{ marginBottom: '4px' }}>
                               <Flex align="center" gap="1">
-                                <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={() => toggleCardDisplayMode(node.id, node)} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
-                                  {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
-                                </IconButton>
-                                <Badge
-                                  size="1"
-                                  variant="soft"
-                                  color={node.type === 'depot' ? 'blue' : node.type === 'station' ? 'orange' : node.type === 'hazard' ? 'red' : 'purple'}
-                                >
-                                  {node.type}
-                                </Badge>
+                                {node.type === 'depot' ? (
+                                  <House size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                ) : node.type === 'station' ? (
+                                  <Zap size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                ) : node.type === 'hazard' ? (
+                                  <AlertTriangle size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                ) : (
+                                  <MapPin size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                )}
+                                <Box>
+                                  <Text size="2" weight="bold">Flight Node {node.flightNodeId || '?'}</Text>
+                                  <Text size="1" style={{ color: nodeColor, fontWeight: 500, display: 'block', marginTop: '-1px' }}>
+                                    {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {typeNum}
+                                  </Text>
+                                </Box>
                               </Flex>
+                              {node.type === 'hazard' && node.severity && (
+                                <Badge size="1" variant="soft" color={getHazardColor(node.severity)}>
+                                  {node.severity}
+                                </Badge>
+                              )}
                             </Flex>
-                            <Text size="1" color="gray">
+                            <Text size="1" color="gray" style={{ display: 'block', marginBottom: '6px' }}>
                               {displayMode === 'coords'
                                 ? `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
                                 : isLoading ? 'Loading address...' : node.address || `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
                               }
                             </Text>
+                            <Flex gap="3" align="center">
+                              {etaInfo ? (
+                                <>
+                                  <Text size="1" color="gray">Dist: <span style={{ fontWeight: 500, color: '#374151' }}>{formatDistanceTimeline(etaInfo.distance)}</span></Text>
+                                  <Text size="1" color="gray">ETA: <span style={{ fontWeight: 500, color: '#374151' }}>{formatDurationTimeline(etaInfo.eta)}</span></Text>
+                                </>
+                              ) : (
+                                <Text size="1" color="gray">Dist: <span style={{ color: '#9ca3af' }}>--</span></Text>
+                              )}
+                              {eventCount > 0 && (
+                                <Text size="1" color="gray">Events: <span style={{ fontWeight: 500, color: '#374151' }}>{eventCount}</span></Text>
+                              )}
+                            </Flex>
                           </Box>
                         </Flex>
                       </Card>
@@ -1733,32 +1965,42 @@ export function BottomPanel() {
                     </Box>
                   )}
                 </div>
-                {flightNodes.length > 0 && (
-                  <div style={{ position: 'sticky', bottom: 8, left: 16, zIndex: 10 }}>
-                    <IconButton size="2" variant="solid" color={globalDisplayMode === 'address' ? 'blue' : 'gray'} onClick={toggleGlobalDisplayMode} title={globalDisplayMode === 'coords' ? 'Show all as addresses' : 'Show all as coordinates'} style={{ borderRadius: '50%', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
-                      {globalDisplayMode === 'coords' ? <MapPinned size={16} /> : <Hash size={16} />}
-                    </IconButton>
-                  </div>
-                )}
               </ScrollArea>
+              )}
             </Tabs.Content>
 
             {/* Tab 4: Routes */}
             <Tabs.Content value="routes" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
-              <RoutesTab
-                routes={routeDetails}
-                selectedRouteId={selectedRouteId}
-                onSelectRoute={setSelectedRouteId}
-              />
+              {viewMode === 'table' ? (
+                <RoutesTable
+                  routes={routeDetails}
+                  selectedRouteId={selectedRouteId}
+                  onSelectRoute={setSelectedRouteId}
+                />
+              ) : (
+                <RoutesTab
+                  routes={routeDetails}
+                  selectedRouteId={selectedRouteId}
+                  onSelectRoute={setSelectedRouteId}
+                />
+              )}
             </Tabs.Content>
 
             {/* Tab 5: Vehicles */}
             <Tabs.Content value="vehicles" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
-              <VehiclesTab
-                vehicles={vehicleDetails}
-                selectedRouteId={selectedRouteId}
-                onSelectRoute={setSelectedRouteId}
-              />
+              {viewMode === 'table' ? (
+                <VehiclesTable
+                  vehicles={vehicleDetails}
+                  selectedRouteId={selectedRouteId}
+                  onSelectRoute={setSelectedRouteId}
+                />
+              ) : (
+                <VehiclesTab
+                  vehicles={vehicleDetails}
+                  selectedRouteId={selectedRouteId}
+                  onSelectRoute={setSelectedRouteId}
+                />
+              )}
             </Tabs.Content>
 
           </Tabs.Root>
@@ -1779,6 +2021,8 @@ function MissionStatsBar({
   droneCount = 2,
   hasRoute = false,
   timelineSummary,
+  droneDeliveries: droneDeliveriesProp,
+  truckDeliveries: truckDeliveriesProp,
 }: {
   missionConfig: {
     nodes: { type: string }[]
@@ -1791,13 +2035,15 @@ function MissionStatsBar({
   droneCount?: number
   hasRoute?: boolean
   timelineSummary?: TimelineSummary
+  droneDeliveries?: number
+  truckDeliveries?: number
 }) {
-  const customerCount = missionConfig.nodes.filter((n) => n.type === 'customer').length
+  const orderCount = missionConfig.nodes.filter((n) => n.type === 'order').length
   const depotCount = missionConfig.nodes.filter((n) => n.type === 'depot').length
   const stationCount = missionConfig.nodes.filter((n) => n.type === 'station').length
   const hazardCount = missionConfig.nodes.filter((n) => n.type === 'hazard').length
 
-  const totalWaypoints = missionConfig.nodes.length
+  const totalNodes = missionConfig.nodes.length
   const hasTruck = fleetMode === 'truck-drone' || fleetMode === 'truck-only'
   const hasDrones = fleetMode === 'truck-drone' || fleetMode === 'drones-only'
 
@@ -1808,14 +2054,14 @@ function MissionStatsBar({
       className="px-4 py-2 border-t"
       style={{ backgroundColor: 'rgba(249, 250, 251, 0.8)' }}
     >
-      <Flex gap="1" align="center" title="Total Waypoints">
+      <Flex gap="1" align="center" title="Total Flight Nodes">
         <MapPin size={14} className="text-gray-600" />
-        <Text size="1" weight="medium">{totalWaypoints}</Text>
+        <Text size="1" weight="medium">{totalNodes}</Text>
       </Flex>
       <Box className="w-px h-4 bg-gray-300" />
-      <Flex gap="1" align="center" title="Customer Locations">
+      <Flex gap="1" align="center" title="Order Locations">
         <MapPin size={14} className="text-green-600" />
-        <Text size="1" weight="medium">{customerCount}</Text>
+        <Text size="1" weight="medium">{orderCount}</Text>
       </Flex>
       <Flex gap="1" align="center" title="Depots">
         <House size={14} className="text-blue-600" />
@@ -1861,7 +2107,22 @@ function MissionStatsBar({
           {hasTruck && hasDrones && (
             <Flex gap="1" align="center" title="Deliveries (drone / truck)">
               <Package size={12} className="text-gray-500" />
-              <Text size="1" weight="medium">{timelineSummary.droneDeliveries}d / {timelineSummary.truckDeliveries}t</Text>
+              <Flex
+                gap="1"
+                align="center"
+                style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '4px',
+                  padding: '1px 6px',
+                  backgroundColor: '#f8fafc',
+                }}
+              >
+                <Plane size={11} style={{ color: '#3b82f6' }} />
+                <Text size="1" weight="medium">{droneDeliveriesProp ?? timelineSummary.droneDeliveries}</Text>
+                <Text size="1" style={{ color: '#cbd5e1' }}>/</Text>
+                <Truck size={11} style={{ color: '#374151' }} />
+                <Text size="1" weight="medium">{truckDeliveriesProp ?? timelineSummary.truckDeliveries}</Text>
+              </Flex>
             </Flex>
           )}
         </>
@@ -1926,7 +2187,7 @@ function getStatusColor(status: string): 'gray' | 'blue' | 'green' | 'orange' | 
 function getNodeTypeColor(type: string): 'blue' | 'green' | 'orange' | 'purple' | 'red' {
   const colors = {
     depot: 'blue' as const,
-    customer: 'green' as const,
+    order: 'green' as const,
     station: 'orange' as const,
     waypoint: 'purple' as const,
     hazard: 'red' as const,

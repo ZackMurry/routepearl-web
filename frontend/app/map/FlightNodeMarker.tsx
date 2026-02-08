@@ -24,7 +24,7 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
   // Nodes are draggable only when both plot modes are OFF
 
   // Helper function: Get ALL sortie info for a node (a node can have multiple roles)
-  const { updateNode, removeNode, truckRoute, droneRoutes, plotModeCustomer, plotModeNodes, setSelectedNodeId } = useFlightPlanner()
+  const { updateNode, removeNode, truckRoute, droneRoutes, plotModeOrder, plotModeNodes, setSelectedNodeId } = useFlightPlanner()
 
   const isDroneDelivery = useMemo(
     () =>
@@ -43,10 +43,10 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
     [isDroneDelivery, truckRoute, node],
   )
 
-  // Customer circle color: yellow=drone, blue=truck, white=unrouted
-  const customerColor = isDroneDelivery ? '#facc15' : isTruckDelivery ? '#3b82f6' : '#ffffff'
+  // Order circle color: yellow=drone, blue=truck, white=unrouted
+  const orderColor = isDroneDelivery ? '#facc15' : isTruckDelivery ? '#3b82f6' : '#ffffff'
 
-  const isDraggable = !plotModeCustomer && !plotModeNodes
+  const isDraggable = !plotModeOrder && !plotModeNodes
 
   const getAllSortieInfo = (node: FlightNode): Array<{ type: 'launch' | 'return' | 'delivery'; sortieNumber: number }> => {
     const sortieInfos: Array<{ type: 'launch' | 'return' | 'delivery'; sortieNumber: number }> = []
@@ -75,7 +75,7 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
       anchor: [0.5, 0.5] as [number, number],
       size: 16,
     },
-    customer: {
+    order: {
       icon: ((props: LucideProps) => <LucideCircle {...props} fill='#f9e912' />) as LucideIcon,
       anchor: [0.5, 0.5] as [number, number],
       size: 16,
@@ -108,16 +108,16 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
         />
       )}
 
-      {/* Render NumberedMarker for customer nodes */}
-      {node.type === 'customer' && (
+      {/* Render NumberedMarker for order nodes */}
+      {node.type === 'order' && (
         <NumberedMarker
           position={[node.lat, node.lng]}
-          number={node.addressId || 0}
-          size={28}
-          color={customerColor}
+          number={node.orderId || 0}
+          size={24}
+          color="#ffffff"
           textColor="#000000"
           onClick={() => {
-            if (!plotModeCustomer && !plotModeNodes) {
+            if (!plotModeOrder && !plotModeNodes) {
               setSelectedNodeId(node.id)
             }
           }}
@@ -127,15 +127,15 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
         />
       )}
 
-      {/* Render LucideMarker for non-customer nodes */}
-      {marker && node.type !== 'customer' && (
+      {/* Render LucideMarker for non-order nodes */}
+      {marker && node.type !== 'order' && (
         <LucideMarker
           position={[node.lat, node.lng]}
           anchor={marker.anchor}
           color={isDroneDelivery ? '#4673bd' : 'black'}
           onClick={() => {
             // Only allow selecting when plot modes are off
-            if (!plotModeCustomer && !plotModeNodes) {
+            if (!plotModeOrder && !plotModeNodes) {
               setSelectedNodeId(node.id)
             }
           }}

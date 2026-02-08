@@ -1,7 +1,7 @@
 export type Point = { lat: number; lng: number }
 
 // Flight Planner Types
-export type NodeType = 'depot' | 'customer' | 'station' | 'waypoint' | 'hazard'
+export type NodeType = 'depot' | 'order' | 'station' | 'waypoint' | 'hazard'
 
 export interface FlightNode extends Point {
   id: string
@@ -12,8 +12,8 @@ export interface FlightNode extends Point {
   radius?: number // For hazard nodes (meters)
   severity?: 'low' | 'medium' | 'high' // For hazard nodes
   description?: string // For hazard nodes
-  addressId?: number // For customer nodes - auto-assigned, reused when deleted (displayed as Customer ID)
-  flightNodeId?: number // For non-customer nodes - auto-assigned, reused when deleted
+  orderId?: number // For order nodes - auto-assigned, reused when deleted (displayed as Order ID)
+  flightNodeId?: number // For non-order nodes - auto-assigned, reused when deleted
   address?: string // Cached reverse-geocoded street address
 }
 
@@ -47,7 +47,7 @@ export interface RouteTimingSegment {
  */
 export interface TruckNodeTiming {
   nodeId: string
-  nodeType: 'depot' | 'customer' | 'station' | 'waypoint'
+  nodeType: 'depot' | 'order' | 'station' | 'waypoint'
   arrivalTimeMinutes: number // Minutes from mission start
   departureTimeMinutes: number // Minutes from mission start
   serviceTimeMinutes: number // Time spent at node
@@ -57,22 +57,22 @@ export interface TruckNodeTiming {
 }
 
 /**
- * Timing data for a drone sortie (launch -> customer -> recovery)
+ * Timing data for a drone sortie (launch -> order -> recovery)
  */
 export interface DroneSortieTiming {
   sortieNumber: number
   droneId: number
   launchNodeId: string
-  customerNodeId: string
+  orderNodeId: string
   recoveryNodeId: string
   departureFromLaunchMinutes: number
-  arrivalAtCustomerMinutes: number
-  serviceAtCustomerMinutes: number
-  departureFromCustomerMinutes: number
+  arrivalAtOrderMinutes: number
+  serviceAtOrderMinutes: number
+  departureFromOrderMinutes: number
   arrivalAtRecoveryMinutes: number
   totalSortieDurationMinutes: number
-  launchToCustomerDistanceKm: number
-  customerToRecoveryDistanceKm: number
+  launchToOrderDistanceKm: number
+  orderToRecoveryDistanceKm: number
 }
 
 /**

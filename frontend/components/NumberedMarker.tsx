@@ -30,35 +30,33 @@ export default function NumberedMarker({
   const [icon, setIcon] = useState<L.DivIcon | null>(null)
 
   useEffect(() => {
-    // Create a circle marker with number in the center
-    const fontSize = number > 99 ? size * 0.38 : size * 0.48
+    // Create a pin/teardrop marker with number in the center circle
+    const pinWidth = size
+    const pinHeight = size * 1.4
+    const circleR = size * 0.42
+    const fontSize = number > 99 ? size * 0.32 : size * 0.4
+    const cx = pinWidth / 2
+    const circleY = circleR + 1
+    const tipY = pinHeight - 1
+
     const html = `
-      <div style="
-        width: ${size}px;
-        height: ${size}px;
-        border-radius: 50%;
-        background-color: ${color};
-        border: 2px solid #000000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-      ">
-        <span style="
-          font-size: ${fontSize}px;
-          font-weight: bold;
-          color: ${textColor};
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          line-height: 1;
-        ">${number}</span>
-      </div>
+      <svg width="${pinWidth}" height="${pinHeight}" viewBox="0 0 ${pinWidth} ${pinHeight}" xmlns="http://www.w3.org/2000/svg">
+        <path d="M${cx},${tipY} C${cx - circleR * 0.6},${circleY + circleR * 1.1} ${cx - circleR},${circleY + circleR * 0.4} ${cx - circleR},${circleY}
+          A${circleR},${circleR} 0 1,1 ${cx + circleR},${circleY}
+          C${cx + circleR},${circleY + circleR * 0.4} ${cx + circleR * 0.6},${circleY + circleR * 1.1} ${cx},${tipY}Z"
+          fill="${color}" stroke="#000000" stroke-width="1.5"/>
+        <text x="${cx}" y="${circleY + fontSize * 0.35}" text-anchor="middle"
+          font-size="${fontSize}px" font-weight="bold" fill="${textColor}"
+          font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif"
+        >${number}</text>
+      </svg>
     `
 
     const leafletIcon = L.divIcon({
       html,
       className: '',
-      iconSize: [size, size] as PointTuple,
-      iconAnchor: [size / 2, size / 2] as PointTuple,
+      iconSize: [pinWidth, pinHeight] as PointTuple,
+      iconAnchor: [cx, tipY] as PointTuple,
     })
 
     setIcon(leafletIcon)

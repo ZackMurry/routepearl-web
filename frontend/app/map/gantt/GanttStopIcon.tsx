@@ -121,9 +121,9 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerSecond, totalDu
               Distance: {formatDistance(stop.distance)}
             </div>
           )}
-          {stop.customerName && (
+          {stop.orderName && (
             <div style={{ color: '#60a5fa', marginTop: '2px' }}>
-              Customer: {stop.customerName}
+              Order: {stop.orderName}
             </div>
           )}
           {stop.sortieNumber && (

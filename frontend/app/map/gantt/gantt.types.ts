@@ -14,7 +14,7 @@ export interface GanttStop {
   duration: number // Duration at this stop in seconds
   label: string
   description?: string
-  customerName?: string
+  orderName?: string
   sortieNumber?: number
   distance?: number // Distance of this segment in meters
 }

@@ -37,8 +37,8 @@ interface FlightPlannerContextType {
   setBottomPanelHeight: (height: number) => void
   isFlightPlannerMode: boolean
   setIsFlightPlannerMode: (mode: boolean) => void
-  plotModeCustomer: boolean
-  setPlotModeCustomer: (mode: boolean) => void
+  plotModeOrder: boolean
+  setPlotModeOrder: (mode: boolean) => void
   plotModeNodes: boolean
   setPlotModeNodes: (mode: boolean) => void
   selectedNodeId: string | null
@@ -58,6 +58,10 @@ interface FlightPlannerContextType {
   setFleetMode: (mode: 'truck-drone' | 'truck-only' | 'drones-only') => void
   droneCount: number
   setDroneCount: (count: number) => void
+
+  // Map state
+  mapCenter: Point
+  setMapCenter: (center: Point) => void
 
   // Route generation
   generateRoute: () => Promise<void>
@@ -96,13 +100,14 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [bottomPanelHeight, setBottomPanelHeight] = useState(330) // Default height increased to show Save Plan section
   const [isFlightPlannerMode, setIsFlightPlannerMode] = useState(false) // Default to mission management mode
   const [isGeneratingRoute, setIsGeneratingRoute] = useState(false)
-  const [plotModeCustomer, setPlotModeCustomerInternal] = useState(false)
+  const [plotModeOrder, setPlotModeOrderInternal] = useState(false)
   const [plotModeNodes, setPlotModeNodesInternal] = useState(false)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
   const [fleetMode, setFleetMode] = useState<'truck-drone' | 'truck-only' | 'drones-only'>('truck-drone')
   const [droneCount, setDroneCount] = useState<number>(2)
   const [missionLaunched, setMissionLaunched] = useState(false)
+  const [mapCenter, setMapCenter] = useState<Point>({ lat: 38.9404, lng: -92.3277 })
 
   // Debug logging for route changes
   React.useEffect(() => {
@@ -114,16 +119,16 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   }, [droneRoutes])
 
   // Wrapper functions to ensure mutual exclusivity
-  const setPlotModeCustomer = (mode: boolean) => {
+  const setPlotModeOrder = (mode: boolean) => {
     if (mode) {
       setPlotModeNodesInternal(false) // Turn off nodes mode
     }
-    setPlotModeCustomerInternal(mode)
+    setPlotModeOrderInternal(mode)
   }
 
   const setPlotModeNodes = (mode: boolean) => {
     if (mode) {
-      setPlotModeCustomerInternal(false) // Turn off customer mode
+      setPlotModeOrderInternal(false) // Turn off order mode
     }
     setPlotModeNodesInternal(mode)
   }
@@ -133,11 +138,11 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setMissionConfig((prev) => ({ ...prev, ...updates }))
   }
 
-  // Helper function to get the next available Address ID for customers
-  // Reuses IDs from deleted customers (finds the lowest available ID)
+  // Helper function to get the next available Order ID for orders
+  // Reuses IDs from deleted orders (finds the lowest available ID)
   const getNextAvailableAddressId = (nodes: FlightNode[]): number => {
-    const customerNodes = nodes.filter(n => n.type === 'customer')
-    const usedIds = new Set(customerNodes.map(n => n.addressId).filter((id): id is number => id !== undefined))
+    const orderNodes = nodes.filter(n => n.type === 'order')
+    const usedIds = new Set(orderNodes.map(n => n.orderId).filter((id): id is number => id !== undefined))
 
     // Find the lowest available ID starting from 1
     let nextId = 1
@@ -147,10 +152,10 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     return nextId
   }
 
-  // Helper function to get the next available Flight Node ID for non-customer nodes
+  // Helper function to get the next available Flight Node ID for non-order nodes
   // Reuses IDs from deleted flight nodes (finds the lowest available ID)
   const getNextAvailableFlightNodeId = (nodes: FlightNode[]): number => {
-    const flightNodes = nodes.filter(n => n.type !== 'customer')
+    const flightNodes = nodes.filter(n => n.type !== 'order')
     const usedIds = new Set(flightNodes.map(n => n.flightNodeId).filter((id): id is number => id !== undefined))
 
     // Find the lowest available ID starting from 1
@@ -164,32 +169,32 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   // Helper function to assign missing IDs to nodes
   // Used when loading/importing missions that may have nodes without IDs
   const assignMissingNodeIds = (nodes: FlightNode[]): FlightNode[] => {
-    const usedCustomerIds = new Set<number>()
+    const usedOrderIds = new Set<number>()
     const usedFlightNodeIds = new Set<number>()
 
     // First pass: collect all existing IDs
     nodes.forEach(node => {
-      if (node.type === 'customer' && node.addressId !== undefined) {
-        usedCustomerIds.add(node.addressId)
-      } else if (node.type !== 'customer' && node.flightNodeId !== undefined) {
+      if (node.type === 'order' && node.orderId !== undefined) {
+        usedOrderIds.add(node.orderId)
+      } else if (node.type !== 'order' && node.flightNodeId !== undefined) {
         usedFlightNodeIds.add(node.flightNodeId)
       }
     })
 
     // Second pass: assign IDs to nodes without one
     return nodes.map(node => {
-      if (node.type === 'customer' && node.addressId === undefined) {
-        // Find the lowest available customer ID
+      if (node.type === 'order' && node.orderId === undefined) {
+        // Find the lowest available order ID
         let nextId = 1
-        while (usedCustomerIds.has(nextId)) {
+        while (usedOrderIds.has(nextId)) {
           nextId++
         }
-        usedCustomerIds.add(nextId)
+        usedOrderIds.add(nextId)
         return {
           ...node,
-          addressId: nextId,
+          orderId: nextId,
         }
-      } else if (node.type !== 'customer' && node.flightNodeId === undefined) {
+      } else if (node.type !== 'order' && node.flightNodeId === undefined) {
         // Find the lowest available flight node ID
         let nextId = 1
         while (usedFlightNodeIds.has(nextId)) {
@@ -208,20 +213,20 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   // Node management
   const addNode = (node: FlightNode) => {
     setMissionConfig((prev) => {
-      // If it's a customer node, auto-assign the next available Address ID (displayed as Customer ID)
-      if (node.type === 'customer' && node.addressId === undefined) {
-        const addressId = getNextAvailableAddressId(prev.nodes)
+      // If it's an order node, auto-assign the next available Order ID
+      if (node.type === 'order' && node.orderId === undefined) {
+        const orderId = getNextAvailableAddressId(prev.nodes)
         const nodeWithAddressId = {
           ...node,
-          addressId,
+          orderId,
         }
         return {
           ...prev,
           nodes: [...prev.nodes, nodeWithAddressId],
         }
       }
-      // If it's a non-customer node, auto-assign the next available Flight Node ID
-      if (node.type !== 'customer' && node.flightNodeId === undefined) {
+      // If it's a non-order node, auto-assign the next available Flight Node ID
+      if (node.type !== 'order' && node.flightNodeId === undefined) {
         const flightNodeId = getNextAvailableFlightNodeId(prev.nodes)
         const nodeWithFlightNodeId = {
           ...node,
@@ -456,14 +461,14 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
     // Separate nodes by type
     const depots = missionConfig.nodes.filter((n) => n.type === 'depot')
-    const customers = missionConfig.nodes.filter((n) => n.type === 'customer')
+    const orders = missionConfig.nodes.filter((n) => n.type === 'order')
     const stations = missionConfig.nodes.filter((n) => n.type === 'station')
 
     // If no explicit depots, use first waypoint
     const finalDepots = depots.length > 0 ? depots : [missionConfig.nodes[0]]
-    const finalCustomers =
-      customers.length > 0
-        ? customers
+    const finalOrders =
+      orders.length > 0
+        ? orders
         : missionConfig.nodes.filter((n) => !finalDepots.includes(n) && n.type !== 'hazard')
 
     setIsGeneratingRoute(true)
@@ -473,7 +478,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           depots: finalDepots.map((n) => ({ id: n.id, lat: n.lat, lon: n.lng })),
-          customers: finalCustomers.map((n) => ({ id: n.id, lat: n.lat, lon: n.lng })),
+          customers: finalOrders.map((n) => ({ id: n.id, lat: n.lat, lon: n.lng })),
           stations: stations.map((n) => ({ id: n.id, lat: n.lat, lon: n.lng })),
           algorithm: 'negar',
           provider: 'OSRM-Online'
@@ -552,8 +557,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setBottomPanelHeight,
     isFlightPlannerMode,
     setIsFlightPlannerMode,
-    plotModeCustomer,
-    setPlotModeCustomer,
+    plotModeOrder,
+    setPlotModeOrder,
     plotModeNodes,
     setPlotModeNodes,
     selectedNodeId,
@@ -569,6 +574,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     loadMission,
     exportMission,
     importMission,
+    mapCenter,
+    setMapCenter,
     generateRoute,
     isGeneratingRoute,
     missionLaunched,

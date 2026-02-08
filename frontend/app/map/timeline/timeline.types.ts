@@ -34,7 +34,7 @@ export interface TimelineEvent {
   estimatedDuration: number // Duration of this segment in seconds
   cumulativeTime: number // Total time from mission start in seconds
   status: EventStatus
-  customerName?: string // For delivery events
+  orderName?: string // For delivery events
   distance?: number // Distance of this segment in meters
 }
 
@@ -59,8 +59,8 @@ export interface TimelineConfig {
   droneSpeedKmh: number // Backend: 60 (alpha_kmh)
   truckSpeedKmh: number // Backend: 40 (truck_speed_kmh)
   droneLoadTimeSeconds: number // Time to load drone before launch
-  droneUnloadTimeSeconds: number // Service time at customer - Backend: S = 0.10 hr = 6 min
-  truckDeliveryTimeSeconds: number // Service time at customer - Backend: S = 0.10 hr = 6 min
+  droneUnloadTimeSeconds: number // Service time at order - Backend: S = 0.10 hr = 6 min
+  truckDeliveryTimeSeconds: number // Service time at order - Backend: S = 0.10 hr = 6 min
 }
 
 // Default configuration - aligned with backend parameters

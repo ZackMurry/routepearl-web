@@ -14,7 +14,7 @@ export interface RouteDetail {
   events: number           // event count for this route
   deliveries: number       // delivery count
   stops: number            // total stop count
-  customerIds: number[]    // addressIds of customers served by this route
+  orderIds: number[]       // orderIds of orders served by this route
 }
 
 export function useRouteDetails(
@@ -22,7 +22,7 @@ export function useRouteDetails(
   fleetMode: 'truck-drone' | 'truck-only' | 'drones-only',
   droneCount: number,
   hasRoute: boolean,
-  customerNodes: { addressId?: number; id: string }[]
+  orderNodes: { orderId?: number; id: string }[]
 ): RouteDetail[] {
   return useMemo(() => {
     if (!hasRoute) return []
@@ -41,11 +41,11 @@ export function useRouteDetails(
         ? Math.max(...truckEvents.map((e) => e.cumulativeTime + e.estimatedDuration)) - Math.min(...truckEvents.map((e) => e.cumulativeTime))
         : 0
 
-      // Match delivery events to customer addressIds
-      const truckCustomerIds: number[] = truckDeliveries
+      // Match delivery events to order IDs
+      const truckOrderIds: number[] = truckDeliveries
         .map((e) => {
-          const match = customerNodes.find((c) => c.id === e.id || e.customerName === String(c.addressId))
-          return match?.addressId
+          const match = orderNodes.find((c) => c.id === e.id || e.orderName === String(c.orderId))
+          return match?.orderId
         })
         .filter((id): id is number => id !== undefined)
 
@@ -61,7 +61,7 @@ export function useRouteDetails(
         stops: truckEvents.filter((e) =>
           ['truck_delivery', 'truck_drone_launch', 'truck_drone_recover', 'truck_charging'].includes(e.type)
         ).length,
-        customerIds: truckCustomerIds,
+        orderIds: truckOrderIds,
       })
     }
 
@@ -87,10 +87,10 @@ export function useRouteDetails(
           ? Math.max(...sortieEvents.map((e) => e.cumulativeTime + e.estimatedDuration)) - Math.min(...sortieEvents.map((e) => e.cumulativeTime))
           : 0
 
-        const sortieCustomerIds: number[] = sortieDeliveries
+        const sortieOrderIds: number[] = sortieDeliveries
           .map((e) => {
-            const match = customerNodes.find((c) => c.id === e.id || e.customerName === String(c.addressId))
-            return match?.addressId
+            const match = orderNodes.find((c) => c.id === e.id || e.orderName === String(c.orderId))
+            return match?.orderId
           })
           .filter((id): id is number => id !== undefined)
 
@@ -106,11 +106,11 @@ export function useRouteDetails(
           stops: sortieEvents.filter((e) =>
             ['drone_delivery', 'drone_launch', 'drone_return'].includes(e.type)
           ).length,
-          customerIds: sortieCustomerIds,
+          orderIds: sortieOrderIds,
         })
       })
     }
 
     return details
-  }, [timelineResult, fleetMode, droneCount, hasRoute, customerNodes])
+  }, [timelineResult, fleetMode, droneCount, hasRoute, orderNodes])
 }

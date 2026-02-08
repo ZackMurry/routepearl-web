@@ -17,8 +17,9 @@ const TruckRoutePath: FC = () => {
       weight={isSelected ? 6 : isDimmed ? 2 : 3}
       opacity={isDimmed ? 0.3 : 1}
       arrowSize={14}
-      arrowRepeat={120}
-      arrowOffset='50%'
+      arrowRepeat={80}
+      arrowOffset='30px'
+      offset={4}
     />
   )
 }

@@ -192,10 +192,10 @@ export function TimelineEventComponent({
           </Badge>
         </Flex>
 
-        {/* Customer name or description */}
-        {(event.customerName || event.description) && (
+        {/* Order name or description */}
+        {(event.orderName || event.description) && (
           <Text size="1" color="gray" className="block mb-2">
-            {event.customerName ? `Customer: ${event.customerName}` : event.description}
+            {event.orderName ? `Order: ${event.orderName}` : event.description}
           </Text>
         )}
 
