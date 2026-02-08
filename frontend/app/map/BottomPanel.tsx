@@ -76,6 +76,7 @@ export function BottomPanel() {
     plotModeNodes,
     setPlotModeNodes,
     selectedNodeId,
+    setSelectedNodeId,
     selectedRouteId,
     setSelectedRouteId,
     fleetMode,
@@ -765,7 +766,7 @@ export function BottomPanel() {
             <Flex className="flex-1" style={{ minHeight: 0, backgroundColor: 'white' }}>
               {/* Left: Nodes with Tabs */}
               <Box className="flex-1 border-r" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                <Tabs.Root value={nodeTab} onValueChange={(v: string) => setNodeTab(v as 'orders' | 'flightNodes')} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Tabs.Root value={nodeTab} onValueChange={(v: string) => { setNodeTab(v as 'orders' | 'flightNodes'); setSelectedNodeId(null); }} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                   <Flex justify="between" align="center" className="px-4 pt-3">
                     <Tabs.List>
                       <Tabs.Trigger value="orders">
@@ -820,6 +821,7 @@ export function BottomPanel() {
                       <OrdersEditableTable
                         orders={orderNodes}
                         selectedNodeId={selectedNodeId}
+                        onSelectNode={(id) => setSelectedNodeId(id)}
                         displayMode={globalDisplayMode}
                         geocodingLoading={geocodingLoading}
                         updateNode={updateNode}
@@ -827,7 +829,6 @@ export function BottomPanel() {
                         addressSearchInputs={addressSearchInputs}
                         onAddressSearchInputChange={(nodeId, value) => setAddressSearchInputs(prev => new Map(prev).set(nodeId, value))}
                         onAddressSearch={handleAddressSearch}
-
                       />
                     ) : (
                     <ScrollArea style={{ height: '100%' }}>
@@ -849,7 +850,9 @@ export function BottomPanel() {
                             style={{
                               backgroundColor: selectedNodeId === node.id ? '#eff6ff' : 'white',
                               border: selectedNodeId === node.id ? '2px solid #3b82f6' : undefined,
+                              cursor: 'pointer',
                             }}
+                            onClick={() => setSelectedNodeId(selectedNodeId === node.id ? null : node.id)}
                           >
                             <Flex justify="between" align="start">
                               <Flex direction="column" gap="2" className="flex-1 mr-2">
@@ -983,6 +986,7 @@ export function BottomPanel() {
                       <FlightNodesEditableTable
                         nodes={flightNodes}
                         selectedNodeId={selectedNodeId}
+                        onSelectNode={(id) => setSelectedNodeId(id)}
                         displayMode={globalDisplayMode}
                         geocodingLoading={geocodingLoading}
                         updateNode={updateNode}
@@ -990,7 +994,6 @@ export function BottomPanel() {
                         addressSearchInputs={addressSearchInputs}
                         onAddressSearchInputChange={(nodeId, value) => setAddressSearchInputs(prev => new Map(prev).set(nodeId, value))}
                         onAddressSearch={handleAddressSearch}
-
                       />
                     ) : (
                     <ScrollArea style={{ height: '100%' }}>
@@ -1012,7 +1015,9 @@ export function BottomPanel() {
                             style={{
                               backgroundColor: selectedNodeId === node.id ? '#eff6ff' : 'white',
                               border: selectedNodeId === node.id ? '2px solid #3b82f6' : undefined,
+                              cursor: 'pointer',
                             }}
+                            onClick={() => setSelectedNodeId(selectedNodeId === node.id ? null : node.id)}
                           >
                             <Flex justify="between" align="start" className="mb-2">
                               <Box>
@@ -1351,7 +1356,7 @@ export function BottomPanel() {
               <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} />
 
               {/* Tabs */}
-              <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'flightNodes' | 'routes' | 'vehicles'); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'flightNodes' | 'routes' | 'vehicles'); setSelectedNodeId(null); setSelectedRouteId(null); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <Flex align="center" justify="between" className="px-4 pt-2">
                   <Tabs.List style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
                     <Tabs.Trigger value="gantt">
@@ -1412,7 +1417,8 @@ export function BottomPanel() {
                       orderEtaMap={orderEtaMap}
                       displayMode={globalDisplayMode}
                       geocodingLoading={geocodingLoading}
-
+                      selectedNodeId={selectedNodeId}
+                      onSelectNode={(id) => setSelectedNodeId(id)}
                     />
                   ) : (
                   <ScrollArea style={{ height: '100%' }}>
@@ -1435,7 +1441,13 @@ export function BottomPanel() {
                           <Card
                             key={order.id}
                             className="p-0"
-                            style={{ border: '1px solid #e5e7eb', overflow: 'hidden' }}
+                            style={{
+                              border: selectedNodeId === order.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                              backgroundColor: selectedNodeId === order.id ? '#eff6ff' : undefined,
+                              overflow: 'hidden',
+                              cursor: 'pointer',
+                            }}
+                            onClick={() => setSelectedNodeId(selectedNodeId === order.id ? null : order.id)}
                           >
                             <Flex>
                               <div style={{ width: '4px', minHeight: '100%', backgroundColor: accentColor, flexShrink: 0 }} />
@@ -1512,6 +1524,8 @@ export function BottomPanel() {
                       geocodingLoading={geocodingLoading}
                       nodeEtaMap={nodeEtaMap}
                       nodeEventCountMap={nodeEventCountMap}
+                      selectedNodeId={selectedNodeId}
+                      onSelectNode={(id) => setSelectedNodeId(id)}
                     />
                   ) : (
                   <ScrollArea style={{ height: '100%' }}>
@@ -1535,7 +1549,13 @@ export function BottomPanel() {
                           <Card
                             key={node.id}
                             className="p-0"
-                            style={{ border: '1px solid #e5e7eb', overflow: 'hidden' }}
+                            style={{
+                              border: selectedNodeId === node.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                              backgroundColor: selectedNodeId === node.id ? '#eff6ff' : undefined,
+                              overflow: 'hidden',
+                              cursor: 'pointer',
+                            }}
+                            onClick={() => setSelectedNodeId(selectedNodeId === node.id ? null : node.id)}
                           >
                             <Flex>
                               <div style={{ width: '4px', minHeight: '100%', backgroundColor: nodeColor, flexShrink: 0 }} />
@@ -1720,7 +1740,7 @@ export function BottomPanel() {
           <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} />
 
           {/* Tabs */}
-          <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'flightNodes' | 'routes' | 'vehicles'); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'flightNodes' | 'routes' | 'vehicles'); setSelectedNodeId(null); setSelectedRouteId(null); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <Flex align="center" justify="between" className="px-4 pt-2">
               <Tabs.List style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
                 <Tabs.Trigger value="gantt">
@@ -1781,7 +1801,8 @@ export function BottomPanel() {
                   orderEtaMap={orderEtaMap}
                   displayMode={globalDisplayMode}
                   geocodingLoading={geocodingLoading}
-
+                  selectedNodeId={selectedNodeId}
+                  onSelectNode={(id) => setSelectedNodeId(id)}
                 />
               ) : (
               <ScrollArea style={{ height: '100%' }}>
@@ -1804,7 +1825,13 @@ export function BottomPanel() {
                       <Card
                         key={order.id}
                         className="p-0"
-                        style={{ border: '1px solid #e5e7eb', overflow: 'hidden' }}
+                        style={{
+                          border: selectedNodeId === order.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                          backgroundColor: selectedNodeId === order.id ? '#eff6ff' : undefined,
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => setSelectedNodeId(selectedNodeId === order.id ? null : order.id)}
                       >
                         <Flex>
                           <div style={{ width: '4px', minHeight: '100%', backgroundColor: accentColor, flexShrink: 0 }} />
@@ -1881,6 +1908,8 @@ export function BottomPanel() {
                   geocodingLoading={geocodingLoading}
                   nodeEtaMap={nodeEtaMap}
                   nodeEventCountMap={nodeEventCountMap}
+                  selectedNodeId={selectedNodeId}
+                  onSelectNode={(id) => setSelectedNodeId(id)}
                 />
               ) : (
               <ScrollArea style={{ height: '100%' }}>
@@ -1904,7 +1933,13 @@ export function BottomPanel() {
                       <Card
                         key={node.id}
                         className="p-0"
-                        style={{ border: '1px solid #e5e7eb', overflow: 'hidden' }}
+                        style={{
+                          border: selectedNodeId === node.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                          backgroundColor: selectedNodeId === node.id ? '#eff6ff' : undefined,
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => setSelectedNodeId(selectedNodeId === node.id ? null : node.id)}
                       >
                         <Flex>
                           <div style={{ width: '4px', minHeight: '100%', backgroundColor: nodeColor, flexShrink: 0 }} />

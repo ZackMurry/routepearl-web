@@ -8,6 +8,7 @@ import { FlightNode } from '@/lib/types'
 interface Props {
   nodes: FlightNode[]
   selectedNodeId: string | null
+  onSelectNode?: (id: string | null) => void
   displayMode: 'coords' | 'address'
   geocodingLoading: Map<string, boolean>
   updateNode: (id: string, updates: Partial<FlightNode>) => void
@@ -25,7 +26,7 @@ const TYPE_COLORS: Record<string, string> = {
 }
 
 const FlightNodesEditableTable: FC<Props> = ({
-  nodes, selectedNodeId, displayMode, geocodingLoading,
+  nodes, selectedNodeId, onSelectNode, displayMode, geocodingLoading,
   updateNode, removeNode, addressSearchInputs, onAddressSearchInputChange, onAddressSearch,
 }) => {
   // Compute per-type numbering
@@ -73,7 +74,7 @@ const FlightNodesEditableTable: FC<Props> = ({
             const typeColor = TYPE_COLORS[node.type] || '#8b5cf6'
 
             return (
-              <tr key={node.id} className={isSelected ? 'selected' : ''}>
+              <tr key={node.id} className={isSelected ? 'selected' : ''} onClick={() => onSelectNode?.(isSelected ? null : node.id)} style={{ cursor: 'pointer' }}>
                 <td>
                   <span style={{ fontWeight: 700 }}>{node.flightNodeId || '?'}</span>
                   <span style={{ color: typeColor, fontWeight: 500, fontSize: '11px', display: 'block' }}>

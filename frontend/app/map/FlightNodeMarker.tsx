@@ -24,7 +24,7 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
   // Nodes are draggable only when both plot modes are OFF
 
   // Helper function: Get ALL sortie info for a node (a node can have multiple roles)
-  const { updateNode, removeNode, truckRoute, droneRoutes, plotModeOrder, plotModeNodes, setSelectedNodeId } = useFlightPlanner()
+  const { updateNode, removeNode, truckRoute, droneRoutes, plotModeOrder, plotModeNodes, selectedNodeId, setSelectedNodeId } = useFlightPlanner()
 
   const isDroneDelivery = useMemo(
     () =>
@@ -116,9 +116,10 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
           size={24}
           color="#ffffff"
           textColor="#000000"
+          selected={selectedNodeId === node.id}
           onClick={() => {
             if (!plotModeOrder && !plotModeNodes) {
-              setSelectedNodeId(node.id)
+              setSelectedNodeId(selectedNodeId === node.id ? null : node.id)
             }
           }}
           onRightClick={() => removeNode(node.id)}
@@ -133,10 +134,10 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
           position={[node.lat, node.lng]}
           anchor={marker.anchor}
           color={isDroneDelivery ? '#4673bd' : 'black'}
+          selected={selectedNodeId === node.id}
           onClick={() => {
-            // Only allow selecting when plot modes are off
             if (!plotModeOrder && !plotModeNodes) {
-              setSelectedNodeId(node.id)
+              setSelectedNodeId(selectedNodeId === node.id ? null : node.id)
             }
           }}
           onRightClick={() => removeNode(node.id)}

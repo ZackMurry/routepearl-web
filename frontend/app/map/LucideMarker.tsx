@@ -14,6 +14,7 @@ type Props = {
   color?: string
   align?: Align
   anchor?: PointTuple
+  selected?: boolean
   onRightClick?: () => void
   onClick?: () => void
   onDragEnd?: (lat: number, lng: number) => void
@@ -27,6 +28,7 @@ export default function LucideMarker({
   color = 'red',
   align = 'center',
   anchor,
+  selected = false,
   onRightClick,
   onClick,
   onDragEnd,
@@ -36,31 +38,45 @@ export default function LucideMarker({
   const [icon, setIcon] = useState<L.DivIcon | null>(null)
 
   useEffect(() => {
-    // Convert React icon to HTML for Leaflet
-    const html = renderToStaticMarkup(<LucideIcon size={size} color={color} />)
+    const scale = selected ? 1.5 : 1
+    const effectiveSize = size * scale
+    const iconMarkup = renderToStaticMarkup(<LucideIcon size={effectiveSize} color={color} />)
+
+    // Wrap with a highlight ring when selected
+    const html = selected
+      ? `<div style="position:relative;display:inline-block;">
+           <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${effectiveSize + 10}px;height:${effectiveSize + 10}px;border-radius:50%;background:rgba(37,99,235,0.15);border:2px solid #2563eb;"></div>
+           ${iconMarkup}
+         </div>`
+      : iconMarkup
 
     // Map alignment strings to iconAnchor coordinates
     const anchors: Record<Align, [number, number]> = {
-      center: [size / 2, size / 2],
-      bottom: [size / 2, size],
-      top: [size / 2, 0],
-      left: [0, size / 2],
-      right: [size, size / 2],
-      'bottom-left': [0, size],
-      'bottom-right': [size, size],
+      center: [effectiveSize / 2, effectiveSize / 2],
+      bottom: [effectiveSize / 2, effectiveSize],
+      top: [effectiveSize / 2, 0],
+      left: [0, effectiveSize / 2],
+      right: [effectiveSize, effectiveSize / 2],
+      'bottom-left': [0, effectiveSize],
+      'bottom-right': [effectiveSize, effectiveSize],
       'top-left': [0, 0],
-      'top-right': [size, 0],
+      'top-right': [effectiveSize, 0],
     }
 
+    const outerSize = selected ? effectiveSize + 12 : effectiveSize
     const leafletIcon = L.divIcon({
       html,
-      className: '', // remove default styles
-      iconSize: [size, size],
-      iconAnchor: anchor ? (anchor.map(it => it * size) as PointTuple) : anchors[align],
+      className: '',
+      iconSize: [outerSize, outerSize],
+      iconAnchor: anchor
+        ? (anchor.map(it => it * effectiveSize) as PointTuple)
+        : selected
+          ? [outerSize / 2, outerSize / 2]
+          : anchors[align],
     })
 
     setIcon(leafletIcon)
-  }, [align, anchor, size, color, LucideIcon])
+  }, [align, anchor, size, color, LucideIcon, selected])
 
   if (!icon) return null
 
@@ -69,12 +85,13 @@ export default function LucideMarker({
       position={position}
       icon={icon}
       draggable={draggable}
+      zIndexOffset={selected ? 1000 : 0}
       eventHandlers={{
         click: () => {
           onClick?.()
         },
         contextmenu: e => {
-          e.originalEvent.preventDefault() // prevent browser menu
+          e.originalEvent.preventDefault()
           onRightClick?.()
         },
         dragend: e => {

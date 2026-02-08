@@ -12,9 +12,11 @@ interface Props {
   orderEtaMap: Map<string, { eta: number; distance: number }>
   displayMode: 'coords' | 'address'
   geocodingLoading: Map<string, boolean>
+  selectedNodeId?: string | null
+  onSelectNode?: (id: string | null) => void
 }
 
-const OrdersTable: FC<Props> = ({ orders, orderDeliveryMap, orderEtaMap, displayMode, geocodingLoading }) => {
+const OrdersTable: FC<Props> = ({ orders, orderDeliveryMap, orderEtaMap, displayMode, geocodingLoading, selectedNodeId, onSelectNode }) => {
   if (orders.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '24px', color: '#6b7280', fontSize: '13px' }}>
@@ -41,12 +43,18 @@ const OrdersTable: FC<Props> = ({ orders, orderDeliveryMap, orderEtaMap, display
             const etaInfo = orderEtaMap.get(order.id)
             const accentColor = vehicle === 'drone' ? '#facc15' : vehicle === 'truck' ? '#3b82f6' : '#d1d5db'
             const isLoading = geocodingLoading.get(order.id) || false
+            const isSelected = selectedNodeId === order.id
             const location = displayMode === 'coords'
               ? `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
               : isLoading ? 'Loading...' : order.address || `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
 
             return (
-              <tr key={order.id}>
+              <tr
+                key={order.id}
+                className={isSelected ? 'selected' : ''}
+                onClick={() => onSelectNode?.(isSelected ? null : order.id)}
+                style={{ cursor: 'pointer' }}
+              >
                 <td className="accent-cell" style={{ '--accent-color': accentColor } as React.CSSProperties}>
                   <Flex align="center" gap="1">
                     <MapPin size={12} style={{ color: accentColor === '#d1d5db' ? '#9ca3af' : accentColor, flexShrink: 0 }} />

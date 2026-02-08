@@ -19,9 +19,11 @@ interface Props {
   geocodingLoading: Map<string, boolean>
   nodeEtaMap?: Map<string, { eta: number; distance: number }>
   nodeEventCountMap?: Map<string, number>
+  selectedNodeId?: string | null
+  onSelectNode?: (id: string | null) => void
 }
 
-const FlightNodesTable: FC<Props> = ({ nodes, displayMode, geocodingLoading, nodeEtaMap, nodeEventCountMap }) => {
+const FlightNodesTable: FC<Props> = ({ nodes, displayMode, geocodingLoading, nodeEtaMap, nodeEventCountMap, selectedNodeId, onSelectNode }) => {
   // Compute per-type numbering
   const typeNumberMap = useMemo(() => {
     const map = new Map<string, number>()
@@ -66,8 +68,10 @@ const FlightNodesTable: FC<Props> = ({ nodes, displayMode, geocodingLoading, nod
             const eventCount = nodeEventCountMap?.get(node.id) || 0
             const typeNum = typeNumberMap.get(node.id) || ''
 
+            const isSelected = selectedNodeId === node.id
+
             return (
-              <tr key={node.id}>
+              <tr key={node.id} className={isSelected ? 'selected' : ''} onClick={() => onSelectNode?.(isSelected ? null : node.id)} style={{ cursor: 'pointer' }}>
                 <td className="accent-cell" style={{ '--accent-color': config.accentColor } as React.CSSProperties}>
                   <Flex align="center" gap="1">
                     <Icon size={12} style={{ color: config.accentColor, flexShrink: 0 }} />

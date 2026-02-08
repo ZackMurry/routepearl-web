@@ -8,6 +8,7 @@ import { FlightNode } from '@/lib/types'
 interface Props {
   orders: FlightNode[]
   selectedNodeId: string | null
+  onSelectNode?: (id: string | null) => void
   displayMode: 'coords' | 'address'
   geocodingLoading: Map<string, boolean>
   updateNode: (id: string, updates: Partial<FlightNode>) => void
@@ -18,7 +19,7 @@ interface Props {
 }
 
 const OrdersEditableTable: FC<Props> = ({
-  orders, selectedNodeId, displayMode, geocodingLoading,
+  orders, selectedNodeId, onSelectNode, displayMode, geocodingLoading,
   updateNode, removeNode, addressSearchInputs, onAddressSearchInputChange, onAddressSearch,
 }) => {
   if (orders.length === 0) {
@@ -52,7 +53,7 @@ const OrdersEditableTable: FC<Props> = ({
             const isLoading = geocodingLoading.get(order.id) || false
 
             return (
-              <tr key={order.id} className={isSelected ? 'selected' : ''}>
+              <tr key={order.id} className={isSelected ? 'selected' : ''} onClick={() => onSelectNode?.(isSelected ? null : order.id)} style={{ cursor: 'pointer' }}>
                 <td>
                   <Badge color="green" size="1" style={{ fontWeight: 'bold' }}>
                     {order.orderId || '?'}
