@@ -621,7 +621,7 @@ export function BottomPanel() {
             pointerEvents: 'auto',
           }}
         >
-        <Card className="rounded-t-lg rounded-b-none shadow-xl mx-4 mb-0" style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
+        <Card className="rounded-none shadow-xl" style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
           <Flex direction="column">
             <Flex justify="between" align="center" className="p-3">
               <Flex gap="4" align="center">

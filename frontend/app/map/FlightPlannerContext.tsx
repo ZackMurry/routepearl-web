@@ -66,6 +66,7 @@ interface FlightPlannerContextType {
   // Route generation
   generateRoute: () => Promise<void>
   isGeneratingRoute: boolean
+  hasUnassignedWaypoints: boolean
 
   // Mission launch
   missionLaunched: boolean
@@ -453,8 +454,10 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   }
 
   // Generate route using backend API
+  const hasUnassignedWaypoints = missionConfig.nodes.some((n) => n.type === 'waypoint')
+
   const generateRoute = async () => {
-    if (missionConfig.nodes.length < 2) {
+    if (missionConfig.nodes.length < 2 || hasUnassignedWaypoints) {
       updateMissionConfig({ routes: undefined })
       return
     }
@@ -578,6 +581,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setMapCenter,
     generateRoute,
     isGeneratingRoute,
+    hasUnassignedWaypoints,
     missionLaunched,
     launchMission,
     stopMission,
