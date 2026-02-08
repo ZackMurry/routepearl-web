@@ -80,6 +80,7 @@ export function FlightPlannerSidebar() {
     generateRoute,
     isGeneratingRoute,
     hasUnassignedWaypoints,
+    fleetMode,
   } = useFlightPlanner()
 
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -258,7 +259,7 @@ export function FlightPlannerSidebar() {
                 size='3'
                 variant='soft'
                 color='gray'
-                onClick={() => { setSidebarCollapsed(false); setIsFlightPlannerMode(false) }}
+                onClick={() => setIsFlightPlannerMode(false)}
                 title='Exit Flight Planner'
                 style={{ cursor: 'pointer' }}
               >
@@ -321,7 +322,7 @@ export function FlightPlannerSidebar() {
                 </div>
                 {/* Truck route */}
                 <div
-                  title={`Truck Route: ${truckRoute.length > 0 ? `${truckRoute.length} pts` : '--'}`}
+                  title={`Truck Route: ${fleetMode === 'drones-only' ? 'Disabled' : truckRoute.length > 0 ? `${truckRoute.length} pts` : '--'}`}
                   style={{
                     width: 28,
                     height: 28,
@@ -329,15 +330,16 @@ export function FlightPlannerSidebar() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: truckRoute.length > 0 ? 'rgba(55, 65, 81, 0.08)' : '#f3f4f6',
-                    border: `1.5px solid ${truckRoute.length > 0 ? '#374151' : '#d1d5db'}`,
+                    opacity: fleetMode === 'drones-only' ? 0.35 : 1,
+                    backgroundColor: fleetMode === 'drones-only' ? '#f3f4f6' : truckRoute.length > 0 ? 'rgba(55, 65, 81, 0.08)' : '#f3f4f6',
+                    border: `1.5px solid ${fleetMode === 'drones-only' ? '#d1d5db' : truckRoute.length > 0 ? '#374151' : '#d1d5db'}`,
                   }}
                 >
-                  <Truck size={14} style={{ color: truckRoute.length > 0 ? '#374151' : '#9ca3af' }} />
+                  <Truck size={14} style={{ color: fleetMode === 'drones-only' ? '#d1d5db' : truckRoute.length > 0 ? '#374151' : '#9ca3af' }} />
                 </div>
                 {/* Drone paths */}
                 <div
-                  title={`Drone Paths: ${droneRoutes.length > 0 ? `${droneRoutes.length} sorties` : '--'}`}
+                  title={`Drone Paths: ${fleetMode === 'truck-only' ? 'Disabled' : droneRoutes.length > 0 ? `${droneRoutes.length} sorties` : '--'}`}
                   style={{
                     width: 28,
                     height: 28,
@@ -345,11 +347,12 @@ export function FlightPlannerSidebar() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: droneRoutes.length > 0 ? 'rgba(59, 130, 246, 0.1)' : '#f3f4f6',
-                    border: `1.5px solid ${droneRoutes.length > 0 ? '#3b82f6' : '#d1d5db'}`,
+                    opacity: fleetMode === 'truck-only' ? 0.35 : 1,
+                    backgroundColor: fleetMode === 'truck-only' ? '#f3f4f6' : droneRoutes.length > 0 ? 'rgba(59, 130, 246, 0.1)' : '#f3f4f6',
+                    border: `1.5px solid ${fleetMode === 'truck-only' ? '#d1d5db' : droneRoutes.length > 0 ? '#3b82f6' : '#d1d5db'}`,
                   }}
                 >
-                  <Plane size={14} style={{ color: droneRoutes.length > 0 ? '#3b82f6' : '#9ca3af' }} />
+                  <Plane size={14} style={{ color: fleetMode === 'truck-only' ? '#d1d5db' : droneRoutes.length > 0 ? '#3b82f6' : '#9ca3af' }} />
                 </div>
                 {/* Order points */}
                 <div
@@ -394,7 +397,7 @@ export function FlightPlannerSidebar() {
               <IconButton
                 size='3'
                 variant='soft'
-                onClick={() => { setSidebarCollapsed(false); handleMakeFlightPlan() }}
+                onClick={() => handleMakeFlightPlan()}
                 disabled={missionLaunched}
                 title={missionConfig.nodes.length > 0 ? 'Edit Flight Plan' : 'Make Flight Plan'}
                 style={{ cursor: 'pointer' }}
@@ -404,7 +407,7 @@ export function FlightPlannerSidebar() {
               <IconButton
                 size='3'
                 variant='soft'
-                onClick={() => { setSidebarCollapsed(false); handleImportFlightPlan() }}
+                onClick={() => handleImportFlightPlan()}
                 disabled={missionLaunched}
                 title='Load Flight Plan'
                 style={{ cursor: 'pointer' }}
@@ -870,14 +873,15 @@ export function FlightPlannerSidebar() {
                           padding: '6px 12px',
                           borderBottom: '1px solid #f3f4f6',
                           backgroundColor: 'white',
+                          opacity: fleetMode === 'drones-only' ? 0.35 : 1,
                         }}
                       >
                         <Flex align='center' gap='2'>
-                          <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: truckRoute.length > 0 ? '#374151' : '#d1d5db' }} />
-                          <Text size='1' style={{ color: '#6b7280' }}>Truck Route</Text>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: fleetMode === 'drones-only' ? '#d1d5db' : truckRoute.length > 0 ? '#374151' : '#d1d5db' }} />
+                          <Text size='1' style={{ color: fleetMode === 'drones-only' ? '#9ca3af' : '#6b7280' }}>Truck Route</Text>
                         </Flex>
-                        <Text size='1' weight='medium' style={{ color: truckRoute.length > 0 ? '#374151' : '#9ca3af' }}>
-                          {truckRoute.length > 0 ? `${truckRoute.length} pts` : '--'}
+                        <Text size='1' weight='medium' style={{ color: fleetMode === 'drones-only' ? '#d1d5db' : truckRoute.length > 0 ? '#374151' : '#9ca3af' }}>
+                          {fleetMode === 'drones-only' ? 'Disabled' : truckRoute.length > 0 ? `${truckRoute.length} pts` : '--'}
                         </Text>
                       </Flex>
 
@@ -889,14 +893,15 @@ export function FlightPlannerSidebar() {
                           padding: '6px 12px',
                           borderBottom: '1px solid #f3f4f6',
                           backgroundColor: 'white',
+                          opacity: fleetMode === 'truck-only' ? 0.35 : 1,
                         }}
                       >
                         <Flex align='center' gap='2'>
-                          <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: droneRoutes.length > 0 ? '#3b82f6' : '#d1d5db' }} />
-                          <Text size='1' style={{ color: '#6b7280' }}>Drone Paths</Text>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: fleetMode === 'truck-only' ? '#d1d5db' : droneRoutes.length > 0 ? '#3b82f6' : '#d1d5db' }} />
+                          <Text size='1' style={{ color: fleetMode === 'truck-only' ? '#9ca3af' : '#6b7280' }}>Drone Paths</Text>
                         </Flex>
-                        <Text size='1' weight='medium' style={{ color: droneRoutes.length > 0 ? '#374151' : '#9ca3af' }}>
-                          {droneRoutes.length > 0 ? `${droneRoutes.length} sorties` : '--'}
+                        <Text size='1' weight='medium' style={{ color: fleetMode === 'truck-only' ? '#d1d5db' : droneRoutes.length > 0 ? '#374151' : '#9ca3af' }}>
+                          {fleetMode === 'truck-only' ? 'Disabled' : droneRoutes.length > 0 ? `${droneRoutes.length} sorties` : '--'}
                         </Text>
                       </Flex>
 
