@@ -3,7 +3,7 @@
 import React, { FC, useMemo } from 'react'
 import { Flex, ScrollArea } from '@radix-ui/themes'
 import { House, Zap, AlertTriangle, MapPin } from 'lucide-react'
-import { FlightNode } from '@/lib/types'
+import { MissionSite } from '@/lib/types'
 import { formatDistance, formatDuration } from '../timeline/timeline.types'
 
 const NODE_TYPE_CONFIG: Record<string, { color: 'blue' | 'orange' | 'red' | 'purple'; icon: typeof House; accentColor: string }> = {
@@ -14,7 +14,7 @@ const NODE_TYPE_CONFIG: Record<string, { color: 'blue' | 'orange' | 'red' | 'pur
 }
 
 interface Props {
-  nodes: FlightNode[]
+  nodes: MissionSite[]
   displayMode: 'coords' | 'address'
   geocodingLoading: Map<string, boolean>
   nodeEtaMap?: Map<string, { eta: number; distance: number }>
@@ -23,7 +23,7 @@ interface Props {
   onSelectNode?: (id: string | null) => void
 }
 
-const FlightNodesTable: FC<Props> = ({ nodes, displayMode, geocodingLoading, nodeEtaMap, nodeEventCountMap, selectedNodeId, onSelectNode }) => {
+const MissionSitesTable: FC<Props> = ({ nodes, displayMode, geocodingLoading, nodeEtaMap, nodeEventCountMap, selectedNodeId, onSelectNode }) => {
   // Compute per-type numbering
   const typeNumberMap = useMemo(() => {
     const map = new Map<string, number>()
@@ -38,7 +38,7 @@ const FlightNodesTable: FC<Props> = ({ nodes, displayMode, geocodingLoading, nod
   if (nodes.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '24px', color: '#6b7280', fontSize: '13px' }}>
-        No flight nodes added yet.
+        No mission sites added yet.
       </div>
     )
   }
@@ -75,11 +75,11 @@ const FlightNodesTable: FC<Props> = ({ nodes, displayMode, geocodingLoading, nod
                 <td className="accent-cell" style={{ '--accent-color': config.accentColor } as React.CSSProperties}>
                   <Flex align="center" gap="1">
                     <Icon size={12} style={{ color: config.accentColor, flexShrink: 0 }} />
-                    <span style={{ fontWeight: 600 }}>{node.flightNodeId || '?'}</span>
+                    <span style={{ fontWeight: 600 }}>{node.siteId || '?'}</span>
                   </Flex>
                 </td>
                 <td>
-                  <span style={{ fontWeight: 600 }}>Flight Node {node.flightNodeId || '?'}</span>
+                  <span style={{ fontWeight: 600 }}>Mission Site {node.siteId || '?'}</span>
                   <span style={{ color: config.accentColor, fontWeight: 500 }}> — {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {typeNum}</span>
                 </td>
                 <td className="cell-truncate" style={{ color: '#374151' }}>
@@ -103,4 +103,4 @@ const FlightNodesTable: FC<Props> = ({ nodes, displayMode, geocodingLoading, nod
   )
 }
 
-export default FlightNodesTable
+export default MissionSitesTable

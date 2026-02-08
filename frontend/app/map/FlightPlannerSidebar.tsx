@@ -42,7 +42,7 @@ import {
   CheckCircle,
   AlertCircle,
 } from 'lucide-react'
-import { FlightNode, HazardZone, RoutingAlgorithm } from '@/lib/types'
+import { MissionSite, HazardZone, RoutingAlgorithm } from '@/lib/types'
 import { forwardGeocode, seedAddressCache, parseCSVLine, isLatLng, csvTagToNodeType, nodeTypeToCsvTag, csvQuote } from '@/lib/geocoding'
 import { useMap } from 'react-leaflet'
 
@@ -140,7 +140,7 @@ export function FlightPlannerSidebar() {
           }
         }
 
-        const newNode: FlightNode = {
+        const newNode: MissionSite = {
           id: `node-${Date.now()}-${Math.random()}`,
           type: nodeType,
           lat,
@@ -601,7 +601,7 @@ export function FlightPlannerSidebar() {
                           </Text>
                         </Flex>
                         <Text size='1' color='gray'>
-                          All flight nodes must be assigned a type (depot, order, station, or hazard) before generating a route.
+                          All mission sites must be assigned a type (depot, order, station, or hazard) before generating a route.
                         </Text>
                       </Box>
                     )}

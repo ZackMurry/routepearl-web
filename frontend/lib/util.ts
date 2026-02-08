@@ -1,4 +1,4 @@
-import { FlightNode, Point } from './types'
+import { MissionSite, Point } from './types'
 
 export function getOrDefault<T>(map: { [key: string]: T }, key?: string, defaultKey = 'default'): T {
   if (key in map) {
@@ -8,7 +8,7 @@ export function getOrDefault<T>(map: { [key: string]: T }, key?: string, default
 }
 
 // Helper function: Check if a point matches a node (within 0.0001 degrees ~11m)
-export const pointMatchesNode = (point: Point, node: FlightNode): boolean => {
+export const pointMatchesNode = (point: Point, node: MissionSite): boolean => {
   const latDiff = Math.abs(point.lat - node.lat)
   const lngDiff = Math.abs(point.lng - node.lng)
   return latDiff < 0.0001 && lngDiff < 0.0001

@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useEffect, useMemo } from 'react'
 import { useFlightPlanner } from './FlightPlannerContext'
-import { FlightNode } from '@/lib/types'
+import { MissionSite } from '@/lib/types'
 import { Box, Card, Flex, Text, Button, Badge, IconButton, ScrollArea, TextField, Progress, Tabs, Select } from '@radix-ui/themes'
 import {
   ChevronUp,
@@ -40,6 +40,8 @@ import {
   Search,
   LayoutGrid,
   Table2,
+  Calendar,
+  Layers,
 } from 'lucide-react'
 import { useTimelineGenerator } from './timeline/useTimelineGenerator'
 import { TimelineSummary, formatDistance as formatDistanceTimeline, formatDuration as formatDurationTimeline } from './timeline/timeline.types'
@@ -47,7 +49,7 @@ import { GanttChart, useGanttData, generateEmptyGanttData, GanttChartState } fro
 import { RoutesTab, useRouteDetails, VehiclesTab, useVehicleDetails } from './routes'
 import { pointMatchesNode } from '@/lib/util'
 import { reverseGeocode, forwardGeocode, seedAddressCache, parseCSVLine, isLatLng, csvTagToNodeType, nodeTypeToCsvTag, csvQuote } from '@/lib/geocoding'
-import { ViewToggle, OrdersTable, OrdersEditableTable, FlightNodesTable, FlightNodesEditableTable, RoutesTable, VehiclesTable } from './tables'
+import { ViewToggle, OrdersTable, OrdersEditableTable, MissionSitesTable, MissionSitesEditableTable, RoutesTable, VehiclesTable } from './tables'
 
 export function BottomPanel() {
   const {
@@ -95,11 +97,61 @@ export function BottomPanel() {
   const [toastOpen, setToastOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
-  const [missionTab, setMissionTab] = useState<'gantt' | 'orders' | 'flightNodes' | 'routes' | 'vehicles'>('gantt')
+  const [missionTab, setMissionTab] = useState<'gantt' | 'orders' | 'missionSites' | 'routes' | 'vehicles'>('gantt')
   const [vehicleFilter, setVehicleFilter] = useState<'all' | 'drones' | 'trucks'>('all')
-  const [nodeTab, setNodeTab] = useState<'orders' | 'flightNodes'>('orders')
+  const [nodeTab, setNodeTab] = useState<'orders' | 'missionSites'>('orders')
 
   const [csvImporting, setCsvImporting] = useState(false)
+
+  // --- Date/Time display state ---
+  const [timeMode, setTimeMode] = useState<'clock' | 'mission'>('clock')
+  const [currentTime, setCurrentTime] = useState(new Date())
+
+  // Live clock - update every second
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // --- Date/Time formatting helpers ---
+  const formatClockTime = (date: Date) => {
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+    })
+  }
+
+  const formatMissionElapsed = (seconds: number) => {
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    const s = seconds % 60
+    return `T+ ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  }
+
+  const DateTimeDisplay = () => (
+    <Flex
+      gap="1"
+      align="center"
+      onClick={() => setTimeMode(prev => prev === 'clock' ? 'mission' : 'clock')}
+      style={{
+        cursor: 'pointer',
+        padding: '2px 8px',
+        borderRadius: '4px',
+        backgroundColor: missionLaunched ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
+        userSelect: 'none',
+      }}
+      title={timeMode === 'clock' ? 'Click for mission time' : 'Click for clock time'}
+    >
+      <Calendar size={13} style={{ color: missionLaunched ? '#10b981' : '#6b7280' }} />
+      <Text size="1" style={{ color: missionLaunched ? '#10b981' : '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
+        {timeMode === 'clock' ? formatClockTime(currentTime) : formatMissionElapsed(missionElapsedTime)}
+      </Text>
+    </Flex>
+  )
 
   // --- Grid / Table view toggle (single global toggle) ---
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
@@ -117,7 +169,7 @@ export function BottomPanel() {
     return cardDisplayOverrides.get(nodeId) ?? globalDisplayMode
   }
 
-  const toggleCardDisplayMode = (nodeId: string, node: FlightNode) => {
+  const toggleCardDisplayMode = (nodeId: string, node: MissionSite) => {
     const currentEffective = cardDisplayOverrides.get(nodeId) ?? globalDisplayMode
     const newMode = currentEffective === 'coords' ? 'address' : 'coords'
     setCardDisplayOverrides(prev => {
@@ -159,7 +211,7 @@ export function BottomPanel() {
     }
   }
 
-  const ensureAddressLoaded = async (node: FlightNode) => {
+  const ensureAddressLoaded = async (node: MissionSite) => {
     if (node.address) return
     setGeocodingLoading(prev => new Map(prev).set(node.id, true))
     try {
@@ -296,7 +348,7 @@ export function BottomPanel() {
           }
         }
 
-        const newNode: FlightNode = {
+        const newNode: MissionSite = {
           id: `node-${Date.now()}-${Math.random()}`,
           type: nodeType,
           lat,
@@ -347,7 +399,7 @@ export function BottomPanel() {
   }
 
   const handleAddOrder = () => {
-    const newNode: FlightNode = {
+    const newNode: MissionSite = {
       id: `node-${Date.now()}`,
       type: 'order',
       lat: mapCenter.lat,
@@ -356,8 +408,8 @@ export function BottomPanel() {
     addNode(newNode)
   }
 
-  const handleAddFlightNode = () => {
-    const newNode: FlightNode = {
+  const handleAddMissionSite = () => {
+    const newNode: MissionSite = {
       id: `node-${Date.now()}`,
       type: 'waypoint',
       lat: mapCenter.lat,
@@ -397,7 +449,7 @@ export function BottomPanel() {
   const missionStatus = currentMission?.status || 'Idle'
   const hasRoute = truckRoute.length > 0 || droneRoutes.length > 0
   const orderNodes = missionConfig.nodes.filter((n) => n.type === 'order')
-  const flightNodes = missionConfig.nodes.filter((n) => n.type !== 'order')
+  const missionSites = missionConfig.nodes.filter((n) => n.type !== 'order')
 
   // When a node is selected (e.g. by clicking a map marker), switch to the correct tab
   useEffect(() => {
@@ -405,7 +457,7 @@ export function BottomPanel() {
     const node = missionConfig.nodes.find((n) => n.id === selectedNodeId)
     if (!node) return
 
-    const targetTab = node.type === 'order' ? 'orders' : 'flightNodes'
+    const targetTab = node.type === 'order' ? 'orders' : 'missionSites'
 
     if (isFlightPlannerMode) {
       setNodeTab(targetTab)
@@ -504,18 +556,18 @@ export function BottomPanel() {
     return map
   }, [hasRoute, orderNodes, orderDeliveryMap, droneRoutes, truckRoute])
 
-  // Compute per-type numbering for flight nodes (e.g., Depot 1, Station 2)
+  // Compute per-type numbering for mission sites (e.g., Depot 1, Station 2)
   const nodeTypeNumberMap = useMemo(() => {
     const map = new Map<string, number>()
     const counters: Record<string, number> = {}
-    for (const node of flightNodes) {
+    for (const node of missionSites) {
       counters[node.type] = (counters[node.type] || 0) + 1
       map.set(node.id, counters[node.type])
     }
     return map
-  }, [flightNodes])
+  }, [missionSites])
 
-  // Compute ETA (cumulative time) and distance-on-route for each flight node on the truck route
+  // Compute ETA (cumulative time) and distance-on-route for each mission site on the truck route
   const nodeEtaMap = useMemo(() => {
     const map = new Map<string, { eta: number; distance: number }>()
     if (!hasRoute || truckRoute.length < 2) return map
@@ -535,7 +587,7 @@ export function BottomPanel() {
       truckCumDist.push(truckCumDist[i - 1] + haversine(truckRoute[i - 1], truckRoute[i]))
     }
 
-    for (const node of flightNodes) {
+    for (const node of missionSites) {
       for (let i = 0; i < truckRoute.length; i++) {
         if (pointMatchesNode(truckRoute[i], node)) {
           const dist = truckCumDist[i]
@@ -546,20 +598,20 @@ export function BottomPanel() {
       }
     }
     return map
-  }, [hasRoute, truckRoute, flightNodes])
+  }, [hasRoute, truckRoute, missionSites])
 
-  // Count timeline events per flight node location
+  // Count timeline events per mission site location
   const nodeEventCountMap = useMemo(() => {
     const map = new Map<string, number>()
     if (!hasRoute) return map
-    for (const node of flightNodes) {
+    for (const node of missionSites) {
       const count = timelineResult.events.filter(
         (e) => Math.abs(e.location.lat - node.lat) < 0.0001 && Math.abs(e.location.lng - node.lng) < 0.0001
       ).length
       if (count > 0) map.set(node.id, count)
     }
     return map
-  }, [hasRoute, flightNodes, timelineResult.events])
+  }, [hasRoute, missionSites, timelineResult.events])
 
   // Generate Gantt chart data - always call hooks unconditionally
   const ganttDataFromHook = useGanttData(timelineResult, fleetMode, droneCount)
@@ -663,6 +715,7 @@ export function BottomPanel() {
                     <Badge color={getStatusColor(missionStatus)}>{missionStatus}</Badge>
                   </Flex>
                 )}
+                <DateTimeDisplay />
                 <Flex gap="3" align="center" className="text-gray-600">
                   <Flex gap="1" align="center" title="Time Elapsed / Estimated">
                     <Clock size={14} />
@@ -755,6 +808,7 @@ export function BottomPanel() {
                     </Text>
                   </Flex>
                 )}
+                <DateTimeDisplay />
                 <Flex gap="3" align="center" className="text-gray-600">
                   <Flex gap="1" align="center" title="Time Elapsed / Estimated">
                     <Clock size={14} />
@@ -782,16 +836,16 @@ export function BottomPanel() {
             <Flex className="flex-1" style={{ minHeight: 0, backgroundColor: 'white' }}>
               {/* Left: Nodes with Tabs */}
               <Box className="flex-1 border-r" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                <Tabs.Root value={nodeTab} onValueChange={(v: string) => { setNodeTab(v as 'orders' | 'flightNodes'); setSelectedNodeId(null); }} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Tabs.Root value={nodeTab} onValueChange={(v: string) => { setNodeTab(v as 'orders' | 'missionSites'); setSelectedNodeId(null); }} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                   <Flex justify="between" align="center" className="px-4 pt-3">
                     <Tabs.List>
                       <Tabs.Trigger value="orders">
                         <MapPin size={14} className="mr-1" />
-                        Order Locations ({orderNodes.length})
+                        Order Points ({orderNodes.length})
                       </Tabs.Trigger>
-                      <Tabs.Trigger value="flightNodes">
-                        <Plane size={14} className="mr-1" />
-                        Flight Nodes ({flightNodes.length})
+                      <Tabs.Trigger value="missionSites">
+                        <Layers size={14} className="mr-1" />
+                        Mission Sites ({missionSites.length})
                       </Tabs.Trigger>
                     </Tabs.List>
                     <Flex gap="3" align="center">
@@ -823,7 +877,7 @@ export function BottomPanel() {
                           >
                             <MousePointer2 size={14} /> Plot
                           </Button>
-                          <Button size="1" onClick={handleAddFlightNode}>
+                          <Button size="1" onClick={handleAddMissionSite}>
                             <Plus size={14} /> Add Node
                           </Button>
                         </>
@@ -831,7 +885,7 @@ export function BottomPanel() {
                     </Flex>
                   </Flex>
 
-                  {/* Order Locations Tab */}
+                  {/* Order Points Tab */}
                   <Tabs.Content value="orders" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'hidden' }}>
                     {viewMode === 'table' ? (
                       <OrdersEditableTable
@@ -996,11 +1050,11 @@ export function BottomPanel() {
                     )}
                   </Tabs.Content>
 
-                  {/* Flight Nodes Tab */}
-                  <Tabs.Content value="flightNodes" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'hidden' }}>
+                  {/* Mission Sites Tab */}
+                  <Tabs.Content value="missionSites" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'hidden' }}>
                     {viewMode === 'table' ? (
-                      <FlightNodesEditableTable
-                        nodes={flightNodes}
+                      <MissionSitesEditableTable
+                        nodes={missionSites}
                         selectedNodeId={selectedNodeId}
                         onSelectNode={(id) => setSelectedNodeId(id)}
                         displayMode={globalDisplayMode}
@@ -1021,7 +1075,7 @@ export function BottomPanel() {
                           paddingRight: '8px',
                         }}
                       >
-                        {flightNodes.map((node, index) => {
+                        {missionSites.map((node, index) => {
                           const displayMode = getDisplayMode(node.id)
                           const isLoading = geocodingLoading.get(node.id) || false
                           return (
@@ -1038,7 +1092,7 @@ export function BottomPanel() {
                             <Flex justify="between" align="start" className="mb-2">
                               <Box>
                                 <Flex align="center" gap="1">
-                                  <Text size="2" weight="bold">Flight Node {node.flightNodeId || '?'}</Text>
+                                  <Text size="2" weight="bold">Mission Site {node.siteId || '?'}</Text>
                                   <Text size="2" color="gray">—</Text>
                                   <Text size="2" weight="medium" style={{ color: node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6' }}>
                                     {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {nodeTypeNumberMap.get(node.id) || ''}
@@ -1059,7 +1113,7 @@ export function BottomPanel() {
                               <Select.Root
                                 value={node.type}
                                 onValueChange={(value: string) => {
-                                  const updates: Partial<FlightNode> = { type: value as FlightNode['type'] }
+                                  const updates: Partial<MissionSite> = { type: value as MissionSite['type'] }
                                   if (value === 'hazard') {
                                     if (!node.radius) updates.radius = 100
                                     if (!node.severity) updates.severity = 'medium'
@@ -1174,10 +1228,10 @@ export function BottomPanel() {
                           )
                         })}
                       </div>
-                      {flightNodes.length === 0 && (
+                      {missionSites.length === 0 && (
                         <Box className="text-center p-6 bg-gray-50 rounded">
                           <Text size="2" color="gray">
-                            No flight nodes added yet. Click &quot;Add Node&quot; to add depots, stations, waypoints, or hazards.
+                            No mission sites added yet. Click &quot;Add Node&quot; to add depots, stations, waypoints, or hazards.
                           </Text>
                         </Box>
                       )}
@@ -1347,6 +1401,7 @@ export function BottomPanel() {
                     </Badge>
                   </Flex>
 
+                  <DateTimeDisplay />
                   <Flex gap="3" align="center" className="text-gray-600">
                     <Flex gap="1" align="center" title="Time Elapsed / Estimated">
                       <Clock size={14} />
@@ -1372,7 +1427,7 @@ export function BottomPanel() {
               <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} />
 
               {/* Tabs */}
-              <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'flightNodes' | 'routes' | 'vehicles'); setSelectedNodeId(null); setSelectedRouteId(null); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'missionSites' | 'routes' | 'vehicles'); setSelectedNodeId(null); setSelectedRouteId(null); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <Flex align="center" justify="between" className="px-4 pt-2">
                   <Tabs.List style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
                     <Tabs.Trigger value="gantt">
@@ -1383,9 +1438,9 @@ export function BottomPanel() {
                       <MapPin size={16} className="mr-1" />
                       Orders ({orderNodes.length})
                     </Tabs.Trigger>
-                    <Tabs.Trigger value="flightNodes">
-                      <Plane size={16} className="mr-1" />
-                      Flight Nodes ({flightNodes.length})
+                    <Tabs.Trigger value="missionSites">
+                      <Layers size={16} className="mr-1" />
+                      Mission Sites ({missionSites.length})
                     </Tabs.Trigger>
                     <Tabs.Trigger value="routes">
                       <Route size={16} className="mr-1" />
@@ -1398,7 +1453,7 @@ export function BottomPanel() {
                   </Tabs.List>
                   {missionTab !== 'gantt' && (
                     <Flex gap="3" align="center">
-                      {(missionTab === 'orders' || missionTab === 'flightNodes') && (
+                      {(missionTab === 'orders' || missionTab === 'missionSites') && (
                         <IconButton size="1" variant="ghost" color={globalDisplayMode === 'address' ? 'blue' : 'gray'} onClick={toggleGlobalDisplayMode} title={globalDisplayMode === 'coords' ? 'Show addresses' : 'Show coordinates'} style={{ cursor: 'pointer' }}>
                           {globalDisplayMode === 'coords' ? <MapPinned size={14} /> : <Hash size={14} />}
                         </IconButton>
@@ -1531,11 +1586,11 @@ export function BottomPanel() {
                   )}
                 </Tabs.Content>
 
-                {/* Tab 3: Flight Nodes */}
-                <Tabs.Content value="flightNodes" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
+                {/* Tab 3: Mission Sites */}
+                <Tabs.Content value="missionSites" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
                   {viewMode === 'table' ? (
-                    <FlightNodesTable
-                      nodes={flightNodes}
+                    <MissionSitesTable
+                      nodes={missionSites}
                       displayMode={globalDisplayMode}
                       geocodingLoading={geocodingLoading}
                       nodeEtaMap={nodeEtaMap}
@@ -1554,7 +1609,7 @@ export function BottomPanel() {
                         paddingRight: '24px',
                       }}
                     >
-                      {flightNodes.map((node) => {
+                      {missionSites.map((node) => {
                         const nodeColor = node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6'
                         const displayMode = getDisplayMode(node.id)
                         const isLoading = geocodingLoading.get(node.id) || false
@@ -1588,7 +1643,7 @@ export function BottomPanel() {
                                       <MapPin size={14} style={{ color: nodeColor, flexShrink: 0 }} />
                                     )}
                                     <Box>
-                                      <Text size="2" weight="bold">Flight Node {node.flightNodeId || '?'}</Text>
+                                      <Text size="2" weight="bold">Mission Site {node.siteId || '?'}</Text>
                                       <Text size="1" style={{ color: nodeColor, fontWeight: 500, display: 'block', marginTop: '-1px' }}>
                                         {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {typeNum}
                                       </Text>
@@ -1624,10 +1679,10 @@ export function BottomPanel() {
                           </Card>
                         )
                       })}
-                      {flightNodes.length === 0 && (
+                      {missionSites.length === 0 && (
                         <Box className="text-center p-6 bg-gray-50 rounded" style={{ gridColumn: '1 / -1' }}>
                           <Text size="2" color="gray">
-                            No flight nodes (depots, stations, waypoints, hazards) defined.
+                            No mission sites (depots, stations, waypoints, hazards) defined.
                           </Text>
                         </Box>
                       )}
@@ -1732,6 +1787,7 @@ export function BottomPanel() {
                 </Badge>
               </Flex>
 
+              <DateTimeDisplay />
               <Flex gap="3" align="center" className="text-gray-600">
                 <Flex gap="1" align="center" title="Time Elapsed / Estimated">
                   <Clock size={14} />
@@ -1757,7 +1813,7 @@ export function BottomPanel() {
           <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} />
 
           {/* Tabs */}
-          <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'flightNodes' | 'routes' | 'vehicles'); setSelectedNodeId(null); setSelectedRouteId(null); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'missionSites' | 'routes' | 'vehicles'); setSelectedNodeId(null); setSelectedRouteId(null); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <Flex align="center" justify="between" className="px-4 pt-2">
               <Tabs.List style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
                 <Tabs.Trigger value="gantt">
@@ -1768,9 +1824,9 @@ export function BottomPanel() {
                   <MapPin size={16} className="mr-1" />
                   Orders ({orderNodes.length})
                 </Tabs.Trigger>
-                <Tabs.Trigger value="flightNodes">
-                  <Plane size={16} className="mr-1" />
-                  Flight Nodes ({flightNodes.length})
+                <Tabs.Trigger value="missionSites">
+                  <Layers size={16} className="mr-1" />
+                  Mission Sites ({missionSites.length})
                 </Tabs.Trigger>
                 <Tabs.Trigger value="routes">
                   <Route size={16} className="mr-1" />
@@ -1783,7 +1839,7 @@ export function BottomPanel() {
               </Tabs.List>
               {missionTab !== 'gantt' && (
                 <Flex gap="3" align="center">
-                  {(missionTab === 'orders' || missionTab === 'flightNodes') && (
+                  {(missionTab === 'orders' || missionTab === 'missionSites') && (
                     <IconButton size="1" variant="ghost" color={globalDisplayMode === 'address' ? 'blue' : 'gray'} onClick={toggleGlobalDisplayMode} title={globalDisplayMode === 'coords' ? 'Show addresses' : 'Show coordinates'} style={{ cursor: 'pointer' }}>
                       {globalDisplayMode === 'coords' ? <MapPinned size={14} /> : <Hash size={14} />}
                     </IconButton>
@@ -1916,11 +1972,11 @@ export function BottomPanel() {
               )}
             </Tabs.Content>
 
-            {/* Tab 3: Flight Nodes */}
-            <Tabs.Content value="flightNodes" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
+            {/* Tab 3: Mission Sites */}
+            <Tabs.Content value="missionSites" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
               {viewMode === 'table' ? (
-                <FlightNodesTable
-                  nodes={flightNodes}
+                <MissionSitesTable
+                  nodes={missionSites}
                   displayMode={globalDisplayMode}
                   geocodingLoading={geocodingLoading}
                   nodeEtaMap={nodeEtaMap}
@@ -1939,7 +1995,7 @@ export function BottomPanel() {
                     paddingRight: '24px',
                   }}
                 >
-                  {flightNodes.map((node) => {
+                  {missionSites.map((node) => {
                     const nodeColor = node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6'
                     const displayMode = getDisplayMode(node.id)
                     const isLoading = geocodingLoading.get(node.id) || false
@@ -1973,7 +2029,7 @@ export function BottomPanel() {
                                   <MapPin size={14} style={{ color: nodeColor, flexShrink: 0 }} />
                                 )}
                                 <Box>
-                                  <Text size="2" weight="bold">Flight Node {node.flightNodeId || '?'}</Text>
+                                  <Text size="2" weight="bold">Mission Site {node.siteId || '?'}</Text>
                                   <Text size="1" style={{ color: nodeColor, fontWeight: 500, display: 'block', marginTop: '-1px' }}>
                                     {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {typeNum}
                                   </Text>
@@ -2009,10 +2065,10 @@ export function BottomPanel() {
                       </Card>
                     )
                   })}
-                  {flightNodes.length === 0 && (
+                  {missionSites.length === 0 && (
                     <Box className="text-center p-6 bg-gray-50 rounded" style={{ gridColumn: '1 / -1' }}>
                       <Text size="2" color="gray">
-                        No flight nodes defined. Create or load a flight plan.
+                        No mission sites defined. Create or load a flight plan.
                       </Text>
                     </Box>
                   )}
@@ -2107,12 +2163,12 @@ function MissionStatsBar({
       className="px-4 py-2 border-t"
       style={{ backgroundColor: 'rgba(249, 250, 251, 0.8)' }}
     >
-      <Flex gap="1" align="center" title="Total Flight Nodes">
+      <Flex gap="1" align="center" title="Total Mission Sites">
         <MapPin size={14} className="text-gray-600" />
         <Text size="1" weight="medium">{totalNodes}</Text>
       </Flex>
       <Box className="w-px h-4 bg-gray-300" />
-      <Flex gap="1" align="center" title="Order Locations">
+      <Flex gap="1" align="center" title="Order Points">
         <MapPin size={14} className="text-green-600" />
         <Text size="1" weight="medium">{orderCount}</Text>
       </Flex>

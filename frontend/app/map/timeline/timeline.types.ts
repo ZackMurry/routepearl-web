@@ -1,4 +1,4 @@
-import { Point, FlightNode } from '@/lib/types'
+import { Point, MissionSite } from '@/lib/types'
 
 // Event type discriminators
 export type DroneEventType = 'drone_launch' | 'drone_delivery' | 'drone_return'

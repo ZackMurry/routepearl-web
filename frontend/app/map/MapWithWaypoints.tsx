@@ -3,14 +3,14 @@ import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { MapContainer, TileLayer, useMapEvents, Circle, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import './flight-planner.css'
-import { Point, FlightNode } from '@/lib/types'
+import { Point, MissionSite } from '@/lib/types'
 import TextMarker from '@/components/TextMarker'
 import ArrowheadPolyline from '@/components/ArrowheadPolyline'
 import chroma from 'chroma-js'
 import { FlightPlannerProvider, useFlightPlanner } from './FlightPlannerContext'
 import { FlightPlannerSidebar } from './FlightPlannerSidebar'
 import { BottomPanel } from './BottomPanel'
-import FlightNodeMarker from './FlightNodeMarker'
+import MissionSiteMarker from './MissionSiteMarker'
 import SortieFlightPath from './SortieFlightPath'
 import classNames from 'classnames'
 import ClickHandler from './ClickHandler'
@@ -416,9 +416,9 @@ function MapContent() {
           <LocationJump />
           <MapCenterTracker />
 
-          {/* Render flight nodes */}
+          {/* Render mission sites */}
           {missionConfig.nodes.map(node => (
-            <FlightNodeMarker key={node.id} node={node} />
+            <MissionSiteMarker key={node.id} node={node} />
           ))}
 
           {/* Render hazard zones */}

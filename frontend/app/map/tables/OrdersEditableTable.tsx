@@ -3,15 +3,15 @@
 import React, { FC } from 'react'
 import { Badge, Flex, IconButton, TextField, Button, ScrollArea } from '@radix-ui/themes'
 import { Trash2, Search } from 'lucide-react'
-import { FlightNode } from '@/lib/types'
+import { MissionSite } from '@/lib/types'
 
 interface Props {
-  orders: FlightNode[]
+  orders: MissionSite[]
   selectedNodeId: string | null
   onSelectNode?: (id: string | null) => void
   displayMode: 'coords' | 'address'
   geocodingLoading: Map<string, boolean>
-  updateNode: (id: string, updates: Partial<FlightNode>) => void
+  updateNode: (id: string, updates: Partial<MissionSite>) => void
   removeNode: (id: string) => void
   addressSearchInputs: Map<string, string>
   onAddressSearchInputChange: (nodeId: string, value: string) => void

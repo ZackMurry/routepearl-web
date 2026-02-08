@@ -1,4 +1,4 @@
-import { FlightNode } from '@/lib/types'
+import { MissionSite } from '@/lib/types'
 import { useEffect } from 'react'
 import { useMap, useMapEvents } from 'react-leaflet'
 import { useFlightPlanner } from './FlightPlannerContext'
@@ -10,7 +10,7 @@ const ClickHandler = () => {
       // Only create nodes if one of the plot modes is enabled
       if (!plotModeOrder && !plotModeNodes) return
 
-      let newNode: FlightNode
+      let newNode: MissionSite
 
       if (plotModeOrder) {
         // Order plot mode - create order nodes

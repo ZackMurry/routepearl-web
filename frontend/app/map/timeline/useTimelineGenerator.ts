@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { Point, FlightNode } from '@/lib/types'
+import { Point, MissionSite } from '@/lib/types'
 import {
   TimelineEvent,
   TimelineSummary,
@@ -32,9 +32,9 @@ function calculateTravelTime(distance: number, speedKmh: number): number {
 // Find node at location by type
 function findNodeAtLocation(
   location: Point,
-  nodes: FlightNode[],
+  nodes: MissionSite[],
   tolerance: number = 0.0001
-): FlightNode | undefined {
+): MissionSite | undefined {
   return nodes.find(
     (node) =>
       Math.abs(node.lat - location.lat) < tolerance &&
@@ -45,9 +45,9 @@ function findNodeAtLocation(
 // Find order node at location
 function findOrderAtLocation(
   location: Point,
-  nodes: FlightNode[],
+  nodes: MissionSite[],
   tolerance: number = 0.0001
-): FlightNode | undefined {
+): MissionSite | undefined {
   return nodes.find(
     (node) =>
       node.type === 'order' &&
@@ -83,9 +83,9 @@ interface SignificantPoint {
   index: number
   point: Point
   type: 'depot' | 'order' | 'station' | 'drone_launch' | 'drone_recover'
-  node?: FlightNode
+  node?: MissionSite
   sortieNumber?: number
-  orderNode?: FlightNode // The order being delivered (for drone launch/recover)
+  orderNode?: MissionSite // The order being delivered (for drone launch/recover)
 }
 
 /**
@@ -99,14 +99,14 @@ interface SignificantPoint {
  *
  * @param truckRoute - Array of truck route points
  * @param droneRoutes - Array of drone sorties (each sortie: [launch, delivery, return])
- * @param nodes - Flight nodes with order/depot information
+ * @param nodes - Mission sites with order/depot information
  * @param config - Timeline configuration (speeds, service times)
  * @returns TimelineResult with events, summary, and data source indicator
  */
 export function useTimelineGenerator(
   truckRoute: Point[],
   droneRoutes: Point[][],
-  nodes: FlightNode[],
+  nodes: MissionSite[],
   config: TimelineConfig = DEFAULT_TIMELINE_CONFIG
 ): TimelineResult {
   return useMemo(() => {

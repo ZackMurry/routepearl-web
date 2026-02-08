@@ -3,7 +3,7 @@ export type Point = { lat: number; lng: number }
 // Flight Planner Types
 export type NodeType = 'depot' | 'order' | 'station' | 'waypoint' | 'hazard'
 
-export interface FlightNode extends Point {
+export interface MissionSite extends Point {
   id: string
   type: NodeType
   label?: string
@@ -13,7 +13,7 @@ export interface FlightNode extends Point {
   severity?: 'low' | 'medium' | 'high' // For hazard nodes
   description?: string // For hazard nodes
   orderId?: number // For order nodes - auto-assigned, reused when deleted (displayed as Order ID)
-  flightNodeId?: number // For non-order nodes - auto-assigned, reused when deleted
+  siteId?: number // For non-order nodes - auto-assigned, reused when deleted
   address?: string // Cached reverse-geocoded street address
 }
 
@@ -119,7 +119,7 @@ export interface MissionConfig {
   estimatedDuration?: number // Display-only, computed from backend
 
   // Mid-level parameters
-  nodes: FlightNode[]
+  nodes: MissionSite[]
 
   // Low-level parameters
   algorithm: RoutingAlgorithm

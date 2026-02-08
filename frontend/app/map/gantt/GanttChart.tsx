@@ -125,14 +125,6 @@ const GanttChart: FC<Props> = ({
   const headerHeight = 28
   const totalContentHeight = headerHeight + filteredVehicles.length * rowHeight
 
-  // Format current date
-  const dateString = data.startTime.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-
   // No plan state
   if (state === 'no-plan') {
     return (
@@ -337,11 +329,6 @@ const GanttChart: FC<Props> = ({
             })}
           </Flex>
         )}
-
-        {/* Date display */}
-        <Text size="1" style={{ color: '#6b7280' }}>
-          {dateString}
-        </Text>
 
         {/* Duration / Distance info */}
         <Text size="1" style={{ color: '#6b7280' }}>

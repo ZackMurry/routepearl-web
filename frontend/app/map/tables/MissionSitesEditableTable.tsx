@@ -3,15 +3,15 @@
 import React, { FC, useMemo } from 'react'
 import { Flex, IconButton, TextField, Button, Select, ScrollArea } from '@radix-ui/themes'
 import { Trash2, Search } from 'lucide-react'
-import { FlightNode } from '@/lib/types'
+import { MissionSite } from '@/lib/types'
 
 interface Props {
-  nodes: FlightNode[]
+  nodes: MissionSite[]
   selectedNodeId: string | null
   onSelectNode?: (id: string | null) => void
   displayMode: 'coords' | 'address'
   geocodingLoading: Map<string, boolean>
-  updateNode: (id: string, updates: Partial<FlightNode>) => void
+  updateNode: (id: string, updates: Partial<MissionSite>) => void
   removeNode: (id: string) => void
   addressSearchInputs: Map<string, string>
   onAddressSearchInputChange: (nodeId: string, value: string) => void
@@ -25,7 +25,7 @@ const TYPE_COLORS: Record<string, string> = {
   waypoint: '#8b5cf6',
 }
 
-const FlightNodesEditableTable: FC<Props> = ({
+const MissionSitesEditableTable: FC<Props> = ({
   nodes, selectedNodeId, onSelectNode, displayMode, geocodingLoading,
   updateNode, removeNode, addressSearchInputs, onAddressSearchInputChange, onAddressSearch,
 }) => {
@@ -43,7 +43,7 @@ const FlightNodesEditableTable: FC<Props> = ({
   if (nodes.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '24px', color: '#6b7280', fontSize: '13px' }}>
-        No flight nodes added yet. Click &quot;Add Node&quot; or click on the map.
+        No mission sites added yet. Click &quot;Add Node&quot; or click on the map.
       </div>
     )
   }
@@ -76,7 +76,7 @@ const FlightNodesEditableTable: FC<Props> = ({
             return (
               <tr key={node.id} className={isSelected ? 'selected' : ''} onClick={() => onSelectNode?.(isSelected ? null : node.id)} style={{ cursor: 'pointer' }}>
                 <td>
-                  <span style={{ fontWeight: 700 }}>{node.flightNodeId || '?'}</span>
+                  <span style={{ fontWeight: 700 }}>{node.siteId || '?'}</span>
                   <span style={{ color: typeColor, fontWeight: 500, fontSize: '11px', display: 'block' }}>
                     {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {typeNum}
                   </span>
@@ -85,7 +85,7 @@ const FlightNodesEditableTable: FC<Props> = ({
                   <Select.Root
                     value={node.type}
                     onValueChange={(v: string) =>
-                      updateNode(node.id, { type: v as FlightNode['type'] })
+                      updateNode(node.id, { type: v as MissionSite['type'] })
                     }
                     size="1"
                   >
@@ -162,4 +162,4 @@ const FlightNodesEditableTable: FC<Props> = ({
   )
 }
 
-export default FlightNodesEditableTable
+export default MissionSitesEditableTable

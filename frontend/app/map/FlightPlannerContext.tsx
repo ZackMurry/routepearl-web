@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, ReactNode } from 'react'
-import { Mission, MissionConfig, MissionStatus, FlightNode, HazardZone, Point } from '@/lib/types'
+import { Mission, MissionConfig, MissionStatus, MissionSite, HazardZone, Point } from '@/lib/types'
 
 interface FlightPlannerContextType {
   // Mission state
@@ -13,8 +13,8 @@ interface FlightPlannerContextType {
   updateMissionConfig: (updates: Partial<MissionConfig>) => void
 
   // Node management
-  addNode: (node: FlightNode) => void
-  updateNode: (id: string, updates: Partial<FlightNode>) => void
+  addNode: (node: MissionSite) => void
+  updateNode: (id: string, updates: Partial<MissionSite>) => void
   removeNode: (id: string) => void
 
   // Hazard zone management
@@ -141,7 +141,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
   // Helper function to get the next available Order ID for orders
   // Reuses IDs from deleted orders (finds the lowest available ID)
-  const getNextAvailableAddressId = (nodes: FlightNode[]): number => {
+  const getNextAvailableAddressId = (nodes: MissionSite[]): number => {
     const orderNodes = nodes.filter(n => n.type === 'order')
     const usedIds = new Set(orderNodes.map(n => n.orderId).filter((id): id is number => id !== undefined))
 
@@ -153,11 +153,11 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     return nextId
   }
 
-  // Helper function to get the next available Flight Node ID for non-order nodes
-  // Reuses IDs from deleted flight nodes (finds the lowest available ID)
-  const getNextAvailableFlightNodeId = (nodes: FlightNode[]): number => {
-    const flightNodes = nodes.filter(n => n.type !== 'order')
-    const usedIds = new Set(flightNodes.map(n => n.flightNodeId).filter((id): id is number => id !== undefined))
+  // Helper function to get the next available Mission Site ID for non-order nodes
+  // Reuses IDs from deleted mission sites (finds the lowest available ID)
+  const getNextAvailableMissionSiteId = (nodes: MissionSite[]): number => {
+    const missionSites = nodes.filter(n => n.type !== 'order')
+    const usedIds = new Set(missionSites.map(n => n.siteId).filter((id): id is number => id !== undefined))
 
     // Find the lowest available ID starting from 1
     let nextId = 1
@@ -169,16 +169,16 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
   // Helper function to assign missing IDs to nodes
   // Used when loading/importing missions that may have nodes without IDs
-  const assignMissingNodeIds = (nodes: FlightNode[]): FlightNode[] => {
+  const assignMissingNodeIds = (nodes: MissionSite[]): MissionSite[] => {
     const usedOrderIds = new Set<number>()
-    const usedFlightNodeIds = new Set<number>()
+    const usedMissionSiteIds = new Set<number>()
 
     // First pass: collect all existing IDs
     nodes.forEach(node => {
       if (node.type === 'order' && node.orderId !== undefined) {
         usedOrderIds.add(node.orderId)
-      } else if (node.type !== 'order' && node.flightNodeId !== undefined) {
-        usedFlightNodeIds.add(node.flightNodeId)
+      } else if (node.type !== 'order' && node.siteId !== undefined) {
+        usedMissionSiteIds.add(node.siteId)
       }
     })
 
@@ -195,16 +195,16 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
           ...node,
           orderId: nextId,
         }
-      } else if (node.type !== 'order' && node.flightNodeId === undefined) {
-        // Find the lowest available flight node ID
+      } else if (node.type !== 'order' && node.siteId === undefined) {
+        // Find the lowest available mission site ID
         let nextId = 1
-        while (usedFlightNodeIds.has(nextId)) {
+        while (usedMissionSiteIds.has(nextId)) {
           nextId++
         }
-        usedFlightNodeIds.add(nextId)
+        usedMissionSiteIds.add(nextId)
         return {
           ...node,
-          flightNodeId: nextId,
+          siteId: nextId,
         }
       }
       return node
@@ -212,7 +212,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   }
 
   // Node management
-  const addNode = (node: FlightNode) => {
+  const addNode = (node: MissionSite) => {
     setMissionConfig((prev) => {
       // If it's an order node, auto-assign the next available Order ID
       if (node.type === 'order' && node.orderId === undefined) {
@@ -226,16 +226,16 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
           nodes: [...prev.nodes, nodeWithAddressId],
         }
       }
-      // If it's a non-order node, auto-assign the next available Flight Node ID
-      if (node.type !== 'order' && node.flightNodeId === undefined) {
-        const flightNodeId = getNextAvailableFlightNodeId(prev.nodes)
-        const nodeWithFlightNodeId = {
+      // If it's a non-order node, auto-assign the next available Mission Site ID
+      if (node.type !== 'order' && node.siteId === undefined) {
+        const siteId = getNextAvailableMissionSiteId(prev.nodes)
+        const nodeWithMissionSiteId = {
           ...node,
-          flightNodeId,
+          siteId,
         }
         return {
           ...prev,
-          nodes: [...prev.nodes, nodeWithFlightNodeId],
+          nodes: [...prev.nodes, nodeWithMissionSiteId],
         }
       }
       return {
@@ -245,7 +245,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  const updateNode = (id: string, updates: Partial<FlightNode>) => {
+  const updateNode = (id: string, updates: Partial<MissionSite>) => {
     setMissionConfig((prev) => ({
       ...prev,
       nodes: prev.nodes.map((node) => (node.id === id ? { ...node, ...updates } : node)),

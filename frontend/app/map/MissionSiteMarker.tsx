@@ -1,4 +1,4 @@
-import { FlightNode } from '@/lib/types'
+import { MissionSite } from '@/lib/types'
 import React, { FC, ReactNode, useMemo } from 'react'
 import { Circle } from 'react-leaflet'
 import LucideMarker from './LucideMarker'
@@ -10,7 +10,7 @@ import { HAZARD_COLORS, NODE_COLORS } from '@/lib/constants'
 import { Circle as LucideCircle, House, LucideIcon, LucideProps, MapPin, Zap } from 'lucide-react'
 
 interface Props {
-  node: FlightNode
+  node: MissionSite
 }
 
 interface Marker {
@@ -19,7 +19,7 @@ interface Marker {
   size?: number
 }
 
-const FlightNodeMarker: FC<Props> = ({ node }) => {
+const MissionSiteMarker: FC<Props> = ({ node }) => {
   const hazardColor = getOrDefault(HAZARD_COLORS, node.severity)
   // Nodes are draggable only when both plot modes are OFF
 
@@ -48,7 +48,7 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
 
   const isDraggable = !plotModeOrder && !plotModeNodes
 
-  const getAllSortieInfo = (node: FlightNode): Array<{ type: 'launch' | 'return' | 'delivery'; sortieNumber: number }> => {
+  const getAllSortieInfo = (node: MissionSite): Array<{ type: 'launch' | 'return' | 'delivery'; sortieNumber: number }> => {
     const sortieInfos: Array<{ type: 'launch' | 'return' | 'delivery'; sortieNumber: number }> = []
 
     for (let i = 0; i < droneRoutes.length; i++) {
@@ -193,4 +193,4 @@ const FlightNodeMarker: FC<Props> = ({ node }) => {
   )
 }
 
-export default FlightNodeMarker
+export default MissionSiteMarker

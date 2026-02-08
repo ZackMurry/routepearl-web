@@ -3,11 +3,11 @@
 import React, { FC } from 'react'
 import { Badge, Flex, ScrollArea } from '@radix-ui/themes'
 import { MapPin, Plane, Truck } from 'lucide-react'
-import { FlightNode } from '@/lib/types'
+import { MissionSite } from '@/lib/types'
 import { formatDistance, formatDuration } from '../timeline/timeline.types'
 
 interface Props {
-  orders: FlightNode[]
+  orders: MissionSite[]
   orderDeliveryMap: Map<string, 'drone' | 'truck' | 'unrouted'>
   orderEtaMap: Map<string, { eta: number; distance: number }>
   displayMode: 'coords' | 'address'

@@ -166,7 +166,7 @@ export function isLatLng(value: string): boolean {
   return !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
 }
 
-/** Map CSV node-tag values to internal FlightNode types */
+/** Map CSV node-tag values to internal MissionSite types */
 export function csvTagToNodeType(tag: string): 'order' | 'depot' | 'station' | 'hazard' | null {
   const normalized = tag.trim().toLowerCase()
   switch (normalized) {
@@ -178,7 +178,7 @@ export function csvTagToNodeType(tag: string): 'order' | 'depot' | 'station' | '
   }
 }
 
-/** Map internal FlightNode type to CSV node-tag */
+/** Map internal MissionSite type to CSV node-tag */
 export function nodeTypeToCsvTag(type: string): string | null {
   switch (type) {
     case 'order': return 'order'
