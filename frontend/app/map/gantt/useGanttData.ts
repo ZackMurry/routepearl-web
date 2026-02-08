@@ -62,6 +62,7 @@ export function useGanttData(
         orderName: event.orderName,
         sortieNumber: event.sortieNumber,
         distance: event.distance,
+        nodeId: event.nodeId,
       }))
 
       // Compute cumulative distance for truck stops
@@ -123,6 +124,7 @@ export function useGanttData(
               orderName: event.orderName,
               sortieNumber: event.sortieNumber,
               distance: event.distance,
+              nodeId: event.nodeId,
             })
           })
         })

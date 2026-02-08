@@ -36,6 +36,7 @@ export interface TimelineEvent {
   status: EventStatus
   orderName?: string // For delivery events
   distance?: number // Distance of this segment in meters
+  nodeId?: string // Original MissionSite node ID
 }
 
 // Timeline summary statistics

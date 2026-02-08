@@ -1,7 +1,7 @@
 'use client'
 
 import React, { FC } from 'react'
-import { GanttVehicle, GanttAxisMode } from './gantt.types'
+import { GanttVehicle, GanttStop, GanttAxisMode } from './gantt.types'
 import GanttStopIcon from './GanttStopIcon'
 import { Truck, Plane } from 'lucide-react'
 
@@ -14,9 +14,13 @@ interface Props {
   rowIndex: number
   isGreyed?: boolean // For empty fleet state
   gridIntervalPx: number // Pixel spacing for grid lines
+  onStopClick?: (stop: GanttStop) => void
+  onStopDoubleClick?: (stop: GanttStop) => void
+  onVehicleClick?: (vehicle: GanttVehicle) => void
+  onVehicleDoubleClick?: (vehicle: GanttVehicle) => void
 }
 
-const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDistance, axisMode, rowIndex, isGreyed = false, gridIntervalPx }) => {
+const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDistance, axisMode, rowIndex, isGreyed = false, gridIntervalPx, onStopClick, onStopDoubleClick, onVehicleClick, onVehicleDoubleClick }) => {
   const rowHeight = 48
   const isEven = rowIndex % 2 === 0
 
@@ -32,6 +36,8 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDista
     >
       {/* Vehicle label */}
       <div
+        onClick={() => onVehicleClick?.(vehicle)}
+        onDoubleClick={() => onVehicleDoubleClick?.(vehicle)}
         style={{
           width: '150px',
           minWidth: '150px',
@@ -42,6 +48,7 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDista
           borderRight: '1px solid #d1d5db',
           backgroundColor: '#f3f4f6',
           borderLeft: `3px solid ${vehicle.color}`,
+          cursor: onVehicleClick ? 'pointer' : 'default',
         }}
       >
         {/* Vehicle icon */}
@@ -107,6 +114,8 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDista
               pixelsPerUnit={pixelsPerUnit}
               totalDuration={totalDuration}
               axisMode={axisMode}
+              onStopClick={onStopClick}
+              onStopDoubleClick={onStopDoubleClick}
             />
           ))}
 

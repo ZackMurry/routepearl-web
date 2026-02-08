@@ -70,7 +70,9 @@ interface FlightPlannerContextType {
 
   // Mission launch
   missionLaunched: boolean
+  missionPaused: boolean
   launchMission: () => void
+  pauseMission: () => void
   stopMission: () => void
 }
 
@@ -108,6 +110,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [fleetMode, setFleetMode] = useState<'truck-drone' | 'truck-only' | 'drones-only'>('truck-drone')
   const [droneCount, setDroneCount] = useState<number>(2)
   const [missionLaunched, setMissionLaunched] = useState(false)
+  const [missionPaused, setMissionPaused] = useState(false)
   const [mapCenter, setMapCenter] = useState<Point>({ lat: 38.9404, lng: -92.3277 })
 
   // Debug logging for route changes
@@ -437,7 +440,23 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
       })
     }
     setMissionLaunched(true)
+    setMissionPaused(false)
     console.log('Mission launched:', missionConfig.missionName)
+  }
+
+  // Pause/resume mission
+  const pauseMission = () => {
+    if (!missionLaunched) return
+    const newPaused = !missionPaused
+    if (currentMission) {
+      setCurrentMission({
+        ...currentMission,
+        status: newPaused ? 'paused' : 'active',
+        updatedAt: new Date(),
+      })
+    }
+    setMissionPaused(newPaused)
+    console.log(newPaused ? 'Mission paused' : 'Mission resumed')
   }
 
   // Stop mission
@@ -450,6 +469,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
       })
     }
     setMissionLaunched(false)
+    setMissionPaused(false)
     console.log('Mission stopped')
   }
 
@@ -583,7 +603,9 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     isGeneratingRoute,
     hasUnassignedWaypoints,
     missionLaunched,
+    missionPaused,
     launchMission,
+    pauseMission,
     stopMission,
   }
 

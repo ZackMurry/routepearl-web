@@ -21,6 +21,7 @@ export interface GanttStop {
   sortieNumber?: number
   distance?: number // Distance of this segment in meters
   cumulativeDistance?: number // Cumulative distance from mission start in meters
+  nodeId?: string // Original MissionSite node ID for map selection
 }
 
 // Vehicle row data

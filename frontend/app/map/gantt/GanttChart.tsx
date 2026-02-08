@@ -3,7 +3,7 @@
 import React, { FC, useRef, useState, useEffect } from 'react'
 import { Box, Flex, Text, Button } from '@radix-ui/themes'
 import { Plus, FolderOpen, ZoomIn, ZoomOut, Plane, Truck, Clock, Route } from 'lucide-react'
-import { GanttData, GanttChartState, GanttAxisMode, formatGanttTime, formatGanttDistance } from './gantt.types'
+import { GanttData, GanttChartState, GanttAxisMode, GanttStop, GanttVehicle, formatGanttTime, formatGanttDistance } from './gantt.types'
 import GanttTimeAxis from './GanttTimeAxis'
 import GanttRow from './GanttRow'
 import GanttCurrentTimeMarker from './GanttCurrentTimeMarker'
@@ -18,6 +18,10 @@ interface Props {
   onLoadPlan?: () => void
   vehicleFilter?: VehicleFilter
   onVehicleFilterChange?: (filter: VehicleFilter) => void
+  onStopClick?: (stop: GanttStop) => void
+  onStopDoubleClick?: (stop: GanttStop) => void
+  onVehicleClick?: (vehicle: GanttVehicle) => void
+  onVehicleDoubleClick?: (vehicle: GanttVehicle) => void
 }
 
 // Pick a "nice" grid interval in pixels for distance mode
@@ -38,6 +42,10 @@ const GanttChart: FC<Props> = ({
   onLoadPlan,
   vehicleFilter = 'all',
   onVehicleFilterChange,
+  onStopClick,
+  onStopDoubleClick,
+  onVehicleClick,
+  onVehicleDoubleClick,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(800)
@@ -370,6 +378,10 @@ const GanttChart: FC<Props> = ({
                 rowIndex={index}
                 isGreyed={state === 'empty-fleet'}
                 gridIntervalPx={gridIntervalPx}
+                onStopClick={onStopClick}
+                onStopDoubleClick={onStopDoubleClick}
+                onVehicleClick={onVehicleClick}
+                onVehicleDoubleClick={onVehicleDoubleClick}
               />
             ))}
 

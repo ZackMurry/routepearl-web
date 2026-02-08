@@ -451,21 +451,9 @@ export function BottomPanel() {
   const orderNodes = missionConfig.nodes.filter((n) => n.type === 'order')
   const missionSites = missionConfig.nodes.filter((n) => n.type !== 'order')
 
-  // When a node is selected (e.g. by clicking a map marker), switch to the correct tab
+  // When a node is selected, expand the bottom panel if collapsed
   useEffect(() => {
     if (!selectedNodeId) return
-    const node = missionConfig.nodes.find((n) => n.id === selectedNodeId)
-    if (!node) return
-
-    const targetTab = node.type === 'order' ? 'orders' : 'missionSites'
-
-    if (isFlightPlannerMode) {
-      setNodeTab(targetTab)
-    } else {
-      setMissionTab(targetTab)
-    }
-
-    // Also expand the bottom panel if collapsed
     if (!bottomPanelExpanded) {
       setBottomPanelExpanded(true)
     }
@@ -724,7 +712,7 @@ export function BottomPanel() {
                   </Flex>
                 )}
                 <DateTimeDisplay />
-                <Flex gap="3" align="center" className="text-gray-600">
+                <Flex gap="5" align="center" className="text-gray-600">
                   <Flex gap="1" align="center" title="Time Elapsed / Estimated">
                     <Clock size={14} />
                     <Text size="1">00:00/{estimatedTime}</Text>
@@ -817,7 +805,7 @@ export function BottomPanel() {
                   </Flex>
                 )}
                 <DateTimeDisplay />
-                <Flex gap="3" align="center" className="text-gray-600">
+                <Flex gap="5" align="center" className="text-gray-600">
                   <Flex gap="1" align="center" title="Time Elapsed / Estimated">
                     <Clock size={14} />
                     <Text size="1">00:00/{estimatedTime}</Text>
@@ -961,7 +949,7 @@ export function BottomPanel() {
                                       size="1"
                                       type="number"
                                       step="0.0001"
-                                      style={{ flex: 1 }}
+                                      style={{ flex: 1, fontSize: '11px', height: '26px' }}
                                     />
                                     <Flex direction="column" gap="1">
                                       <IconButton
@@ -992,7 +980,7 @@ export function BottomPanel() {
                                       size="1"
                                       type="number"
                                       step="0.0001"
-                                      style={{ flex: 1 }}
+                                      style={{ flex: 1, fontSize: '11px', height: '26px' }}
                                     />
                                     <Flex direction="column" gap="1">
                                       <IconButton
@@ -1023,7 +1011,7 @@ export function BottomPanel() {
                                     }
                                     placeholder={isLoading ? 'Looking up address...' : 'Enter street address'}
                                     size="1"
-                                    style={{ flex: 1 }}
+                                    style={{ flex: 1, fontSize: '11px', height: '26px' }}
                                     onKeyDown={(e: React.KeyboardEvent) => {
                                       if (e.key === 'Enter') handleAddressSearch(node.id)
                                     }}
@@ -1150,7 +1138,7 @@ export function BottomPanel() {
                                     size="1"
                                     type="number"
                                     step="0.0001"
-                                    style={{ flex: 1 }}
+                                    style={{ flex: 1, fontSize: '11px', height: '26px' }}
                                   />
                                   <Flex direction="column" gap="1">
                                     <IconButton size="1" variant="soft" onClick={() => updateNode(node.id, { lat: parseFloat((node.lat + 0.0001).toFixed(6)), address: undefined })} style={{ minWidth: '24px', minHeight: '18px', padding: '2px 4px' }}>
@@ -1171,7 +1159,7 @@ export function BottomPanel() {
                                     size="1"
                                     type="number"
                                     step="0.0001"
-                                    style={{ flex: 1 }}
+                                    style={{ flex: 1, fontSize: '11px', height: '26px' }}
                                   />
                                   <Flex direction="column" gap="1">
                                     <IconButton size="1" variant="soft" onClick={() => updateNode(node.id, { lng: parseFloat((node.lng + 0.0001).toFixed(6)), address: undefined })} style={{ minWidth: '24px', minHeight: '18px', padding: '2px 4px' }}>
@@ -1192,7 +1180,7 @@ export function BottomPanel() {
                                   }
                                   placeholder={isLoading ? 'Looking up address...' : 'Enter street address'}
                                   size="1"
-                                  style={{ flex: 1 }}
+                                  style={{ flex: 1, fontSize: '11px', height: '26px' }}
                                   onKeyDown={(e: React.KeyboardEvent) => {
                                     if (e.key === 'Enter') handleAddressSearch(node.id)
                                   }}
@@ -1410,7 +1398,7 @@ export function BottomPanel() {
                   </Flex>
 
                   <DateTimeDisplay />
-                  <Flex gap="3" align="center" className="text-gray-600">
+                  <Flex gap="5" align="center" className="text-gray-600">
                     <Flex gap="1" align="center" title="Time Elapsed / Estimated">
                       <Clock size={14} />
                       <Text size="1">00:00/{estimatedTime}</Text>
@@ -1484,6 +1472,33 @@ export function BottomPanel() {
                     onLoadPlan={() => fileInputRef.current?.click()}
                     vehicleFilter={vehicleFilter}
                     onVehicleFilterChange={setVehicleFilter}
+                    onStopClick={(stop) => {
+                      if (stop.nodeId) {
+                        setSelectedNodeId(selectedNodeId === stop.nodeId ? null : stop.nodeId)
+                        setSelectedRouteId(null)
+                      }
+                    }}
+                    onStopDoubleClick={(stop) => {
+                      if (stop.nodeId) {
+                        setSelectedNodeId(stop.nodeId)
+                        setSelectedRouteId(null)
+                        const node = missionConfig.nodes.find(n => n.id === stop.nodeId)
+                        if (node) {
+                          setMissionTab(node.type === 'order' ? 'orders' : 'missionSites')
+                        }
+                      }
+                    }}
+                    onVehicleClick={(vehicle) => {
+                      const routeId = vehicle.type === 'truck' ? 'truck' : vehicle.id
+                      setSelectedRouteId(selectedRouteId === routeId ? null : routeId)
+                      setSelectedNodeId(null)
+                    }}
+                    onVehicleDoubleClick={(vehicle) => {
+                      const routeId = vehicle.type === 'truck' ? 'truck' : vehicle.id
+                      setSelectedRouteId(routeId)
+                      setSelectedNodeId(null)
+                      setMissionTab('routes')
+                    }}
                   />
                 </Tabs.Content>
 
@@ -1796,7 +1811,7 @@ export function BottomPanel() {
               </Flex>
 
               <DateTimeDisplay />
-              <Flex gap="3" align="center" className="text-gray-600">
+              <Flex gap="5" align="center" className="text-gray-600">
                 <Flex gap="1" align="center" title="Time Elapsed / Estimated">
                   <Clock size={14} />
                   <Text size="1">00:00/{estimatedTime}</Text>
@@ -1870,6 +1885,33 @@ export function BottomPanel() {
                 onLoadPlan={() => fileInputRef.current?.click()}
                 vehicleFilter={vehicleFilter}
                 onVehicleFilterChange={setVehicleFilter}
+                onStopClick={(stop) => {
+                  if (stop.nodeId) {
+                    setSelectedNodeId(selectedNodeId === stop.nodeId ? null : stop.nodeId)
+                    setSelectedRouteId(null)
+                  }
+                }}
+                onStopDoubleClick={(stop) => {
+                  if (stop.nodeId) {
+                    setSelectedNodeId(stop.nodeId)
+                    setSelectedRouteId(null)
+                    const node = missionConfig.nodes.find(n => n.id === stop.nodeId)
+                    if (node) {
+                      setMissionTab(node.type === 'order' ? 'orders' : 'missionSites')
+                    }
+                  }
+                }}
+                onVehicleClick={(vehicle) => {
+                  const routeId = vehicle.type === 'truck' ? 'truck' : vehicle.id
+                  setSelectedRouteId(selectedRouteId === routeId ? null : routeId)
+                  setSelectedNodeId(null)
+                }}
+                onVehicleDoubleClick={(vehicle) => {
+                  const routeId = vehicle.type === 'truck' ? 'truck' : vehicle.id
+                  setSelectedRouteId(routeId)
+                  setSelectedNodeId(null)
+                  setMissionTab('routes')
+                }}
               />
             </Tabs.Content>
 
@@ -2166,10 +2208,10 @@ function MissionStatsBar({
 
   return (
     <Flex
-      gap="4"
+      gap="5"
       align="center"
       className="px-4 py-2 border-t"
-      style={{ backgroundColor: 'rgba(249, 250, 251, 0.8)' }}
+      style={{ backgroundColor: 'rgba(249, 250, 251, 0.8)', flexWrap: 'wrap', rowGap: '4px' }}
     >
       <Flex gap="1" align="center" title="Total Mission Sites">
         <MapPin size={14} className="text-gray-600" />

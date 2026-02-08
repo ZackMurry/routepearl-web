@@ -12,9 +12,11 @@ interface Props {
   pixelsPerUnit: number
   totalDuration: number
   axisMode: GanttAxisMode
+  onStopClick?: (stop: GanttStop) => void
+  onStopDoubleClick?: (stop: GanttStop) => void
 }
 
-const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDuration, axisMode }) => {
+const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDuration, axisMode, onStopClick, onStopDoubleClick }) => {
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const iconRef = useRef<HTMLDivElement>(null)
@@ -99,6 +101,8 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDura
         }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={() => setShowTooltip(false)}
+        onClick={() => onStopClick?.(stop)}
+        onDoubleClick={() => onStopDoubleClick?.(stop)}
       >
         {/* Icon container */}
         <div

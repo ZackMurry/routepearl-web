@@ -42,18 +42,33 @@ function findNodeAtLocation(
   )
 }
 
-// Find order node at location
+// Find order node at location (with fallback to closest order within 500m)
 function findOrderAtLocation(
   location: Point,
   nodes: MissionSite[],
   tolerance: number = 0.0001
 ): MissionSite | undefined {
-  return nodes.find(
+  // Exact match first
+  const exact = nodes.find(
     (node) =>
       node.type === 'order' &&
       Math.abs(node.lat - location.lat) < tolerance &&
       Math.abs(node.lng - location.lng) < tolerance
   )
+  if (exact) return exact
+
+  // Fallback: find closest order within 500m
+  let closest: MissionSite | undefined
+  let closestDist = 500
+  for (const node of nodes) {
+    if (node.type !== 'order') continue
+    const d = calculateDistance(location, { lat: node.lat, lng: node.lng })
+    if (d < closestDist) {
+      closestDist = d
+      closest = node
+    }
+  }
+  return closest
 }
 
 // Check if a point matches any point in a set (with tolerance)
@@ -152,6 +167,7 @@ export function useTimelineGenerator(
     }
 
     // 1. Add truck departure event
+    const depotNode = nodes.find((n) => n.type === 'depot')
     events.push({
       id: nextId(),
       type: 'truck_depart',
@@ -162,6 +178,7 @@ export function useTimelineGenerator(
       estimatedDuration: 0,
       cumulativeTime: 0,
       status: 'pending',
+      nodeId: depotNode?.id,
     })
 
     // 2. Process drone sorties - add all drone events
@@ -185,11 +202,13 @@ export function useTimelineGenerator(
         sortieNumber: sortieNum,
         location: launchPoint,
         label: `Sortie ${sortieNum}: Drone Launch`,
+        orderName: order?.label,
         description: `Launching for ${order?.label || 'Order'}`,
         estimatedDuration: config.droneLoadTimeSeconds,
         cumulativeTime: droneCumulativeTime,
         status: 'pending',
         distance: 0,
+        nodeId: order?.id,
       })
       droneCumulativeTime += config.droneLoadTimeSeconds
 
@@ -212,6 +231,7 @@ export function useTimelineGenerator(
         cumulativeTime: droneCumulativeTime,
         status: 'pending',
         distance: launchToDeliveryDist,
+        nodeId: order?.id,
       })
       droneCumulativeTime += launchToDeliveryTime + config.droneUnloadTimeSeconds
       droneDistance += launchToDeliveryDist
@@ -230,10 +250,13 @@ export function useTimelineGenerator(
         sortieNumber: sortieNum,
         location: returnPoint,
         label: `Sortie ${sortieNum}: Drone Return`,
+        orderName: order?.label,
+        description: `Returning after delivering to ${order?.label || 'Order'}`,
         estimatedDuration: deliveryToReturnTime,
         cumulativeTime: droneCumulativeTime,
         status: 'pending',
         distance: deliveryToReturnDist,
+        nodeId: order?.id,
       })
       droneCumulativeTime += deliveryToReturnTime
       droneDistance += deliveryToReturnDist
@@ -457,6 +480,7 @@ export function useTimelineGenerator(
             estimatedDuration: config.truckDeliveryTimeSeconds,
             cumulativeTime: truckCumulativeTime,
             status: 'pending',
+            nodeId: currSig.node?.id,
           })
           truckCumulativeTime += config.truckDeliveryTimeSeconds
           break
@@ -476,6 +500,7 @@ export function useTimelineGenerator(
             estimatedDuration: config.droneLoadTimeSeconds,
             cumulativeTime: truckCumulativeTime,
             status: 'pending',
+            nodeId: currSig.orderNode?.id,
           })
           truckCumulativeTime += config.droneLoadTimeSeconds
           break
@@ -496,6 +521,7 @@ export function useTimelineGenerator(
             estimatedDuration: config.droneLoadTimeSeconds,
             cumulativeTime: truckCumulativeTime,
             status: 'pending',
+            nodeId: currSig.orderNode?.id,
           })
           truckCumulativeTime += config.droneLoadTimeSeconds
           break
@@ -513,6 +539,7 @@ export function useTimelineGenerator(
             estimatedDuration: 600, // 10 min charging estimate
             cumulativeTime: truckCumulativeTime,
             status: 'pending',
+            nodeId: currSig.node?.id,
           })
           truckCumulativeTime += 600
           break
@@ -531,6 +558,7 @@ export function useTimelineGenerator(
               estimatedDuration: 0,
               cumulativeTime: truckCumulativeTime,
               status: 'pending',
+              nodeId: currSig.node?.id || depotNode?.id,
             })
           }
           break

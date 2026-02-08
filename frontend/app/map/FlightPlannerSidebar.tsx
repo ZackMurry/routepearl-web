@@ -68,7 +68,9 @@ export function FlightPlannerSidebar() {
     truckRoute,
     droneRoutes,
     missionLaunched,
+    missionPaused,
     launchMission,
+    pauseMission,
     stopMission,
     importMission,
     exportMission,
@@ -454,8 +456,14 @@ export function FlightPlannerSidebar() {
                     >
                       <Play size={14} /> Launch
                     </Button>
-                    <Button size='2' color='orange' variant='soft' disabled>
-                      <Pause size={14} /> Pause
+                    <Button
+                      size='2'
+                      color='orange'
+                      variant='soft'
+                      disabled={!missionLaunched}
+                      onClick={pauseMission}
+                    >
+                      <Pause size={14} /> {missionPaused ? 'Resume' : 'Pause'}
                     </Button>
                     <Button
                       size='2'
@@ -470,7 +478,7 @@ export function FlightPlannerSidebar() {
 
                   {/* Status Table */}
                   <Box
-                    className='mt-10'
+                    className='mt-14'
                     style={{
                       border: '1px solid #e5e7eb',
                       borderRadius: '8px',
@@ -533,15 +541,15 @@ export function FlightPlannerSidebar() {
                       }}
                     >
                       <Flex align='center' gap='2'>
-                        <Play size={14} style={{ color: missionLaunched ? '#10b981' : '#6b7280' }} />
+                        <Play size={14} style={{ color: missionLaunched ? (missionPaused ? '#f59e0b' : '#10b981') : '#6b7280' }} />
                         <Text size='2' style={{ color: '#374151' }}>Mission</Text>
                       </Flex>
                       <Badge
                         size='1'
-                        color={missionLaunched ? 'green' : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'blue' : 'gray'}
+                        color={missionLaunched ? (missionPaused ? 'orange' : 'green') : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'blue' : 'gray'}
                         variant={missionLaunched ? 'solid' : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'soft' : 'outline'}
                       >
-                        {missionLaunched ? 'Active' : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'Ready' : 'Not Ready'}
+                        {missionLaunched ? (missionPaused ? 'Paused' : 'Active') : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'Ready' : 'Not Ready'}
                       </Badge>
                     </Flex>
                   </Box>
