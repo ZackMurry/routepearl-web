@@ -17,6 +17,7 @@ type Props = {
   selected?: boolean
   onRightClick?: () => void
   onClick?: () => void
+  onDoubleClick?: () => void
   onDragEnd?: (lat: number, lng: number) => void
   draggable?: boolean
   LucideIcon?: React.FC<LucideProps>
@@ -31,6 +32,7 @@ export default function LucideMarker({
   selected = false,
   onRightClick,
   onClick,
+  onDoubleClick,
   onDragEnd,
   draggable = false,
   LucideIcon = FlagTriangleRight,
@@ -97,6 +99,9 @@ export default function LucideMarker({
       eventHandlers={{
         click: () => {
           onClick?.()
+        },
+        dblclick: () => {
+          onDoubleClick?.()
         },
         contextmenu: e => {
           e.originalEvent.preventDefault()

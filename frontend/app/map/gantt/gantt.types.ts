@@ -18,6 +18,7 @@ export interface GanttStop {
   label: string
   description?: string
   orderName?: string
+  orderId?: number // Map marker order ID (displayed number)
   sortieNumber?: number
   distance?: number // Distance of this segment in meters
   cumulativeDistance?: number // Cumulative distance from mission start in meters

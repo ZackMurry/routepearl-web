@@ -35,6 +35,7 @@ export interface TimelineEvent {
   cumulativeTime: number // Total time from mission start in seconds
   status: EventStatus
   orderName?: string // For delivery events
+  orderId?: number // Map marker order ID (displayed number)
   distance?: number // Distance of this segment in meters
   nodeId?: string // Original MissionSite node ID
 }

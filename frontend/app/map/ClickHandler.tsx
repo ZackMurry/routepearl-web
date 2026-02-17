@@ -4,11 +4,11 @@ import { useMap, useMapEvents } from 'react-leaflet'
 import { useFlightPlanner } from './FlightPlannerContext'
 
 const ClickHandler = () => {
-  const { missionConfig, addNode, truckRoute, droneRoutes, plotModeOrder, plotModeNodes } = useFlightPlanner()
+  const { missionConfig, addNode, truckRoute, droneRoutes, plotModeOrder, plotModeNodes, isFlightPlannerMode } = useFlightPlanner()
   useMapEvents({
     click(e) {
-      // Only create nodes if one of the plot modes is enabled
-      if (!plotModeOrder && !plotModeNodes) return
+      // Only create nodes if in flight planner mode and one of the plot modes is enabled
+      if (!isFlightPlannerMode || (!plotModeOrder && !plotModeNodes)) return
 
       let newNode: MissionSite
 
@@ -39,7 +39,7 @@ const ClickHandler = () => {
   const map = useMap()
   useEffect(() => {
     const isCrosshair = map.getContainer().classList.contains('leaflet-cursor-crosshair')
-    const shouldBeCrosshair = plotModeNodes || plotModeOrder
+    const shouldBeCrosshair = isFlightPlannerMode && (plotModeNodes || plotModeOrder)
     if (shouldBeCrosshair && !isCrosshair) {
       map.getContainer().className += ' leaflet-cursor-crosshair'
     } else if (!shouldBeCrosshair && isCrosshair) {

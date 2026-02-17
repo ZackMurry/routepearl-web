@@ -43,6 +43,9 @@ interface FlightPlannerContextType {
   setPlotModeNodes: (mode: boolean) => void
   selectedNodeId: string | null
   setSelectedNodeId: (id: string | null) => void
+  focusNodeId: string | null
+  focusNodeCounter: number
+  requestFocusNode: (id: string) => void
   selectedRouteId: string | null // 'truck', 'drone-1', 'drone-2', etc.
   setSelectedRouteId: (id: string | null) => void
 
@@ -62,6 +65,7 @@ interface FlightPlannerContextType {
   // Map state
   mapCenter: Point
   setMapCenter: (center: Point) => void
+  fitBoundsCounter: number
 
   // Route generation
   generateRoute: () => Promise<void>
@@ -101,17 +105,26 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [bottomPanelExpanded, setBottomPanelExpanded] = useState(true)
   const [bottomPanelHeight, setBottomPanelHeight] = useState(400) // Default height increased for better visibility
-  const [isFlightPlannerMode, setIsFlightPlannerMode] = useState(false) // Default to mission management mode
+  const [isFlightPlannerMode, setIsFlightPlannerModeInternal] = useState(false) // Default to mission management mode
   const [isGeneratingRoute, setIsGeneratingRoute] = useState(false)
   const [plotModeOrder, setPlotModeOrderInternal] = useState(false)
   const [plotModeNodes, setPlotModeNodesInternal] = useState(false)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
+  const [focusNodeId, setFocusNodeId] = useState<string | null>(null)
+  const [focusNodeCounter, setFocusNodeCounter] = useState(0)
+
+  const requestFocusNode = (id: string) => {
+    setSelectedNodeId(id)
+    setFocusNodeId(id)
+    setFocusNodeCounter(c => c + 1)
+  }
   const [fleetMode, setFleetMode] = useState<'truck-drone' | 'truck-only' | 'drones-only'>('truck-drone')
   const [droneCount, setDroneCount] = useState<number>(2)
   const [missionLaunched, setMissionLaunched] = useState(false)
   const [missionPaused, setMissionPaused] = useState(false)
   const [mapCenter, setMapCenter] = useState<Point>({ lat: 38.9404, lng: -92.3277 })
+  const [fitBoundsCounter, setFitBoundsCounter] = useState(0)
 
   // Debug logging for route changes
   React.useEffect(() => {
@@ -121,6 +134,14 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   React.useEffect(() => {
     console.log('Drone routes updated:', droneRoutes.length, 'paths')
   }, [droneRoutes])
+
+  const setIsFlightPlannerMode = (mode: boolean) => {
+    if (!mode) {
+      setPlotModeOrderInternal(false)
+      setPlotModeNodesInternal(false)
+    }
+    setIsFlightPlannerModeInternal(mode)
+  }
 
   // Wrapper functions to ensure mutual exclusivity
   const setPlotModeOrder = (mode: boolean) => {
@@ -357,6 +378,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
     setCurrentMission(missionWithIds)
     setMissionConfig(configWithIds)
+    setFitBoundsCounter(c => c + 1)
     console.log('Mission loaded:', mission.config.missionName)
     console.log('Route data loaded:', {
       truckRoutePoints: mission.config.routes?.truckRoute?.length || 0,
@@ -586,6 +608,9 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setPlotModeNodes,
     selectedNodeId,
     setSelectedNodeId,
+    focusNodeId,
+    focusNodeCounter,
+    requestFocusNode,
     selectedRouteId,
     setSelectedRouteId,
     fleetMode,
@@ -599,6 +624,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     importMission,
     mapCenter,
     setMapCenter,
+    fitBoundsCounter,
     generateRoute,
     isGeneratingRoute,
     hasUnassignedWaypoints,

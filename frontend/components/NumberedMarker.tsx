@@ -13,6 +13,7 @@ type Props = {
   selected?: boolean
   onRightClick?: () => void
   onClick?: () => void
+  onDoubleClick?: () => void
   onDragEnd?: (lat: number, lng: number) => void
   draggable?: boolean
 }
@@ -26,6 +27,7 @@ export default function NumberedMarker({
   selected = false,
   onRightClick,
   onClick,
+  onDoubleClick,
   onDragEnd,
   draggable = false,
 }: Props) {
@@ -84,6 +86,9 @@ export default function NumberedMarker({
       eventHandlers={{
         click: () => {
           onClick?.()
+        },
+        dblclick: () => {
+          onDoubleClick?.()
         },
         contextmenu: e => {
           e.originalEvent.preventDefault()

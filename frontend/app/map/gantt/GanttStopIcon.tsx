@@ -121,6 +121,31 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDura
         >
           {getIcon(stop.type)}
         </div>
+        {/* Order ID badge */}
+        {stop.orderId != null && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '-6px',
+              right: '-6px',
+              minWidth: '14px',
+              height: '14px',
+              borderRadius: '7px',
+              backgroundColor: '#1f2937',
+              color: 'white',
+              fontSize: '9px',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0 3px',
+              lineHeight: 1,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+            }}
+          >
+            {stop.orderId}
+          </div>
+        )}
       </div>
 
       {/* Tooltip rendered via portal to escape overflow clipping */}

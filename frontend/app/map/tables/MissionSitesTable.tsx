@@ -71,7 +71,7 @@ const MissionSitesTable: FC<Props> = ({ nodes, displayMode, geocodingLoading, no
             const isSelected = selectedNodeId === node.id
 
             return (
-              <tr key={node.id} className={isSelected ? 'selected' : ''} onClick={() => onSelectNode?.(isSelected ? null : node.id)} style={{ cursor: 'pointer' }}>
+              <tr key={node.id} data-node-id={node.id} className={isSelected ? 'selected' : ''} onClick={() => onSelectNode?.(isSelected ? null : node.id)} style={{ cursor: 'pointer' }}>
                 <td className="accent-cell" style={{ '--accent-color': config.accentColor } as React.CSSProperties}>
                   <Flex align="center" gap="1">
                     <Icon size={12} style={{ color: config.accentColor, flexShrink: 0 }} />

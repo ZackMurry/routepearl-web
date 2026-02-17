@@ -79,6 +79,8 @@ export function BottomPanel() {
     setPlotModeNodes,
     selectedNodeId,
     setSelectedNodeId,
+    focusNodeId,
+    focusNodeCounter,
     selectedRouteId,
     setSelectedRouteId,
     fleetMode,
@@ -102,6 +104,35 @@ export function BottomPanel() {
   const [nodeTab, setNodeTab] = useState<'orders' | 'missionSites'>('orders')
 
   const [csvImporting, setCsvImporting] = useState(false)
+
+  // --- Focus node effect: switch tab and scroll to node entry on map marker double-click ---
+  useEffect(() => {
+    if (focusNodeCounter === 0 || !focusNodeId) return
+
+    const node = missionConfig.nodes.find(n => n.id === focusNodeId)
+    if (!node) return
+
+    const isOrder = node.type === 'order'
+
+    if (isFlightPlannerMode) {
+      setNodeTab(isOrder ? 'orders' : 'missionSites')
+    } else {
+      setMissionTab(isOrder ? 'orders' : 'missionSites')
+    }
+
+    // Expand panel if collapsed
+    if (!bottomPanelExpanded) {
+      setBottomPanelExpanded(true)
+    }
+
+    // Scroll to the element after a delay to allow tab switch to render
+    setTimeout(() => {
+      const el = document.querySelector(`[data-node-id="${focusNodeId}"]`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 150)
+  }, [focusNodeCounter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Date/Time display state ---
   const [timeMode, setTimeMode] = useState<'clock' | 'mission'>('clock')
@@ -486,9 +517,9 @@ export function BottomPanel() {
 
   // Stats for header display — sourced from timeline summary for consistency
   const totalOrders = orderNodes.length
-  const deliveredPackages = hasRoute ? (droneDeliveryCount + truckDeliveryCount) : 0
+  const deliveredPackages = hasRoute && missionLaunched ? (droneDeliveryCount + truckDeliveryCount) : 0
   const totalDistance = hasRoute ? formatDistanceTimeline(timelineResult.summary.totalDistance) : '--'
-  const coveredDistance = '0km' // Live tracking - future feature
+  const coveredDistance = missionLaunched ? '0km' : '--' // Live tracking - future feature
   const estimatedTime = hasRoute ? formatDurationTimeline(timelineResult.summary.totalDuration) : '--:--'
 
   // Compute ETA and distance for each order directly from route data
@@ -912,6 +943,7 @@ export function BottomPanel() {
                           return (
                           <Card
                             key={node.id}
+                            data-node-id={node.id}
                             className="p-2"
                             style={{
                               backgroundColor: selectedNodeId === node.id ? '#eff6ff' : 'white',
@@ -1077,6 +1109,7 @@ export function BottomPanel() {
                           return (
                           <Card
                             key={node.id}
+                            data-node-id={node.id}
                             className="p-2"
                             style={{
                               backgroundColor: selectedNodeId === node.id ? '#eff6ff' : 'white',
@@ -1534,6 +1567,7 @@ export function BottomPanel() {
                         return (
                           <Card
                             key={order.id}
+                            data-node-id={order.id}
                             className="p-0"
                             style={{
                               border: selectedNodeId === order.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
@@ -1642,6 +1676,7 @@ export function BottomPanel() {
                         return (
                           <Card
                             key={node.id}
+                            data-node-id={node.id}
                             className="p-0"
                             style={{
                               border: selectedNodeId === node.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
@@ -1947,6 +1982,7 @@ export function BottomPanel() {
                     return (
                       <Card
                         key={order.id}
+                        data-node-id={order.id}
                         className="p-0"
                         style={{
                           border: selectedNodeId === order.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
@@ -2055,6 +2091,7 @@ export function BottomPanel() {
                     return (
                       <Card
                         key={node.id}
+                        data-node-id={node.id}
                         className="p-0"
                         style={{
                           border: selectedNodeId === node.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
@@ -2257,20 +2294,15 @@ function MissionStatsBar({
             <Route size={12} className="text-gray-500" />
             <Text size="1" weight="medium">{formatDistanceTimeline(timelineSummary.totalDistance)}</Text>
           </Flex>
-          {hasTruck && (
-            <Flex gap="1" align="center" title="Truck distance">
-              <Truck size={12} style={{ color: '#374151' }} />
-              <Text size="1" weight="medium">{formatDistanceTimeline(timelineSummary.truckDistance)}</Text>
+          <Flex gap="1" align="center" title="Truck distance" style={{ opacity: hasTruck ? 1 : 0.35 }}>
+              <Truck size={12} style={{ color: hasTruck ? '#374151' : '#9ca3af' }} />
+              <Text size="1" weight="medium" style={{ color: hasTruck ? undefined : '#9ca3af' }}>{hasTruck ? formatDistanceTimeline(timelineSummary.truckDistance) : '--'}</Text>
             </Flex>
-          )}
-          {hasDrones && (
-            <Flex gap="1" align="center" title="Drone distance">
-              <Plane size={12} style={{ color: '#3b82f6' }} />
-              <Text size="1" weight="medium">{formatDistanceTimeline(timelineSummary.droneDistance)}</Text>
+          <Flex gap="1" align="center" title="Drone distance" style={{ opacity: hasDrones ? 1 : 0.35 }}>
+              <Plane size={12} style={{ color: hasDrones ? '#3b82f6' : '#9ca3af' }} />
+              <Text size="1" weight="medium" style={{ color: hasDrones ? undefined : '#9ca3af' }}>{hasDrones ? formatDistanceTimeline(timelineSummary.droneDistance) : '--'}</Text>
             </Flex>
-          )}
-          {hasTruck && hasDrones && (
-            <Flex gap="1" align="center" title="Deliveries (drone / truck)">
+          <Flex gap="1" align="center" title="Deliveries (drone / truck)">
               <Package size={12} className="text-gray-500" />
               <Flex
                 gap="1"
@@ -2282,14 +2314,17 @@ function MissionStatsBar({
                   backgroundColor: '#f8fafc',
                 }}
               >
-                <Plane size={11} style={{ color: '#3b82f6' }} />
-                <Text size="1" weight="medium">{droneDeliveriesProp ?? timelineSummary.droneDeliveries}</Text>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 2, opacity: hasDrones ? 1 : 0.35 }}>
+                  <Plane size={11} style={{ color: hasDrones ? '#3b82f6' : '#9ca3af' }} />
+                  <Text size="1" weight="medium" style={{ color: hasDrones ? undefined : '#9ca3af' }}>{hasDrones ? (droneDeliveriesProp ?? timelineSummary.droneDeliveries) : '-'}</Text>
+                </span>
                 <Text size="1" style={{ color: '#cbd5e1' }}>/</Text>
-                <Truck size={11} style={{ color: '#374151' }} />
-                <Text size="1" weight="medium">{truckDeliveriesProp ?? timelineSummary.truckDeliveries}</Text>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 2, opacity: hasTruck ? 1 : 0.35 }}>
+                  <Truck size={11} style={{ color: hasTruck ? '#374151' : '#9ca3af' }} />
+                  <Text size="1" weight="medium" style={{ color: hasTruck ? undefined : '#9ca3af' }}>{hasTruck ? (truckDeliveriesProp ?? timelineSummary.truckDeliveries) : '-'}</Text>
+                </span>
               </Flex>
             </Flex>
-          )}
         </>
       )}
     </Flex>

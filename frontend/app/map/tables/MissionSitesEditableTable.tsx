@@ -74,7 +74,7 @@ const MissionSitesEditableTable: FC<Props> = ({
             const typeColor = TYPE_COLORS[node.type] || '#8b5cf6'
 
             return (
-              <tr key={node.id} className={isSelected ? 'selected' : ''} onClick={() => onSelectNode?.(isSelected ? null : node.id)} style={{ cursor: 'pointer' }}>
+              <tr key={node.id} data-node-id={node.id} className={isSelected ? 'selected' : ''} onClick={() => onSelectNode?.(isSelected ? null : node.id)} style={{ cursor: 'pointer' }}>
                 <td>
                   <span style={{ fontWeight: 700 }}>{node.siteId || '?'}</span>
                   <span style={{ color: typeColor, fontWeight: 500, fontSize: '11px', display: 'block' }}>

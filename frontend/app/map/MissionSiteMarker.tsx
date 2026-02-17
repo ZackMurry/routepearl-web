@@ -1,5 +1,5 @@
 import { MissionSite } from '@/lib/types'
-import React, { FC, ReactNode, useMemo } from 'react'
+import React, { FC, ReactNode, useMemo, useRef, useCallback } from 'react'
 import { Circle } from 'react-leaflet'
 import LucideMarker from './LucideMarker'
 import { getOrDefault, pointMatchesNode } from '@/lib/util'
@@ -24,7 +24,7 @@ const MissionSiteMarker: FC<Props> = ({ node }) => {
   // Nodes are draggable only when both plot modes are OFF
 
   // Helper function: Get ALL sortie info for a node (a node can have multiple roles)
-  const { updateNode, removeNode, truckRoute, droneRoutes, plotModeOrder, plotModeNodes, selectedNodeId, setSelectedNodeId } = useFlightPlanner()
+  const { updateNode, removeNode, truckRoute, droneRoutes, plotModeOrder, plotModeNodes, selectedNodeId, setSelectedNodeId, isFlightPlannerMode, requestFocusNode } = useFlightPlanner()
 
   const isDroneDelivery = useMemo(
     () =>
@@ -47,6 +47,26 @@ const MissionSiteMarker: FC<Props> = ({ node }) => {
   const orderColor = isDroneDelivery ? '#facc15' : isTruckDelivery ? '#3b82f6' : '#ffffff'
 
   const isDraggable = !plotModeOrder && !plotModeNodes
+
+  // Manual double-click detection via click timing
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleMarkerClick = useCallback(() => {
+    if (plotModeOrder || plotModeNodes) return
+
+    if (clickTimer.current) {
+      // Second click within window → double-click
+      clearTimeout(clickTimer.current)
+      clickTimer.current = null
+      requestFocusNode(node.id)
+    } else {
+      // First click → wait to see if a second follows
+      clickTimer.current = setTimeout(() => {
+        clickTimer.current = null
+        setSelectedNodeId(selectedNodeId === node.id ? null : node.id)
+      }, 250)
+    }
+  }, [plotModeOrder, plotModeNodes, node.id, selectedNodeId, setSelectedNodeId, requestFocusNode])
 
   const getAllSortieInfo = (node: MissionSite): Array<{ type: 'launch' | 'return' | 'delivery'; sortieNumber: number }> => {
     const sortieInfos: Array<{ type: 'launch' | 'return' | 'delivery'; sortieNumber: number }> = []
@@ -117,12 +137,8 @@ const MissionSiteMarker: FC<Props> = ({ node }) => {
           color={orderColor}
           textColor={isTruckDelivery ? '#ffffff' : '#000000'}
           selected={selectedNodeId === node.id}
-          onClick={() => {
-            if (!plotModeOrder && !plotModeNodes) {
-              setSelectedNodeId(selectedNodeId === node.id ? null : node.id)
-            }
-          }}
-          onRightClick={() => removeNode(node.id)}
+          onClick={handleMarkerClick}
+          onRightClick={() => { if (isFlightPlannerMode) removeNode(node.id) }}
           draggable={isDraggable}
           onDragEnd={(lat, lng) => updateNode(node.id, { lat, lng })}
         />
@@ -135,12 +151,8 @@ const MissionSiteMarker: FC<Props> = ({ node }) => {
           anchor={marker.anchor}
           color={isDroneDelivery ? '#4673bd' : 'black'}
           selected={selectedNodeId === node.id}
-          onClick={() => {
-            if (!plotModeOrder && !plotModeNodes) {
-              setSelectedNodeId(selectedNodeId === node.id ? null : node.id)
-            }
-          }}
-          onRightClick={() => removeNode(node.id)}
+          onClick={handleMarkerClick}
+          onRightClick={() => { if (isFlightPlannerMode) removeNode(node.id) }}
           draggable={isDraggable}
           onDragEnd={(lat, lng) => updateNode(node.id, { lat, lng })}
           LucideIcon={marker.icon}

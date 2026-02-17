@@ -51,6 +51,7 @@ const OrdersTable: FC<Props> = ({ orders, orderDeliveryMap, orderEtaMap, display
             return (
               <tr
                 key={order.id}
+                data-node-id={order.id}
                 className={isSelected ? 'selected' : ''}
                 onClick={() => onSelectNode?.(isSelected ? null : order.id)}
                 style={{ cursor: 'pointer' }}

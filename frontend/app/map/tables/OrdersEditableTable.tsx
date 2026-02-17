@@ -53,7 +53,7 @@ const OrdersEditableTable: FC<Props> = ({
             const isLoading = geocodingLoading.get(order.id) || false
 
             return (
-              <tr key={order.id} className={isSelected ? 'selected' : ''} onClick={() => onSelectNode?.(isSelected ? null : order.id)} style={{ cursor: 'pointer' }}>
+              <tr key={order.id} data-node-id={order.id} className={isSelected ? 'selected' : ''} onClick={() => onSelectNode?.(isSelected ? null : order.id)} style={{ cursor: 'pointer' }}>
                 <td>
                   <Badge color="green" size="1" style={{ fontWeight: 'bold' }}>
                     {order.orderId || '?'}

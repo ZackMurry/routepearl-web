@@ -1,6 +1,7 @@
 'use client'
 import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { MapContainer, TileLayer, useMapEvents, Circle, useMap } from 'react-leaflet'
+import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './flight-planner.css'
 import { Point, MissionSite } from '@/lib/types'
@@ -16,139 +17,7 @@ import classNames from 'classnames'
 import ClickHandler from './ClickHandler'
 import TruckRoutePath from './TruckRoutePath'
 import { forwardGeocode } from '@/lib/geocoding'
-import { Search, Crosshair, MapPin, Type } from 'lucide-react'
-
-function ZoomControl() {
-  const map = useMap()
-  const [zoom, setZoom] = useState(map.getZoom())
-  const [editValue, setEditValue] = useState(String(map.getZoom()))
-  const [isEditing, setIsEditing] = useState(false)
-
-  useEffect(() => {
-    const onZoom = () => {
-      const z = map.getZoom()
-      setZoom(z)
-      if (!isEditing) setEditValue(String(z))
-    }
-    map.on('zoomend', onZoom)
-    return () => { map.off('zoomend', onZoom) }
-  }, [map, isEditing])
-
-  const handleZoomIn = () => map.zoomIn(0.5)
-  const handleZoomOut = () => map.zoomOut(0.5)
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditValue(e.target.value)
-  }
-
-  const commitZoom = () => {
-    setIsEditing(false)
-    const val = parseFloat(editValue)
-    if (!isNaN(val)) {
-      const clamped = Math.min(Math.max(val, map.getMinZoom()), map.getMaxZoom())
-      map.setZoom(clamped)
-      setEditValue(String(clamped))
-    } else {
-      setEditValue(String(zoom))
-    }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      commitZoom()
-      ;(e.target as HTMLInputElement).blur()
-    } else if (e.key === 'Escape') {
-      setIsEditing(false)
-      setEditValue(String(zoom))
-      ;(e.target as HTMLInputElement).blur()
-    }
-  }
-
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        top: 12,
-        right: 12,
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 0,
-        backgroundColor: 'white',
-        borderRadius: 8,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        overflow: 'hidden',
-        border: '1px solid #e0e0e0',
-      }}
-    >
-      <button
-        onClick={handleZoomOut}
-        title="Zoom out"
-        style={{
-          width: 32,
-          height: 32,
-          border: 'none',
-          backgroundColor: 'white',
-          cursor: 'pointer',
-          fontSize: 18,
-          fontWeight: 'bold',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#374151',
-          borderRight: '1px solid #e5e7eb',
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
-      >
-        −
-      </button>
-      <input
-        type="text"
-        value={isEditing ? editValue : String(zoom)}
-        onChange={handleInputChange}
-        onFocus={() => { setIsEditing(true); setEditValue(String(zoom)) }}
-        onBlur={commitZoom}
-        onKeyDown={handleKeyDown}
-        title="Zoom level (click to edit)"
-        style={{
-          width: 44,
-          height: 32,
-          border: 'none',
-          textAlign: 'center',
-          fontSize: 13,
-          fontWeight: 500,
-          color: '#374151',
-          outline: 'none',
-          backgroundColor: isEditing ? '#f0f9ff' : 'white',
-          cursor: 'text',
-        }}
-      />
-      <button
-        onClick={handleZoomIn}
-        title="Zoom in"
-        style={{
-          width: 32,
-          height: 32,
-          border: 'none',
-          backgroundColor: 'white',
-          cursor: 'pointer',
-          fontSize: 18,
-          fontWeight: 'bold',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#374151',
-          borderLeft: '1px solid #e5e7eb',
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
-      >
-        +
-      </button>
-    </div>
-  )
-}
+import { Search, Crosshair, MapPin, Type, ZoomIn, ZoomOut } from 'lucide-react'
 
 type LocationMode = 'coords' | 'address'
 
@@ -160,8 +29,57 @@ function LocationJump() {
   const [address, setAddress] = useState('')
   const [searching, setSearching] = useState(false)
   const [error, setError] = useState('')
+  const containerRef = useRef<HTMLDivElement>(null)
   const latRef = useRef<HTMLInputElement>(null)
   const addressRef = useRef<HTMLInputElement>(null)
+
+  // Zoom state
+  const [zoom, setZoom] = useState(map.getZoom())
+  const [editingZoom, setEditingZoom] = useState(false)
+  const [zoomInputValue, setZoomInputValue] = useState('')
+  const zoomInputRef = useRef<HTMLInputElement>(null)
+  const ZOOM_MIN = map.getMinZoom()
+  const ZOOM_MAX = map.getMaxZoom()
+
+  useEffect(() => {
+    if (containerRef.current) {
+      L.DomEvent.disableClickPropagation(containerRef.current)
+      L.DomEvent.disableScrollPropagation(containerRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    const onZoom = () => setZoom(map.getZoom())
+    map.on('zoomend', onZoom)
+    return () => { map.off('zoomend', onZoom) }
+  }, [map])
+
+  useEffect(() => {
+    if (editingZoom && zoomInputRef.current) {
+      zoomInputRef.current.focus()
+      zoomInputRef.current.select()
+    }
+  }, [editingZoom])
+
+  const zoomPercent = Math.round(((zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN)) * 100)
+
+  const handleZoomIn = () => map.zoomIn(0.5)
+  const handleZoomOut = () => map.zoomOut(0.5)
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => map.setZoom(parseFloat(e.target.value))
+
+  const handleZoomTextClick = () => {
+    setZoomInputValue(String(zoomPercent))
+    setEditingZoom(true)
+  }
+
+  const commitZoomInput = () => {
+    const parsed = parseFloat(zoomInputValue)
+    if (!isNaN(parsed)) {
+      const zoomVal = ZOOM_MIN + (Math.min(Math.max(parsed, 0), 100) / 100) * (ZOOM_MAX - ZOOM_MIN)
+      map.setZoom(zoomVal)
+    }
+    setEditingZoom(false)
+  }
 
   const jumpToCoords = useCallback(() => {
     const latVal = parseFloat(lat)
@@ -220,10 +138,11 @@ function LocationJump() {
 
   return (
     <div
+      ref={containerRef}
       style={{
         position: 'absolute',
         top: 12,
-        right: 130,
+        right: 12,
         zIndex: 1000,
         display: 'flex',
         flexDirection: 'column',
@@ -263,7 +182,7 @@ function LocationJump() {
               onChange={(e) => setLat(e.target.value)}
               onKeyDown={handleKeyDown}
               style={{
-                width: 72,
+                width: 100,
                 height: 32,
                 border: 'none',
                 borderRight: '1px solid #e5e7eb',
@@ -281,7 +200,7 @@ function LocationJump() {
               onChange={(e) => setLng(e.target.value)}
               onKeyDown={handleKeyDown}
               style={{
-                width: 72,
+                width: 100,
                 height: 32,
                 border: 'none',
                 textAlign: 'center',
@@ -301,7 +220,7 @@ function LocationJump() {
             onChange={(e) => setAddress(e.target.value)}
             onKeyDown={handleKeyDown}
             style={{
-              width: 160,
+              width: 200,
               height: 32,
               border: 'none',
               fontSize: 12,
@@ -351,6 +270,88 @@ function LocationJump() {
           {error}
         </div>
       )}
+
+      {/* Zoom control row */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0,
+          backgroundColor: 'white',
+          borderRadius: 8,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          overflow: 'hidden',
+          border: '1px solid #e0e0e0',
+          height: 32,
+        }}
+      >
+        <button
+          onClick={handleZoomOut}
+          title="Zoom out"
+          style={{ ...btnStyle, borderRight: '1px solid #e5e7eb' }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+        >
+          <ZoomOut size={14} />
+        </button>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 8px' }}>
+          <input
+            type="range"
+            min={ZOOM_MIN}
+            max={ZOOM_MAX}
+            step={0.5}
+            value={zoom}
+            onChange={handleSliderChange}
+            style={{ width: '100%', cursor: 'pointer', accentColor: '#3b82f6' }}
+          />
+        </div>
+        <button
+          onClick={handleZoomIn}
+          title="Zoom in"
+          style={{ ...btnStyle, borderLeft: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb' }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+        >
+          <ZoomIn size={14} />
+        </button>
+        {editingZoom ? (
+          <input
+            ref={zoomInputRef}
+            type="text"
+            value={zoomInputValue}
+            onChange={(e) => setZoomInputValue(e.target.value)}
+            onBlur={commitZoomInput}
+            onKeyDown={(e) => { if (e.key === 'Enter') commitZoomInput() }}
+            style={{
+              width: 44,
+              height: 32,
+              border: 'none',
+              textAlign: 'center',
+              fontSize: 11,
+              fontWeight: 600,
+              color: '#374151',
+              outline: 'none',
+              padding: 0,
+            }}
+          />
+        ) : (
+          <button
+            onClick={handleZoomTextClick}
+            title="Click to type zoom %"
+            style={{
+              ...btnStyle,
+              width: 44,
+              fontSize: 11,
+              fontWeight: 600,
+              color: '#374151',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+          >
+            {zoomPercent}%
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -369,6 +370,26 @@ function MapCenterTracker() {
     onMoveEnd()
     return () => { map.off('moveend', onMoveEnd) }
   }, [map, setMapCenter])
+
+  return null
+}
+
+function FitBoundsOnLoad() {
+  const map = useMap()
+  const { missionConfig, fitBoundsCounter } = useFlightPlanner()
+
+  useEffect(() => {
+    if (fitBoundsCounter === 0) return
+
+    const points = missionConfig.nodes.map(n => [n.lat, n.lng] as [number, number])
+    if (points.length === 0) return
+
+    if (points.length === 1) {
+      map.flyTo(points[0], Math.max(map.getZoom(), 14))
+    } else {
+      map.flyToBounds(points, { padding: [50, 50], maxZoom: 16 })
+    }
+  }, [fitBoundsCounter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return null
 }
@@ -412,9 +433,9 @@ function MapContent() {
           />
 
           <ClickHandler />
-          <ZoomControl />
           <LocationJump />
           <MapCenterTracker />
+          <FitBoundsOnLoad />
 
           {/* Render mission sites */}
           {missionConfig.nodes.map(node => (
