@@ -14,11 +14,11 @@ const TruckRoutePath: FC = () => {
   return (
     <ArrowheadPolyline
       positions={truckRoute}
-      color={hasTruck ? '#000000' : '#9ca3af'}
+      color={hasTruck ? '#1e3a5f' : '#9ca3af'}
       weight={isSelected ? 6 : isDimmed || !hasTruck ? 2 : 3}
       opacity={!hasTruck ? 0.35 : isDimmed ? 0.3 : 1}
       arrowSize={14}
-      arrowRepeat={80}
+      arrowRepeat={200}
       arrowOffset='30px'
       offset={4}
     />

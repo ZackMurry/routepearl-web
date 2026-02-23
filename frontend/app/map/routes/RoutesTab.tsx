@@ -2,7 +2,7 @@
 
 import React, { FC } from 'react'
 import { Box, Card, Flex, Text, Badge, ScrollArea } from '@radix-ui/themes'
-import { Truck, Plane, Route, Clock, Package, MapPin, Zap } from 'lucide-react'
+import { Truck, Drone, Route, Clock, Package, MapPin, Zap } from 'lucide-react'
 import { RouteDetail } from './useRouteDetails'
 import { formatDistance, formatDuration } from '../timeline/timeline.types'
 
@@ -71,7 +71,7 @@ const RoutesTab: FC<Props> = ({ routes, selectedRouteId, onSelectRoute }) => {
                       {route.type === 'truck' ? (
                         <Truck size={14} style={{ color: route.color }} />
                       ) : (
-                        <Plane size={14} style={{ color: route.color }} />
+                        <Drone size={14} style={{ color: route.color }} />
                       )}
                       <Text size="2" weight="bold">
                         {route.name}

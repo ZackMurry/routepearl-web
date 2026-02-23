@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { Flex, Text } from '@radix-ui/themes'
-import { Plane, Truck } from 'lucide-react'
+import { Drone, Truck } from 'lucide-react'
 import { TimelineViewFilter } from './timeline.types'
 
 interface TimelineViewToggleProps {
@@ -18,7 +18,7 @@ interface TimelineViewToggleProps {
 export function TimelineViewToggle({ value, onChange, counts }: TimelineViewToggleProps) {
   const options: { key: TimelineViewFilter; label: string; icon?: React.ReactNode }[] = [
     { key: 'all', label: 'All' },
-    { key: 'drones', label: 'Drones', icon: <Plane size={14} /> },
+    { key: 'drones', label: 'Drones', icon: <Drone size={14} /> },
     { key: 'trucks', label: 'Trucks', icon: <Truck size={14} /> },
   ]
 

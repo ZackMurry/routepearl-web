@@ -2,7 +2,7 @@
 
 import React, { FC } from 'react'
 import { Badge, Flex, ScrollArea } from '@radix-ui/themes'
-import { Truck, Plane } from 'lucide-react'
+import { Truck, Drone } from 'lucide-react'
 import { RouteDetail } from '../routes/useRouteDetails'
 import { formatDistance, formatDuration } from '../timeline/timeline.types'
 
@@ -49,7 +49,7 @@ const RoutesTable: FC<Props> = ({ routes, selectedRouteId, onSelectRoute }) => {
                     {route.type === 'truck' ? (
                       <Truck size={13} style={{ color: route.color, flexShrink: 0 }} />
                     ) : (
-                      <Plane size={13} style={{ color: route.color, flexShrink: 0 }} />
+                      <Drone size={13} style={{ color: route.color, flexShrink: 0 }} />
                     )}
                     <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{route.name}</span>
                   </Flex>

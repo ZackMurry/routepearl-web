@@ -50,21 +50,38 @@ export function useGanttData(
 
     // Process truck events (if truck is in fleet)
     if (fleetMode === 'truck-drone' || fleetMode === 'truck-only') {
-      const truckEvents = events.filter((e) => e.vehicle === 'truck')
+      // Include drone_return events in the truck row so the recovery is visible
+      const truckEvents = events.filter(
+        (e) => e.vehicle === 'truck' || e.type === 'drone_return'
+      )
 
-      const truckStops: GanttStop[] = truckEvents.map((event, index) => ({
-        id: event.id,
-        type: mapEventTypeToStopType(event.type),
-        time: event.cumulativeTime,
-        duration: event.estimatedDuration,
-        label: event.label,
-        description: event.description,
-        orderName: event.orderName,
-        orderId: event.orderId,
-        sortieNumber: event.sortieNumber,
-        distance: event.distance,
-        nodeId: event.nodeId,
-      }))
+      const truckStops: GanttStop[] = truckEvents.map((event, index) => {
+        // For drone launch/return events on the truck row, label which drone
+        let label = event.label
+        if (event.sortieNumber) {
+          const droneNum = ((event.sortieNumber - 1) % droneCount) + 1
+          if (event.type === 'drone_return') {
+            label = `Drone ${droneNum} Return` + (event.orderName ? ` ← ${event.orderName}` : '')
+          } else if (event.type === 'truck_drone_launch') {
+            label = `Launch Drone ${droneNum}` + (event.orderName ? ` → ${event.orderName}` : '')
+          } else if (event.type === 'truck_drone_recover') {
+            label = `Recover Drone ${droneNum}` + (event.orderName ? ` ← ${event.orderName}` : '')
+          }
+        }
+        return {
+          id: event.id,
+          type: mapEventTypeToStopType(event.type),
+          time: event.cumulativeTime,
+          duration: event.estimatedDuration,
+          label,
+          description: event.description,
+          orderName: event.orderName,
+          orderId: event.orderId,
+          sortieNumber: event.sortieNumber,
+          distance: event.distance,
+          nodeId: event.nodeId,
+        }
+      })
 
       // Compute cumulative distance for truck stops
       let truckCumDist = 0

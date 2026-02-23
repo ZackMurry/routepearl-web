@@ -107,8 +107,8 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDura
         {/* Icon container */}
         <div
           style={{
-            width: `${hasOrder && (stop.type === 'launch' || stop.type === 'return') ? iconSize + 16 : iconSize + 8}px`,
-            height: `${iconSize + 8}px`,
+            width: '24px',
+            height: '24px',
             borderRadius: '4px',
             backgroundColor: getBackgroundColor(stop.type),
             display: 'flex',

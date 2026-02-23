@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import { Box, Text, Flex, ScrollArea } from '@radix-ui/themes'
-import { Route, Plane, Truck, Info, AlertCircle } from 'lucide-react'
+import { Route, Drone, Truck, Info, AlertCircle } from 'lucide-react'
 import { useFlightPlanner } from '../FlightPlannerContext'
 import { useTimelineGenerator } from './useTimelineGenerator'
 import { TimelineSummary as TimelineSummaryComponent } from './TimelineSummary'
@@ -84,7 +84,7 @@ export function TimelineTab() {
 
   // Filtered empty state
   if (filteredEvents.length === 0 && events.length > 0) {
-    const icon = viewFilter === 'drones' ? Plane : Truck
+    const icon = viewFilter === 'drones' ? Drone : Truck
     const IconComponent = icon
     const vehicleName = viewFilter === 'drones' ? 'Drone' : 'Truck'
 

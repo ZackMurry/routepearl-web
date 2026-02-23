@@ -5,6 +5,7 @@ export { default as GanttRow } from './GanttRow'
 export { default as GanttTimeAxis } from './GanttTimeAxis'
 export { default as GanttStopIcon } from './GanttStopIcon'
 export { default as GanttCurrentTimeMarker } from './GanttCurrentTimeMarker'
+export { default as GanttListView } from './GanttListView'
 
 export { useGanttData, generateEmptyGanttData } from './useGanttData'
 

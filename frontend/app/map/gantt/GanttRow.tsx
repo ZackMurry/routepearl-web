@@ -3,7 +3,7 @@
 import React, { FC } from 'react'
 import { GanttVehicle, GanttStop, GanttAxisMode } from './gantt.types'
 import GanttStopIcon from './GanttStopIcon'
-import { Truck, Plane } from 'lucide-react'
+import { Truck, Drone } from 'lucide-react'
 
 interface Props {
   vehicle: GanttVehicle
@@ -20,9 +20,21 @@ interface Props {
   onVehicleDoubleClick?: (vehicle: GanttVehicle) => void
 }
 
+const TRUCK_BLUE = '#1e3a5f'
+
+// Convert hex color to rgba with low opacity
+function vehicleTint(hex: string, alpha: number = 0.10): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
 const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDistance, axisMode, rowIndex, isGreyed = false, gridIntervalPx, onStopClick, onStopDoubleClick, onVehicleClick, onVehicleDoubleClick }) => {
-  const rowHeight = 48
+  const rowHeight = 42
   const isEven = rowIndex % 2 === 0
+  const displayColor = vehicle.type === 'truck' ? TRUCK_BLUE : vehicle.color
+  const rowTint = vehicleTint(displayColor)
 
   return (
     <div
@@ -47,7 +59,7 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDista
           gap: '8px',
           borderRight: '1px solid #d1d5db',
           backgroundColor: '#f3f4f6',
-          borderLeft: `3px solid ${vehicle.color}`,
+          borderLeft: `3px solid ${displayColor}`,
           cursor: onVehicleClick ? 'pointer' : 'default',
         }}
       >
@@ -57,14 +69,14 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDista
             width: '24px',
             height: '24px',
             borderRadius: '4px',
-            backgroundColor: vehicle.color,
+            backgroundColor: displayColor,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
           }}
         >
-          {vehicle.type === 'truck' ? <Truck size={14} /> : <Plane size={14} />}
+          {vehicle.type === 'truck' ? <Truck size={14} /> : <Drone size={14} />}
         </div>
         {/* Vehicle name */}
         <span
@@ -86,9 +98,36 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDista
         style={{
           flex: 1,
           position: 'relative',
-          backgroundColor: isGreyed ? '#f3f4f6' : isEven ? 'rgba(249,250,251,0.5)' : 'white',
         }}
       >
+        {/* Colored background strip — same height as icons (24px), centered */}
+        {!isGreyed && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: 0,
+              right: 0,
+              height: '24px',
+              transform: 'translateY(-50%)',
+              backgroundColor: rowTint,
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+        {isGreyed && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: '#f3f4f6',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
         {/* Grid lines */}
         <div
           style={{
@@ -97,7 +136,7 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDista
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundImage: 'linear-gradient(90deg, #e5e7eb 1px, transparent 1px)',
+            backgroundImage: 'linear-gradient(90deg, #9ca3af 1px, transparent 1px)',
             backgroundSize: `${gridIntervalPx}px 100%`,
             backgroundPositionX: '16px',
             pointerEvents: 'none',
@@ -110,7 +149,7 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDista
             <GanttStopIcon
               key={`${vehicle.id}-${stop.id}-${index}`}
               stop={stop}
-              vehicleColor={vehicle.color}
+              vehicleColor={displayColor}
               pixelsPerUnit={pixelsPerUnit}
               totalDuration={totalDuration}
               axisMode={axisMode}

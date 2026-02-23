@@ -2,11 +2,12 @@
 
 import React, { FC, useRef, useState, useEffect } from 'react'
 import { Box, Flex, Text, Button } from '@radix-ui/themes'
-import { Plus, FolderOpen, ZoomIn, ZoomOut, Plane, Truck, Clock, Route } from 'lucide-react'
+import { Plus, FolderOpen, ZoomIn, ZoomOut, Drone, Truck, Clock, Route, BarChart3, List } from 'lucide-react'
 import { GanttData, GanttChartState, GanttAxisMode, GanttStop, GanttVehicle, formatGanttTime, formatGanttDistance } from './gantt.types'
 import GanttTimeAxis from './GanttTimeAxis'
 import GanttRow from './GanttRow'
 import GanttCurrentTimeMarker from './GanttCurrentTimeMarker'
+import GanttListView from './GanttListView'
 
 type VehicleFilter = 'all' | 'drones' | 'trucks'
 
@@ -53,6 +54,7 @@ const GanttChart: FC<Props> = ({
   const [editingZoom, setEditingZoom] = useState(false)
   const [zoomInputValue, setZoomInputValue] = useState('')
   const [axisMode, setAxisMode] = useState<GanttAxisMode>('duration')
+  const [viewMode, setViewMode] = useState<'chart' | 'list'>('chart')
   const zoomInputRef = useRef<HTMLInputElement>(null)
 
   const ZOOM_MIN = 0.5
@@ -129,7 +131,7 @@ const GanttChart: FC<Props> = ({
   })
 
   // Row height for calculating current time marker height
-  const rowHeight = 48
+  const rowHeight = 42
   const headerHeight = 28
   const totalContentHeight = headerHeight + filteredVehicles.length * rowHeight
 
@@ -209,74 +211,106 @@ const GanttChart: FC<Props> = ({
           backgroundColor: '#f3f4f6',
         }}
       >
-        {/* Zoom control */}
+        {/* Zoom control + view toggle */}
         <Flex align="center" gap="2">
-          <ZoomOut
-            size={14}
+          {/* Zoom controls (disabled in list mode) */}
+          <Flex
+            align="center"
+            gap="2"
             style={{
-              color: zoomLevel <= ZOOM_MIN ? '#d1d5db' : '#6b7280',
-              cursor: zoomLevel <= ZOOM_MIN ? 'default' : 'pointer',
+              opacity: viewMode === 'list' ? 0.4 : 1,
+              pointerEvents: viewMode === 'list' ? 'none' : 'auto',
             }}
-            onClick={zoomOut}
-          />
-          <input
-            type="range"
-            min={ZOOM_MIN}
-            max={ZOOM_MAX}
-            step="0.1"
-            value={zoomLevel}
-            onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
-            style={{ width: '100px' }}
-          />
-          <ZoomIn
-            size={14}
-            style={{
-              color: zoomLevel >= ZOOM_MAX ? '#d1d5db' : '#6b7280',
-              cursor: zoomLevel >= ZOOM_MAX ? 'default' : 'pointer',
-            }}
-            onClick={zoomIn}
-          />
-          {editingZoom ? (
-            <input
-              ref={zoomInputRef}
-              type="text"
-              value={zoomInputValue}
-              onChange={(e) => setZoomInputValue(e.target.value)}
-              onBlur={commitZoomInput}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitZoomInput()
-                if (e.key === 'Escape') setEditingZoom(false)
-              }}
+          >
+            <ZoomOut
+              size={14}
               style={{
-                width: '48px',
-                marginLeft: '8px',
-                fontSize: '12px',
-                textAlign: 'center',
-                border: '1px solid #9ca3af',
-                borderRadius: '4px',
-                padding: '1px 4px',
-                outline: 'none',
+                color: zoomLevel <= ZOOM_MIN ? '#d1d5db' : '#6b7280',
+                cursor: zoomLevel <= ZOOM_MIN ? 'default' : 'pointer',
               }}
+              onClick={zoomOut}
             />
-          ) : (
-            <Text
-              size="1"
+            <input
+              type="range"
+              min={ZOOM_MIN}
+              max={ZOOM_MAX}
+              step="0.1"
+              value={zoomLevel}
+              disabled={viewMode === 'list'}
+              onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
+              style={{ width: '100px' }}
+            />
+            <ZoomIn
+              size={14}
               style={{
-                color: '#6b7280',
-                marginLeft: '8px',
-                cursor: 'pointer',
-                userSelect: 'none',
-                padding: '1px 4px',
-                borderRadius: '4px',
-                border: '1px solid transparent',
+                color: zoomLevel >= ZOOM_MAX ? '#d1d5db' : '#6b7280',
+                cursor: zoomLevel >= ZOOM_MAX ? 'default' : 'pointer',
               }}
-              onMouseEnter={(e: React.MouseEvent<HTMLSpanElement>) => (e.currentTarget.style.borderColor = '#d1d5db')}
-              onMouseLeave={(e: React.MouseEvent<HTMLSpanElement>) => (e.currentTarget.style.borderColor = 'transparent')}
-              onClick={handleZoomTextClick}
-            >
-              {Math.round(zoomLevel * 100)}%
-            </Text>
-          )}
+              onClick={zoomIn}
+            />
+            {editingZoom ? (
+              <input
+                ref={zoomInputRef}
+                type="text"
+                value={zoomInputValue}
+                onChange={(e) => setZoomInputValue(e.target.value)}
+                onBlur={commitZoomInput}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitZoomInput()
+                  if (e.key === 'Escape') setEditingZoom(false)
+                }}
+                style={{
+                  width: '48px',
+                  marginLeft: '8px',
+                  fontSize: '12px',
+                  textAlign: 'center',
+                  border: '1px solid #9ca3af',
+                  borderRadius: '4px',
+                  padding: '1px 4px',
+                  outline: 'none',
+                }}
+              />
+            ) : (
+              <Text
+                size="1"
+                style={{
+                  color: '#6b7280',
+                  marginLeft: '8px',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  padding: '1px 4px',
+                  borderRadius: '4px',
+                  border: '1px solid transparent',
+                }}
+                onMouseEnter={(e: React.MouseEvent<HTMLSpanElement>) => (e.currentTarget.style.borderColor = '#d1d5db')}
+                onMouseLeave={(e: React.MouseEvent<HTMLSpanElement>) => (e.currentTarget.style.borderColor = 'transparent')}
+                onClick={handleZoomTextClick}
+              >
+                {Math.round(zoomLevel * 100)}%
+              </Text>
+            )}
+          </Flex>
+
+          {/* Divider */}
+          <div style={{ width: '1px', height: '20px', backgroundColor: '#d1d5db' }} />
+
+          {/* View mode toggle */}
+          <Flex
+            align="center"
+            gap="0"
+            style={{
+              backgroundColor: '#e5e7eb',
+              borderRadius: '6px',
+              padding: '2px',
+            }}
+          >
+            <button style={segBtn(viewMode === 'chart')} onClick={() => setViewMode('chart')} title="Chart view">
+              <BarChart3 size={12} />
+            </button>
+            <button style={segBtn(viewMode === 'list')} onClick={() => setViewMode('list')} title="List view">
+              <List size={12} />
+            </button>
+          </Flex>
         </Flex>
 
         {/* Axis mode toggle */}
@@ -316,7 +350,7 @@ const GanttChart: FC<Props> = ({
           >
             {([
               { key: 'all' as VehicleFilter, label: 'All', icon: null },
-              { key: 'drones' as VehicleFilter, label: 'Drones', icon: <Plane size={12} /> },
+              { key: 'drones' as VehicleFilter, label: 'Drones', icon: <Drone size={12} /> },
               { key: 'trucks' as VehicleFilter, label: 'Trucks', icon: <Truck size={12} /> },
             ]).map((option) => {
               const isActive = vehicleFilter === option.key
@@ -346,59 +380,72 @@ const GanttChart: FC<Props> = ({
         </Text>
       </Flex>
 
-      {/* Scrollable timeline content */}
-      <Box style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
-        <Box style={{ minWidth: `${timelineWidth + 150}px` }}>
-          {/* Time/Distance axis */}
-          <Flex>
-            {/* Empty space for label column */}
-            <Box style={{ width: '150px', minWidth: '150px', backgroundColor: '#f3f4f6', borderRight: '1px solid #d1d5db' }} />
-            {/* Axis */}
-            <Box style={{ flex: 1, position: 'relative' }}>
-              <GanttTimeAxis
-                totalDuration={data.totalDuration}
-                totalDistance={data.totalDistance}
-                axisMode={axisMode}
-                zoomLevel={zoomLevel}
-                width={timelineWidth}
-              />
-            </Box>
-          </Flex>
-
-          {/* Vehicle rows */}
-          <Box style={{ position: 'relative' }}>
-            {filteredVehicles.map((vehicle, index) => (
-              <GanttRow
-                key={vehicle.id}
-                vehicle={vehicle}
-                pixelsPerUnit={pixelsPerUnit}
-                totalDuration={data.totalDuration}
-                totalDistance={data.totalDistance}
-                axisMode={axisMode}
-                rowIndex={index}
-                isGreyed={state === 'empty-fleet'}
-                gridIntervalPx={gridIntervalPx}
-                onStopClick={onStopClick}
-                onStopDoubleClick={onStopDoubleClick}
-                onVehicleClick={onVehicleClick}
-                onVehicleDoubleClick={onVehicleDoubleClick}
-              />
-            ))}
-
-            {/* Current time marker - only show during mission in duration mode */}
-            {currentTime > 0 && (
-              <Box style={{ position: 'absolute', top: 0, left: '150px', right: 0, height: '100%', pointerEvents: 'none' }}>
-                <GanttCurrentTimeMarker
-                  currentTime={currentTime}
-                  pixelsPerSecond={isDistanceMode ? 0 : pixelsPerUnit}
-                  height={filteredVehicles.length * rowHeight}
+      {/* Content area — chart or list */}
+      {viewMode === 'chart' ? (
+        <Box style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+          <Box style={{ minWidth: `${timelineWidth + 150}px` }}>
+            {/* Time/Distance axis */}
+            <Flex>
+              {/* Empty space for label column */}
+              <Box style={{ width: '150px', minWidth: '150px', backgroundColor: '#f3f4f6', borderRight: '1px solid #d1d5db' }} />
+              {/* Axis */}
+              <Box style={{ flex: 1, position: 'relative' }}>
+                <GanttTimeAxis
+                  totalDuration={data.totalDuration}
+                  totalDistance={data.totalDistance}
                   axisMode={axisMode}
+                  zoomLevel={zoomLevel}
+                  width={timelineWidth}
                 />
               </Box>
-            )}
+            </Flex>
+
+            {/* Vehicle rows */}
+            <Box style={{ position: 'relative' }}>
+              {filteredVehicles.map((vehicle, index) => (
+                <GanttRow
+                  key={vehicle.id}
+                  vehicle={vehicle}
+                  pixelsPerUnit={pixelsPerUnit}
+                  totalDuration={data.totalDuration}
+                  totalDistance={data.totalDistance}
+                  axisMode={axisMode}
+                  rowIndex={index}
+                  isGreyed={state === 'empty-fleet'}
+                  gridIntervalPx={gridIntervalPx}
+                  onStopClick={onStopClick}
+                  onStopDoubleClick={onStopDoubleClick}
+                  onVehicleClick={onVehicleClick}
+                  onVehicleDoubleClick={onVehicleDoubleClick}
+                />
+              ))}
+
+              {/* Current time marker - only show during mission in duration mode */}
+              {currentTime > 0 && (
+                <Box style={{ position: 'absolute', top: 0, left: '150px', right: 0, height: '100%', pointerEvents: 'none' }}>
+                  <GanttCurrentTimeMarker
+                    currentTime={currentTime}
+                    pixelsPerSecond={isDistanceMode ? 0 : pixelsPerUnit}
+                    height={filteredVehicles.length * rowHeight}
+                    axisMode={axisMode}
+                  />
+                </Box>
+              )}
+            </Box>
           </Box>
         </Box>
-      </Box>
+      ) : (
+        <Box style={{ flex: 1, overflow: 'hidden' }}>
+          <GanttListView
+            vehicles={filteredVehicles}
+            axisMode={axisMode}
+            onStopClick={onStopClick}
+            onStopDoubleClick={onStopDoubleClick}
+            onVehicleClick={onVehicleClick}
+            onVehicleDoubleClick={onVehicleDoubleClick}
+          />
+        </Box>
+      )}
 
       {/* Empty state message for greyed-out fleet */}
       {state === 'empty-fleet' && (

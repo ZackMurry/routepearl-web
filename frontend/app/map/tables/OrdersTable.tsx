@@ -2,7 +2,7 @@
 
 import React, { FC } from 'react'
 import { Badge, Flex, ScrollArea } from '@radix-ui/themes'
-import { MapPin, Plane, Truck } from 'lucide-react'
+import { MapPin, Drone, Truck } from 'lucide-react'
 import { MissionSite } from '@/lib/types'
 import { formatDistance, formatDuration } from '../timeline/timeline.types'
 
@@ -74,7 +74,7 @@ const OrdersTable: FC<Props> = ({ orders, orderDeliveryMap, orderEtaMap, display
                 <td>
                   {vehicle === 'drone' ? (
                     <Badge size="1" variant="soft" style={{ backgroundColor: '#fef9c3', color: '#a16207' }}>
-                      <Flex align="center" gap="1"><Plane size={10} /> Drone</Flex>
+                      <Flex align="center" gap="1"><Drone size={10} /> Drone</Flex>
                     </Badge>
                   ) : vehicle === 'truck' ? (
                     <Badge size="1" variant="soft" style={{ backgroundColor: '#dbeafe', color: '#1d4ed8' }}>

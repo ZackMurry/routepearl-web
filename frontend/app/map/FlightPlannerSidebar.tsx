@@ -31,6 +31,7 @@ import {
   Pause,
   Square,
   Upload,
+  FolderOpen,
   Download,
   ArrowUp,
   ArrowDown,
@@ -43,7 +44,7 @@ import {
   AlertCircle,
   Package,
   Truck,
-  Plane,
+  Drone,
 } from 'lucide-react'
 import { MissionSite, HazardZone, RoutingAlgorithm } from '@/lib/types'
 import { forwardGeocode, seedAddressCache, parseCSVLine, isLatLng, csvTagToNodeType, nodeTypeToCsvTag, csvQuote } from '@/lib/geocoding'
@@ -352,7 +353,7 @@ export function FlightPlannerSidebar() {
                     border: `1.5px solid ${fleetMode === 'truck-only' ? '#d1d5db' : droneRoutes.length > 0 ? '#3b82f6' : '#d1d5db'}`,
                   }}
                 >
-                  <Plane size={14} style={{ color: fleetMode === 'truck-only' ? '#d1d5db' : droneRoutes.length > 0 ? '#3b82f6' : '#9ca3af' }} />
+                  <Drone size={14} style={{ color: fleetMode === 'truck-only' ? '#d1d5db' : droneRoutes.length > 0 ? '#3b82f6' : '#9ca3af' }} />
                 </div>
                 {/* Order points */}
                 <div
@@ -412,7 +413,7 @@ export function FlightPlannerSidebar() {
                 title='Load Flight Plan'
                 style={{ cursor: 'pointer' }}
               >
-                <Upload size={20} />
+                <FolderOpen size={20} />
               </IconButton>
 
               <div style={{ borderTop: '1px solid #e5e7eb', margin: '4px 0' }} />
@@ -586,7 +587,7 @@ export function FlightPlannerSidebar() {
                       onClick={handleImportFlightPlan}
                       disabled={missionLaunched}
                     >
-                      <Upload size={16} /> Load Flight Plan
+                      <FolderOpen size={16} /> Load Flight Plan
                     </Button>
                   </Flex>
                 </Box>
@@ -953,7 +954,7 @@ export function FlightPlannerSidebar() {
                   >
                     <Select.Trigger />
                     <Select.Content>
-                      <Select.Item value='alns'>ALNS (Adaptive Large Neighborhood Search)</Select.Item>
+                      <Select.Item value='alns'>Default Routing Engine</Select.Item>
                       <Select.Item value='custom'>Custom</Select.Item>
                     </Select.Content>
                   </Select.Root>

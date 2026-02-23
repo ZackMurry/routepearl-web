@@ -62,4 +62,7 @@ declare module 'lucide-react' {
   export const Crosshair: LucideIcon
   export const Calendar: LucideIcon
   export const Type: LucideIcon
+  export const Drone: LucideIcon
+  export const BarChart3: LucideIcon
+  export const List: LucideIcon
 }

@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { Box, Card, Text, Flex, Progress } from '@radix-ui/themes'
-import { Clock, Route, Package, Plane, Truck } from 'lucide-react'
+import { Clock, Route, Package, Drone, Truck } from 'lucide-react'
 import { TimelineSummary as TimelineSummaryType, TimelineViewFilter, formatDuration, formatDistance } from './timeline.types'
 
 interface TimelineSummaryProps {
@@ -112,7 +112,7 @@ export function TimelineSummary({ summary, viewFilter }: TimelineSummaryProps) {
             {viewFilter === 'all' && (
               <Flex gap="2">
                 <Flex align="center" gap="1">
-                  <Plane size={10} className="text-blue-500" />
+                  <Drone size={10} className="text-blue-500" />
                   <Text size="1" color="gray">
                     {summary.droneDeliveries}
                   </Text>

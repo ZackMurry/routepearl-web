@@ -3,7 +3,7 @@
 import React from 'react'
 import { Box, Text, Badge, Flex } from '@radix-ui/themes'
 import {
-  Plane,
+  Drone,
   Truck,
   Package,
   MapPin,
@@ -37,7 +37,7 @@ function getEventIcon(event: TimelineEventType) {
     case 'drone_launch':
       return (
         <div className="relative">
-          <Plane size={iconSize} className={droneColor} />
+          <Drone size={iconSize} className={droneColor} />
           <ArrowUp size={10} className={`absolute -top-1 -right-1 ${droneColor}`} />
         </div>
       )
@@ -51,7 +51,7 @@ function getEventIcon(event: TimelineEventType) {
     case 'drone_return':
       return (
         <div className="relative">
-          <Plane size={iconSize} className={droneColor} />
+          <Drone size={iconSize} className={droneColor} />
           <ArrowDown size={10} className={`absolute -bottom-1 -right-1 ${droneColor}`} />
         </div>
       )

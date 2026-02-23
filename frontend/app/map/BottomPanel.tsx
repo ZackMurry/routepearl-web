@@ -23,13 +23,14 @@ import {
   X,
   LogOut,
   Route,
+  Map as MapIcon,
   FolderOpen,
   ArrowUp,
   ArrowDown,
   MousePointer2,
   Package,
   Truck,
-  Plane,
+  Drone,
   House,
   Zap,
   AlertTriangle,
@@ -1298,7 +1299,7 @@ export function BottomPanel() {
                   >
                     <Flex align="center" gap="2">
                       <Truck size={16} />
-                      <Plane size={16} />
+                      <Drone size={16} />
                       <Text size="2">1 Truck + Drones</Text>
                     </Flex>
                     <TextField.Root
@@ -1333,7 +1334,7 @@ export function BottomPanel() {
                     disabled={hasRoute}
                   >
                     <Flex align="center" gap="2">
-                      <Plane size={16} />
+                      <Drone size={16} />
                       <Text size="2">Drones Only</Text>
                     </Flex>
                     <TextField.Root
@@ -1460,8 +1461,8 @@ export function BottomPanel() {
                 <Flex align="center" justify="between" className="px-4 pt-2">
                   <Tabs.List style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
                     <Tabs.Trigger value="gantt">
-                      <Route size={16} className="mr-1" />
-                      Gantt Chart
+                      <MapIcon size={16} className="mr-1" />
+                      Itinerary
                     </Tabs.Trigger>
                     <Tabs.Trigger value="orders">
                       <MapPin size={16} className="mr-1" />
@@ -1495,7 +1496,7 @@ export function BottomPanel() {
                   )}
                 </Flex>
 
-                {/* Tab 1: Gantt Chart */}
+                {/* Tab 1: Itinerary */}
                 <Tabs.Content value="gantt" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
                   <GanttChart
                     data={ganttData}
@@ -1619,7 +1620,7 @@ export function BottomPanel() {
                                     }}
                                   >
                                     <Flex align="center" gap="1">
-                                      {vehicle === 'drone' ? <Plane size={10} /> : <Truck size={10} />}
+                                      {vehicle === 'drone' ? <Drone size={10} /> : <Truck size={10} />}
                                       Delivered by {vehicle === 'drone' ? 'Drone' : 'Truck'}
                                     </Flex>
                                   </Badge>
@@ -1875,8 +1876,8 @@ export function BottomPanel() {
             <Flex align="center" justify="between" className="px-4 pt-2">
               <Tabs.List style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
                 <Tabs.Trigger value="gantt">
-                  <Route size={16} className="mr-1" />
-                  Gantt Chart
+                  <MapIcon size={16} className="mr-1" />
+                  Itinerary
                 </Tabs.Trigger>
                 <Tabs.Trigger value="orders">
                   <MapPin size={16} className="mr-1" />
@@ -1910,7 +1911,7 @@ export function BottomPanel() {
               )}
             </Flex>
 
-            {/* Tab 1: Gantt Chart */}
+            {/* Tab 1: Itinerary */}
             <Tabs.Content value="gantt" className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
               <GanttChart
                 data={ganttData}
@@ -2034,7 +2035,7 @@ export function BottomPanel() {
                                 }}
                               >
                                 <Flex align="center" gap="1">
-                                  {vehicle === 'drone' ? <Plane size={10} /> : <Truck size={10} />}
+                                  {vehicle === 'drone' ? <Drone size={10} /> : <Truck size={10} />}
                                   Delivered by {vehicle === 'drone' ? 'Drone' : 'Truck'}
                                 </Flex>
                               </Badge>
@@ -2272,16 +2273,12 @@ function MissionStatsBar({
         <Text size="1" weight="medium">{hazardCount}</Text>
       </Flex>
       <Box className="w-px h-4 bg-gray-300" />
-      <Flex gap="1" align="center" title="Algorithm">
-        <Settings size={14} className="text-gray-500" />
-        <Text size="1" weight="medium">{missionConfig.algorithm.toUpperCase()}</Text>
-      </Flex>
       {/* Fleet display */}
       <Flex gap="1" align="center" title={!hasRoute ? 'No route generated' : hasTruck ? 'Truck active' : 'Truck disabled'} style={{ opacity: !hasRoute || !hasTruck ? 0.35 : 1 }}>
         <Truck size={14} style={{ color: hasRoute && hasTruck ? '#374151' : '#9ca3af' }} />
       </Flex>
       <Flex gap="1" align="center" title={!hasRoute ? 'No route generated' : hasDrones ? `${droneCount} drone(s)` : 'Drones disabled'} style={{ opacity: !hasRoute || !hasDrones ? 0.35 : 1 }}>
-        <Plane size={14} style={{ color: hasRoute && hasDrones ? '#3b82f6' : '#9ca3af' }} />
+        <Drone size={14} style={{ color: hasRoute && hasDrones ? '#3b82f6' : '#9ca3af' }} />
         <Text size="1" weight="medium" style={{ color: hasRoute && hasDrones ? undefined : '#9ca3af' }}>
           {hasRoute && hasDrones ? droneCount : '-'}
         </Text>
@@ -2299,7 +2296,7 @@ function MissionStatsBar({
               <Text size="1" weight="medium" style={{ color: hasTruck ? undefined : '#9ca3af' }}>{hasTruck ? formatDistanceTimeline(timelineSummary.truckDistance) : '--'}</Text>
             </Flex>
           <Flex gap="1" align="center" title="Drone distance" style={{ opacity: hasDrones ? 1 : 0.35 }}>
-              <Plane size={12} style={{ color: hasDrones ? '#3b82f6' : '#9ca3af' }} />
+              <Drone size={12} style={{ color: hasDrones ? '#3b82f6' : '#9ca3af' }} />
               <Text size="1" weight="medium" style={{ color: hasDrones ? undefined : '#9ca3af' }}>{hasDrones ? formatDistanceTimeline(timelineSummary.droneDistance) : '--'}</Text>
             </Flex>
           <Flex gap="1" align="center" title="Deliveries (drone / truck)">
@@ -2315,7 +2312,7 @@ function MissionStatsBar({
                 }}
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: 2, opacity: hasDrones ? 1 : 0.35 }}>
-                  <Plane size={11} style={{ color: hasDrones ? '#3b82f6' : '#9ca3af' }} />
+                  <Drone size={11} style={{ color: hasDrones ? '#3b82f6' : '#9ca3af' }} />
                   <Text size="1" weight="medium" style={{ color: hasDrones ? undefined : '#9ca3af' }}>{hasDrones ? (droneDeliveriesProp ?? timelineSummary.droneDeliveries) : '-'}</Text>
                 </span>
                 <Text size="1" style={{ color: '#cbd5e1' }}>/</Text>

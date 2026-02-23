@@ -7,7 +7,7 @@ import TextMarker from '@/components/TextMarker'
 import NumberedMarker from '@/components/NumberedMarker'
 import { useFlightPlanner } from './FlightPlannerContext'
 import { HAZARD_COLORS, NODE_COLORS } from '@/lib/constants'
-import { Circle as LucideCircle, House, LucideIcon, LucideProps, MapPin, Zap } from 'lucide-react'
+import { Circle as LucideCircle, Warehouse, LucideIcon, LucideProps, MapPin, Zap } from 'lucide-react'
 
 interface Props {
   node: MissionSite
@@ -46,7 +46,7 @@ const MissionSiteMarker: FC<Props> = ({ node }) => {
   // Order circle color: yellow=drone, blue=truck, white=unrouted
   const orderColor = isDroneDelivery ? '#facc15' : isTruckDelivery ? '#3b82f6' : '#ffffff'
 
-  const isDraggable = !plotModeOrder && !plotModeNodes
+  const isDraggable = isFlightPlannerMode && !plotModeOrder && !plotModeNodes
 
   // Manual double-click detection via click timing
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -91,7 +91,7 @@ const MissionSiteMarker: FC<Props> = ({ node }) => {
   const allSortieInfo = getAllSortieInfo(node)
   const marker: Marker | null = {
     depot: {
-      icon: ((props: LucideProps) => <House fill='black' {...props} />) as LucideIcon,
+      icon: ((props: LucideProps) => <Warehouse fill='#9ca3af' color='black' {...props} />) as LucideIcon,
       anchor: [0.5, 0.5] as [number, number],
       size: 16,
     },
