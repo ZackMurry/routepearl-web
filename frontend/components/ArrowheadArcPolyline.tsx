@@ -299,7 +299,7 @@ export default function SortieArcPaths({
           color,
           weight,
           opacity,
-          dashArray: dashed ? dashArray ?? '8 8' : undefined,
+          dashArray: dashed ? dashArray ?? '4 6' : undefined,
           dashOffset,
         }).addTo(map)
         layers.push(strokeLine)
@@ -314,16 +314,16 @@ export default function SortieArcPaths({
       layers.push(guideLine)
 
       try {
-        // Arrow style configuration
+        // Drone arrows: colored fill matching the route line
         const arrowStyle = {
           pixelSize: arrowSize,
-          headAngle: 40,
+          headAngle: 35,
           polygon: true,
           pathOptions: {
-            color: '#000',
-            weight: 2,
+            color: '#e8e8e8',
+            weight: 1.5,
             fill: true,
-            fillColor: '#ffffff',
+            fillColor: '#000000',
             fillOpacity: 1.0,
             opacity: 1,
           },

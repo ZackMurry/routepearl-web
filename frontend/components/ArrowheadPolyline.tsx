@@ -145,13 +145,13 @@ export default function ArrowheadPolyline({
             repeat: arrowRepeat,
             symbol: L_extended.Symbol.arrowHead({
               pixelSize: arrowSize,
-              headAngle: 40,
+              headAngle: 35,
               polygon: true,
               pathOptions: {
-                color: '#000',
-                weight: 2,
+                color: '#000000',
+                weight: 1.5,
                 fill: true,
-                fillColor: '#ffffff',
+                fillColor: '#e8e8e8',
                 fillOpacity: 1.0,
                 opacity: 1,
               },

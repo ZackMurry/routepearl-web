@@ -93,7 +93,7 @@ const MissionSiteMarker: FC<Props> = ({ node }) => {
     depot: {
       icon: ((props: LucideProps) => <Warehouse fill='#9ca3af' color='black' {...props} />) as LucideIcon,
       anchor: [0.5, 0.5] as [number, number],
-      size: 16,
+      size: 20,
     },
     order: {
       icon: ((props: LucideProps) => <LucideCircle {...props} fill='#f9e912' />) as LucideIcon,
@@ -157,6 +157,30 @@ const MissionSiteMarker: FC<Props> = ({ node }) => {
           onDragEnd={(lat, lng) => updateNode(node.id, { lat, lng })}
           LucideIcon={marker.icon}
           size={marker.size ?? 24}
+        />
+      )}
+
+      {/* Site ID badge for non-order nodes */}
+      {node.type !== 'order' && node.type !== 'hazard' && node.siteId != null && (
+        <TextMarker
+          position={[node.lat, node.lng]}
+          text={`${node.siteId}`}
+          offset={[4, -17]}
+          style={{
+            backgroundColor: '#1f2937',
+            color: 'white',
+            width: '11px',
+            height: '11px',
+            borderRadius: '50%',
+            fontSize: '7px',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 3px',
+            lineHeight: '1',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+          }}
         />
       )}
 

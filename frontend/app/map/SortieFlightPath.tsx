@@ -13,8 +13,8 @@ const SortieFlightPath: FC<Props> = ({ sortie, sortieIndex }) => {
   const isFinalSortie = sortieIndex === droneRoutes.length - 1
   if (sortie.length < 3) return <></>
 
-  // Each sortie gets a distinct color from the palette
-  const sortieColors = ['#3b82f6', '#8b5cf6', '#ec4899', '#ef4444', '#06b6d4', '#6366f1', '#d946ef']
+  // Each sortie gets a distinct warm color from the palette
+  const sortieColors = ['#ef4444', '#f97316', '#f59e0b', '#ea580c', '#e11d48', '#dc2626', '#d97706']
   const sortieColor = sortieColors[sortieIndex % sortieColors.length]
 
   const routeId = `drone-${sortieIndex + 1}`
