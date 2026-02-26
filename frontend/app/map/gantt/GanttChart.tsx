@@ -245,7 +245,7 @@ const GanttChart: FC<Props> = ({
               value={zoomLevel}
               disabled={viewMode === 'list'}
               onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
-              style={{ width: '100px' }}
+              style={{ width: '100px', cursor: 'pointer', accentColor: '#3b82f6' }}
             />
             <ZoomIn
               size={14}
