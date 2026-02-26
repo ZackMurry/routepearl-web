@@ -3,7 +3,7 @@
 import React, { FC } from 'react'
 import { ScrollArea } from '@radix-ui/themes'
 import { GanttVehicle, GanttStop, GanttStopType, GanttAxisMode, getStopColor, formatGanttTime, formatGanttDistance } from './gantt.types'
-import { House, Package, ArrowUp, ArrowDown, Zap, Truck, Drone } from 'lucide-react'
+import { House, Package, ArrowUp, ArrowDown, Zap, Truck, Drone, LayoutList } from 'lucide-react'
 
 interface Props {
   vehicles: GanttVehicle[]
@@ -87,7 +87,7 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, onStopClick, onStopDoubl
                     flexShrink: 0,
                   }}
                 >
-                  {vehicle.type === 'truck' ? <Truck size={14} /> : <Drone size={14} />}
+                  {vehicle.type === 'all' ? <LayoutList size={14} /> : vehicle.type === 'truck' ? <Truck size={14} /> : <Drone size={14} />}
                 </div>
                 <span style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>
                   {vehicle.name}

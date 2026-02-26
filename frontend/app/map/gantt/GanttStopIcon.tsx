@@ -21,9 +21,9 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDura
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const iconRef = useRef<HTMLDivElement>(null)
 
-  // Position based on axis mode
+  // Position based on axis mode, with optional pixel nudge for overlapping stops
   const unitValue = axisMode === 'distance' ? (stop.cumulativeDistance || 0) : stop.time
-  const leftPosition = unitValue * pixelsPerUnit + 16
+  const leftPosition = unitValue * pixelsPerUnit + 16 + (stop.pixelOffset || 0)
 
   // Icon size
   const iconSize = 16
@@ -72,7 +72,7 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDura
       case 'depot':
         return '#374151' // gray-700
       case 'delivery':
-        return vehicleColor // Use vehicle's color for deliveries
+        return stop.vehicleColor || vehicleColor // Use source vehicle color in "All" row
       case 'launch':
         return '#f97316' // orange
       case 'return':
@@ -192,6 +192,23 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDura
           {stop.sortieNumber && (
             <div style={{ color: '#a78bfa', marginTop: '2px' }}>
               Sortie #{stop.sortieNumber}
+            </div>
+          )}
+          {stop.vehicleName && (
+            <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '2px',
+                  backgroundColor: stop.vehicleColor || '#6b7280',
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ color: '#d1d5db', fontSize: '11px' }}>
+                {stop.vehicleName}
+              </span>
             </div>
           )}
           {stop.description && (

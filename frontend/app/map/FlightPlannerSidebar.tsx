@@ -81,6 +81,7 @@ export function FlightPlannerSidebar() {
     generateRoute,
     isGeneratingRoute,
     hasUnassignedWaypoints,
+    hasUnroutedNodes,
     fleetMode,
   } = useFlightPlanner()
 
@@ -422,9 +423,9 @@ export function FlightPlannerSidebar() {
                 size='3'
                 variant='soft'
                 color='green'
-                disabled={!missionConfig.nodes.length || (truckRoute.length === 0 && droneRoutes.length === 0) || missionLaunched}
+                disabled={!missionConfig.nodes.length || (truckRoute.length === 0 && droneRoutes.length === 0) || hasUnroutedNodes || missionLaunched}
                 onClick={launchMission}
-                title='Launch Mission'
+                title={hasUnroutedNodes ? 'Unrouted points exist — generate a new route or remove them' : 'Launch Mission'}
                 style={{ cursor: 'pointer' }}
               >
                 <Play size={20} />
@@ -487,7 +488,7 @@ export function FlightPlannerSidebar() {
                   <Route size={14} style={{ color: truckRoute.length > 0 || droneRoutes.length > 0 ? '#22c55e' : missionConfig.nodes.length > 0 ? '#f97316' : '#9ca3af' }} />
                 </div>
                 <div
-                  title={`Mission: ${missionLaunched ? (missionPaused ? 'Paused' : 'Active') : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'Ready' : 'Not Ready'}`}
+                  title={`Mission: ${missionLaunched ? (missionPaused ? 'Paused' : 'Active') : hasUnroutedNodes ? 'Unready — unrouted points exist' : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'Ready' : 'Not Ready'}`}
                   style={{
                     width: 28,
                     height: 28,
@@ -495,11 +496,11 @@ export function FlightPlannerSidebar() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: missionLaunched ? (missionPaused ? 'rgba(249, 115, 22, 0.1)' : 'rgba(34, 197, 94, 0.1)') : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'rgba(59, 130, 246, 0.1)' : '#f3f4f6',
-                    border: `1.5px solid ${missionLaunched ? (missionPaused ? '#f97316' : '#22c55e') : (truckRoute.length > 0 || droneRoutes.length > 0) ? '#3b82f6' : '#d1d5db'}`,
+                    backgroundColor: missionLaunched ? (missionPaused ? 'rgba(249, 115, 22, 0.1)' : 'rgba(34, 197, 94, 0.1)') : hasUnroutedNodes ? 'rgba(239, 68, 68, 0.1)' : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'rgba(59, 130, 246, 0.1)' : '#f3f4f6',
+                    border: `1.5px solid ${missionLaunched ? (missionPaused ? '#f97316' : '#22c55e') : hasUnroutedNodes ? '#ef4444' : (truckRoute.length > 0 || droneRoutes.length > 0) ? '#3b82f6' : '#d1d5db'}`,
                   }}
                 >
-                  <Play size={14} style={{ color: missionLaunched ? (missionPaused ? '#f97316' : '#22c55e') : (truckRoute.length > 0 || droneRoutes.length > 0) ? '#3b82f6' : '#9ca3af' }} />
+                  <Play size={14} style={{ color: missionLaunched ? (missionPaused ? '#f97316' : '#22c55e') : hasUnroutedNodes ? '#ef4444' : (truckRoute.length > 0 || droneRoutes.length > 0) ? '#3b82f6' : '#9ca3af' }} />
                 </div>
               </Flex>
             </>
@@ -608,9 +609,11 @@ export function FlightPlannerSidebar() {
                       disabled={
                         !missionConfig.nodes.length ||
                         (truckRoute.length === 0 && droneRoutes.length === 0) ||
+                        hasUnroutedNodes ||
                         missionLaunched
                       }
                       onClick={launchMission}
+                      title={hasUnroutedNodes ? 'Unrouted points exist — generate a new route or remove them' : undefined}
                     >
                       <Play size={14} /> Launch
                     </Button>
@@ -704,10 +707,10 @@ export function FlightPlannerSidebar() {
                       </Flex>
                       <Badge
                         size='1'
-                        color={missionLaunched ? (missionPaused ? 'orange' : 'green') : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'blue' : 'gray'}
-                        variant={missionLaunched ? 'solid' : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'soft' : 'outline'}
+                        color={missionLaunched ? (missionPaused ? 'orange' : 'green') : hasUnroutedNodes ? 'red' : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'blue' : 'gray'}
+                        variant={missionLaunched ? 'solid' : hasUnroutedNodes ? 'soft' : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'soft' : 'outline'}
                       >
-                        {missionLaunched ? (missionPaused ? 'Paused' : 'Active') : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'Ready' : 'Not Ready'}
+                        {missionLaunched ? (missionPaused ? 'Paused' : 'Active') : hasUnroutedNodes ? 'Unready' : (truckRoute.length > 0 || droneRoutes.length > 0) ? 'Ready' : 'Not Ready'}
                       </Badge>
                     </Flex>
                   </Box>

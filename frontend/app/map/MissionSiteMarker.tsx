@@ -165,7 +165,7 @@ const MissionSiteMarker: FC<Props> = ({ node }) => {
         <TextMarker
           position={[node.lat, node.lng]}
           text={`${node.siteId}`}
-          offset={[4, -17]}
+          offset={node.type === 'waypoint' ? [4, -30] : [4, -17]}
           style={{
             backgroundColor: '#1f2937',
             color: 'white',

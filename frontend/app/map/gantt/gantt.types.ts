@@ -4,7 +4,7 @@
 export type GanttStopType = 'depot' | 'delivery' | 'launch' | 'return' | 'charging' | 'travel'
 
 // Vehicle type
-export type GanttVehicleType = 'truck' | 'drone'
+export type GanttVehicleType = 'all' | 'truck' | 'drone'
 
 // Axis mode for toggling between duration and distance
 export type GanttAxisMode = 'duration' | 'distance'
@@ -23,6 +23,9 @@ export interface GanttStop {
   distance?: number // Distance of this segment in meters
   cumulativeDistance?: number // Cumulative distance from mission start in meters
   nodeId?: string // Original MissionSite node ID for map selection
+  pixelOffset?: number // Horizontal pixel nudge for overlapping stops in the "All" row
+  vehicleName?: string // Source vehicle name (set on "All" row stops)
+  vehicleColor?: string // Source vehicle color (set on "All" row stops)
 }
 
 // Vehicle row data
@@ -49,7 +52,8 @@ export type GanttChartState = 'no-plan' | 'empty-fleet' | 'loaded'
 
 // Color constants - matching route colors from SortieFlightPath.tsx
 export const GANTT_COLORS = {
-  truck: '#000000', // Black for truck
+  all: '#4b5563', // gray-600 for combined "All" row
+  truck: '#1e3a8a', // Dark blue for truck
   sortieColors: [
     '#3b82f6', // blue
     '#8b5cf6', // purple

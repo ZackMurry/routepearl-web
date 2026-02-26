@@ -31,7 +31,7 @@ const SortieFlightPath: FC<Props> = ({ sortie, sortieIndex }) => {
           outboundColor={sortieColor}
           weight={isSelected ? 6 : isDimmed ? 2 : 4}
           opacity={isDimmed ? 0.3 : 1}
-          arrowSize={isFinalSortie ? 14 : 12}
+          arrowSize={12}
           arrowRepeat={0}
           arrowOffset='100%'
           curvature={0.22}

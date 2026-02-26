@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react'
 import { Mission, MissionConfig, MissionStatus, MissionSite, HazardZone, Point } from '@/lib/types'
+import { pointMatchesNode } from '@/lib/util'
 
 interface FlightPlannerContextType {
   // Mission state
@@ -71,6 +72,7 @@ interface FlightPlannerContextType {
   generateRoute: () => Promise<void>
   isGeneratingRoute: boolean
   hasUnassignedWaypoints: boolean
+  hasUnroutedNodes: boolean
 
   // Mission launch
   missionLaunched: boolean
@@ -498,6 +500,31 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   // Generate route using backend API
   const hasUnassignedWaypoints = missionConfig.nodes.some((n) => n.type === 'waypoint')
 
+  // Check if any routable nodes aren't covered by the current routes
+  const hasUnroutedNodes = React.useMemo(() => {
+    const hasRoute = truckRoute.length > 0 || droneRoutes.length > 0
+    if (!hasRoute) return false // No route yet — not "unrouted", just not generated
+
+    // All route points (truck + drone delivery points)
+    const routableNodes = missionConfig.nodes.filter(
+      (n) => n.type === 'order' || n.type === 'depot' || n.type === 'station'
+    )
+
+    return routableNodes.some((node) => {
+      // Check truck route
+      const inTruck = truckRoute.some((pt) => pointMatchesNode(pt, node))
+      if (inTruck) return false
+
+      // Check drone routes (delivery point is index 1 in each sortie)
+      const inDrone = droneRoutes.some((sortie) =>
+        sortie.some((pt) => pointMatchesNode(pt, node))
+      )
+      if (inDrone) return false
+
+      return true // This node is unrouted
+    })
+  }, [missionConfig.nodes, truckRoute, droneRoutes])
+
   const generateRoute = async () => {
     if (missionConfig.nodes.length < 2 || hasUnassignedWaypoints) {
       updateMissionConfig({ routes: undefined })
@@ -628,6 +655,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     generateRoute,
     isGeneratingRoute,
     hasUnassignedWaypoints,
+    hasUnroutedNodes,
     missionLaunched,
     missionPaused,
     launchMission,

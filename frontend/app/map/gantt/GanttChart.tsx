@@ -55,6 +55,7 @@ const GanttChart: FC<Props> = ({
   const [zoomInputValue, setZoomInputValue] = useState('')
   const [axisMode, setAxisMode] = useState<GanttAxisMode>('duration')
   const [viewMode, setViewMode] = useState<'chart' | 'list'>('chart')
+  const [showAllRow, setShowAllRow] = useState(true)
   const zoomInputRef = useRef<HTMLInputElement>(null)
 
   const ZOOM_MIN = 0.5
@@ -109,14 +110,18 @@ const GanttChart: FC<Props> = ({
   }, [])
 
   // Calculate timeline width based on zoom
-  const timelineWidth = containerWidth * zoomLevel
+  // The scale width drives marker positioning; the track adds right padding
+  // so the last marker (16px base offset + 12px icon half) doesn't hang on white.
+  const TRACK_PAD_RIGHT = 32
+  const scaleWidth = containerWidth * zoomLevel
+  const timelineWidth = scaleWidth + TRACK_PAD_RIGHT
 
-  // Compute pixels per unit based on axis mode
+  // Compute pixels per unit based on axis mode (uses scaleWidth, not padded width)
   const isDistanceMode = axisMode === 'distance'
   const totalUnits = isDistanceMode
     ? Math.max(data.totalDistance || 1, 1)
     : Math.max(data.totalDuration, 1)
-  const pixelsPerUnit = timelineWidth / totalUnits
+  const pixelsPerUnit = scaleWidth / totalUnits
 
   // Grid interval in pixels (for row grid lines)
   const gridIntervalPx = isDistanceMode
@@ -124,7 +129,9 @@ const GanttChart: FC<Props> = ({
     : 300 * pixelsPerUnit // 5 minutes
 
   // Filter vehicles based on active filter
+  // The "All" summary row visibility is toggled by clicking the All button while already selected
   const filteredVehicles = data.vehicles.filter((v) => {
+    if (v.type === 'all') return showAllRow
     if (vehicleFilter === 'all') return true
     if (vehicleFilter === 'drones') return v.type === 'drone'
     return v.type === 'truck'
@@ -354,11 +361,22 @@ const GanttChart: FC<Props> = ({
               { key: 'trucks' as VehicleFilter, label: 'Trucks', icon: <Truck size={12} /> },
             ]).map((option) => {
               const isActive = vehicleFilter === option.key
+              const isAllHighlight = option.key === 'all' && isActive && showAllRow
+              const btnStyle = isAllHighlight
+                ? { ...segBtn(true), color: '#2563eb', backgroundColor: '#eff6ff' }
+                : segBtn(isActive)
               return (
                 <button
                   key={option.key}
-                  onClick={() => onVehicleFilterChange(option.key)}
-                  style={segBtn(isActive)}
+                  onClick={() => {
+                    if (option.key === 'all' && vehicleFilter === 'all') {
+                      // Already on All — toggle the summary row
+                      setShowAllRow((prev) => !prev)
+                    } else {
+                      onVehicleFilterChange(option.key)
+                    }
+                  }}
+                  style={btnStyle}
                 >
                   {option.icon && (
                     <span style={{ color: isActive ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
@@ -386,8 +404,8 @@ const GanttChart: FC<Props> = ({
           <Box style={{ minWidth: `${timelineWidth + 150}px` }}>
             {/* Time/Distance axis */}
             <Flex>
-              {/* Empty space for label column */}
-              <Box style={{ width: '150px', minWidth: '150px', backgroundColor: '#f3f4f6', borderRight: '1px solid #d1d5db' }} />
+              {/* Empty space for label column — sticky so it stays visible on horizontal scroll */}
+              <Box style={{ position: 'sticky', left: 0, zIndex: 20, width: '150px', minWidth: '150px', backgroundColor: '#e5e7eb', borderRight: '1px solid #9ca3af' }} />
               {/* Axis */}
               <Box style={{ flex: 1, position: 'relative' }}>
                 <GanttTimeAxis

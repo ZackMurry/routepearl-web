@@ -54,7 +54,7 @@ const GanttTimeAxis: FC<Props> = ({ totalDuration, totalDistance, axisMode, zoom
         position: 'relative',
         height: '28px',
         borderBottom: '1px solid #d1d5db',
-        backgroundColor: '#f3f4f6',
+        backgroundColor: '#e5e7eb',
         overflow: 'hidden',
       }}
     >

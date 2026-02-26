@@ -169,6 +169,48 @@ export function useGanttData(
       }
     }
 
+    // Build the "All" row by merging stops from every vehicle,
+    // tagging each stop with its source vehicle name and color
+    const allStops: GanttStop[] = vehicles
+      .flatMap((v) => v.stops.map((s) => ({ ...s, vehicleName: v.name, vehicleColor: v.color })))
+      .sort((a, b) => a.time - b.time)
+
+    // Offset overlapping stops so they sit side-by-side with the same
+    // gap between icon borders (4px) as a lone marker has from the track edge.
+    // Icon width = 24px, gap = 4px → center-to-center stride = 28px.
+    // The first marker keeps the original position; extras fan out to the right.
+    const ICON_SIZE = 24
+    const BORDER_GAP = 4
+    const STRIDE = ICON_SIZE + BORDER_GAP
+    let i = 0
+    while (i < allStops.length) {
+      let j = i + 1
+      while (j < allStops.length && allStops[j].time === allStops[i].time) j++
+      const groupSize = j - i
+      if (groupSize > 1) {
+        for (let k = 0; k < groupSize; k++) {
+          allStops[i + k].pixelOffset = k * STRIDE
+        }
+      }
+      i = j
+    }
+
+    // Recompute cumulative distance across the merged list
+    let allCumDist = 0
+    allStops.forEach((stop) => {
+      allCumDist += stop.distance || 0
+      stop.cumulativeDistance = allCumDist
+    })
+
+    // Insert "All" row at the top
+    vehicles.unshift({
+      id: 'all',
+      name: 'All',
+      type: 'all',
+      color: GANTT_COLORS.all,
+      stops: allStops,
+    })
+
     // Use serialized event timeline for axis scaling (events are positioned sequentially)
     const lastEvent = events.length > 0 ? events[events.length - 1] : null
     const axisDuration = lastEvent
@@ -193,6 +235,15 @@ export function generateEmptyGanttData(
   droneCount: number
 ): GanttData {
   const vehicles: GanttVehicle[] = []
+
+  // Add "All" row at the top
+  vehicles.push({
+    id: 'all',
+    name: 'All',
+    type: 'all',
+    color: GANTT_COLORS.all,
+    stops: [],
+  })
 
   // Add truck if in fleet
   if (fleetMode === 'truck-drone' || fleetMode === 'truck-only') {

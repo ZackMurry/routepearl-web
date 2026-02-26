@@ -3,7 +3,7 @@
 import React, { FC } from 'react'
 import { GanttVehicle, GanttStop, GanttAxisMode } from './gantt.types'
 import GanttStopIcon from './GanttStopIcon'
-import { Truck, Drone } from 'lucide-react'
+import { Truck, Drone, LayoutList } from 'lucide-react'
 
 interface Props {
   vehicle: GanttVehicle
@@ -20,7 +20,7 @@ interface Props {
   onVehicleDoubleClick?: (vehicle: GanttVehicle) => void
 }
 
-const TRUCK_BLUE = '#1e3a5f'
+const TRUCK_BLUE = '#1e3a8a'
 
 // Convert hex color to rgba with low opacity
 function vehicleTint(hex: string, alpha: number = 0.10): string {
@@ -51,6 +51,9 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDista
         onClick={() => onVehicleClick?.(vehicle)}
         onDoubleClick={() => onVehicleDoubleClick?.(vehicle)}
         style={{
+          position: 'sticky',
+          left: 0,
+          zIndex: 20,
           width: '150px',
           minWidth: '150px',
           padding: '8px 12px',
@@ -76,7 +79,7 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDista
             color: 'white',
           }}
         >
-          {vehicle.type === 'truck' ? <Truck size={14} /> : <Drone size={14} />}
+          {vehicle.type === 'all' ? <LayoutList size={14} /> : vehicle.type === 'truck' ? <Truck size={14} /> : <Drone size={14} />}
         </div>
         {/* Vehicle name */}
         <span

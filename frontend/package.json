@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@radix-ui/themes": "^3.3.0",
     "chroma-js": "^3.1.2",
     "classnames": "^2.5.1",
     "leaflet": "^1.9.4",
