@@ -858,7 +858,7 @@ export function BottomPanel() {
                 <ChevronUp size={24} />
               </IconButton>
             </Flex>
-            <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} truckRoutePoints={truckRoute.length} droneSorties={droneRoutes.length} isFlightPlannerMode={isFlightPlannerMode} />
+            <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} truckCount={truckCount} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} truckRoutePoints={truckRoute.length} droneSorties={droneRoutes.length} isFlightPlannerMode={isFlightPlannerMode} />
           </Flex>
         </Card>
         </div>
@@ -978,7 +978,7 @@ export function BottomPanel() {
             </Flex>
 
             {/* Stats Bar */}
-            <MissionStatsBar missionConfig={missionConfig} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} truckRoutePoints={truckRoute.length} droneSorties={droneRoutes.length} isFlightPlannerMode={true} />
+            <MissionStatsBar missionConfig={missionConfig} fleetMode={fleetMode} truckCount={truckCount} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} truckRoutePoints={truckRoute.length} droneSorties={droneRoutes.length} isFlightPlannerMode={true} />
 
             <Flex className="flex-1" style={{ minHeight: 0, backgroundColor: 'white' }}>
               {/* Left: Nodes with Tabs */}
@@ -1949,7 +1949,7 @@ export function BottomPanel() {
               </Flex>
 
               {/* Stats Bar */}
-              <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} truckRoutePoints={truckRoute.length} droneSorties={droneRoutes.length} />
+              <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} truckCount={truckCount} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} truckRoutePoints={truckRoute.length} droneSorties={droneRoutes.length} />
 
               {/* Tabs */}
               <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'missionSites' | 'routes' | 'vehicles'); setSelectedNodeId(null); setSelectedRouteId(null); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -2414,7 +2414,7 @@ export function BottomPanel() {
           </Flex>
 
           {/* Stats Bar */}
-          <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} truckRoutePoints={truckRoute.length} droneSorties={droneRoutes.length} />
+          <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} truckCount={truckCount} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} truckRoutePoints={truckRoute.length} droneSorties={droneRoutes.length} />
 
           {/* Tabs */}
           <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'missionSites' | 'routes' | 'vehicles'); setSelectedNodeId(null); setSelectedRouteId(null); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -2770,6 +2770,7 @@ function MissionStatsBar({
   missionLaunched,
   elapsedTime = '00:00',
   fleetMode = 'truck-drone',
+  truckCount = 1,
   droneCount = 2,
   hasRoute = false,
   timelineSummary,
@@ -2787,6 +2788,7 @@ function MissionStatsBar({
   missionLaunched?: boolean
   elapsedTime?: string
   fleetMode?: 'truck-drone' | 'truck-only' | 'drones-only'
+  truckCount?: number
   droneCount?: number
   hasRoute?: boolean
   timelineSummary?: TimelineSummary
@@ -2835,8 +2837,11 @@ function MissionStatsBar({
       </Flex>
       <Box className="w-px h-4 bg-gray-300" />
       {/* Fleet display */}
-      <Flex gap="1" align="center" title={!hasRoute ? 'No route generated' : hasTruck ? 'Truck active' : 'Truck disabled'} style={{ opacity: !hasRoute || !hasTruck ? 0.35 : 1 }}>
+      <Flex gap="1" align="center" title={!hasRoute ? 'No route generated' : hasTruck ? `${truckCount} truck(s)` : 'Truck disabled'} style={{ opacity: !hasRoute || !hasTruck ? 0.35 : 1 }}>
         <Truck size={14} style={{ color: hasRoute && hasTruck ? '#374151' : '#9ca3af' }} />
+        <Text size="1" weight="medium" style={{ color: hasRoute && hasTruck ? undefined : '#9ca3af' }}>
+          {hasRoute && hasTruck ? truckCount : '-'}
+        </Text>
       </Flex>
       <Flex gap="1" align="center" title={!hasRoute ? 'No route generated' : hasDrones ? `${droneCount} drone(s)` : 'Drones disabled'} style={{ opacity: !hasRoute || !hasDrones ? 0.35 : 1 }}>
         <Drone size={14} style={{ color: hasRoute && hasDrones ? '#3b82f6' : '#9ca3af' }} />
