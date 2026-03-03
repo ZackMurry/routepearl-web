@@ -1651,10 +1651,10 @@ export function BottomPanel() {
               </Box>
 
               {/* Right: Config Panel */}
-              <Box className="w-72 p-4 border-l" style={{ overflow: 'hidden' }}>
+              <Box className="w-79 p-4 border-l" style={{ overflow: 'hidden' }}>
                 {/* Routing Algorithm */}
                 <Box className="mb-4">
-                  <Text size="2" weight="bold" className="mb-2 block">
+                  <Text size="2" weight="bold" style={{ display: 'block', marginBottom: '12px' }}>
                     Routing Algorithm
                   </Text>
                   <Select.Root
