@@ -3,7 +3,7 @@
 import React, { FC } from 'react'
 import { GanttVehicle, GanttStop, GanttAxisMode } from './gantt.types'
 import GanttStopIcon from './GanttStopIcon'
-import { Truck, Drone, LayoutList } from 'lucide-react'
+import { Truck, Drone, LayoutList, User } from 'lucide-react'
 
 interface Props {
   vehicle: GanttVehicle
@@ -18,6 +18,7 @@ interface Props {
   onStopDoubleClick?: (stop: GanttStop) => void
   onVehicleClick?: (vehicle: GanttVehicle) => void
   onVehicleDoubleClick?: (vehicle: GanttVehicle) => void
+  isGroupStart?: boolean // Add top gap for truck-driver group separation
 }
 
 const TRUCK_BLUE = '#1e3a8a'
@@ -30,22 +31,26 @@ function vehicleTint(hex: string, alpha: number = 0.10): string {
   return `rgba(${r},${g},${b},${alpha})`
 }
 
-const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDistance, axisMode, rowIndex, isGreyed = false, gridIntervalPx, onStopClick, onStopDoubleClick, onVehicleClick, onVehicleDoubleClick }) => {
+const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDistance, axisMode, rowIndex, isGreyed = false, gridIntervalPx, isGroupStart = false, onStopClick, onStopDoubleClick, onVehicleClick, onVehicleDoubleClick }) => {
   const rowHeight = 42
   const isEven = rowIndex % 2 === 0
-  const displayColor = vehicle.type === 'truck' ? TRUCK_BLUE : vehicle.color
+  const displayColor = vehicle.type === 'truck' || vehicle.type === 'driver' ? (vehicle.type === 'driver' ? vehicle.color : TRUCK_BLUE) : vehicle.color
   const rowTint = vehicleTint(displayColor)
 
   return (
-    <div
-      className="gantt-row"
-      style={{
-        display: 'flex',
-        height: `${rowHeight}px`,
-        borderBottom: '1px solid #d1d5db',
-        opacity: isGreyed ? 0.4 : 1,
-      }}
-    >
+    <>
+      {isGroupStart && (
+        <div style={{ height: '6px', backgroundColor: '#e5e7eb' }} />
+      )}
+      <div
+        className="gantt-row"
+        style={{
+          display: 'flex',
+          height: `${rowHeight}px`,
+          borderBottom: '1px solid #d1d5db',
+          opacity: isGreyed ? 0.4 : 1,
+        }}
+      >
       {/* Vehicle label */}
       <div
         onClick={() => onVehicleClick?.(vehicle)}
@@ -79,7 +84,7 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDista
             color: 'white',
           }}
         >
-          {vehicle.type === 'all' ? <LayoutList size={14} /> : vehicle.type === 'truck' ? <Truck size={14} /> : <Drone size={14} />}
+          {vehicle.type === 'all' ? <LayoutList size={14} /> : vehicle.type === 'truck' ? <Truck size={14} /> : vehicle.type === 'driver' ? <User size={14} /> : <Drone size={14} />}
         </div>
         {/* Vehicle name */}
         <span
@@ -179,6 +184,7 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDista
         )}
       </div>
     </div>
+    </>
   )
 }
 

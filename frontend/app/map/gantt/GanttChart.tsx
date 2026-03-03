@@ -2,14 +2,14 @@
 
 import React, { FC, useRef, useState, useEffect } from 'react'
 import { Box, Flex, Text, Button } from '@radix-ui/themes'
-import { Plus, FolderOpen, ZoomIn, ZoomOut, Drone, Truck, Clock, Route, BarChart3, List } from 'lucide-react'
+import { Plus, FolderOpen, ZoomIn, ZoomOut, Drone, Truck, Clock, Route, BarChart3, List, User } from 'lucide-react'
 import { GanttData, GanttChartState, GanttAxisMode, GanttStop, GanttVehicle, formatGanttTime, formatGanttDistance } from './gantt.types'
 import GanttTimeAxis from './GanttTimeAxis'
 import GanttRow from './GanttRow'
 import GanttCurrentTimeMarker from './GanttCurrentTimeMarker'
 import GanttListView from './GanttListView'
 
-type VehicleFilter = 'all' | 'drones' | 'trucks'
+type VehicleFilter = 'all' | 'drones' | 'trucks' | 'driver'
 
 interface Props {
   data: GanttData
@@ -56,6 +56,8 @@ const GanttChart: FC<Props> = ({
   const [axisMode, setAxisMode] = useState<GanttAxisMode>('duration')
   const [viewMode, setViewMode] = useState<'chart' | 'list'>('chart')
   const [showAllRow, setShowAllRow] = useState(true)
+  const [showTrucksInDriver, setShowTrucksInDriver] = useState(true)
+  const [showDronesInDriver, setShowDronesInDriver] = useState(true)
   const zoomInputRef = useRef<HTMLInputElement>(null)
 
   const ZOOM_MIN = 0.5
@@ -131,16 +133,41 @@ const GanttChart: FC<Props> = ({
   // Filter vehicles based on active filter
   // The "All" summary row visibility is toggled by clicking the All button while already selected
   const filteredVehicles = data.vehicles.filter((v) => {
+    if (vehicleFilter === 'driver') {
+      if (v.type === 'all') return showAllRow
+      if (v.type === 'truck') return showTrucksInDriver
+      if (v.type === 'driver') return true
+      if (v.type === 'drone') return showDronesInDriver && v.groupId != null // only drones that interact with a truck
+      return false
+    }
+    if (v.type === 'driver') return false // hide driver rows in non-driver views
     if (v.type === 'all') return showAllRow
     if (vehicleFilter === 'all') return true
     if (vehicleFilter === 'drones') return v.type === 'drone'
-    return v.type === 'truck'
+    if (vehicleFilter === 'trucks') return v.type === 'truck'
+    return false
   })
+
+  // In driver mode, sort vehicles so they appear grouped: All, then (Truck N, Driver N, Drone X, Drone Y...) per group
+  const sortedVehicles = vehicleFilter === 'driver'
+    ? [...filteredVehicles].sort((a, b) => {
+        // All row first
+        if (a.type === 'all') return -1
+        if (b.type === 'all') return 1
+        // Then sort by groupId
+        const gA = a.groupId ?? 999
+        const gB = b.groupId ?? 999
+        if (gA !== gB) return gA - gB
+        // Within a group: truck first, then driver, then drones
+        const typeOrder = { truck: 0, driver: 1, drone: 2, all: -1 }
+        return (typeOrder[a.type] ?? 3) - (typeOrder[b.type] ?? 3)
+      })
+    : filteredVehicles
 
   // Row height for calculating current time marker height
   const rowHeight = 42
   const headerHeight = 28
-  const totalContentHeight = headerHeight + filteredVehicles.length * rowHeight
+  const totalContentHeight = headerHeight + sortedVehicles.length * rowHeight
 
   // No plan state
   if (state === 'no-plan') {
@@ -346,47 +373,108 @@ const GanttChart: FC<Props> = ({
 
         {/* Vehicle filter toggle */}
         {onVehicleFilterChange && (
-          <Flex
-            align="center"
-            gap="0"
-            style={{
-              backgroundColor: '#e5e7eb',
-              borderRadius: '6px',
-              padding: '2px',
-            }}
-          >
-            {([
-              { key: 'all' as VehicleFilter, label: 'All', icon: null },
-              { key: 'drones' as VehicleFilter, label: 'Drones', icon: <Drone size={12} /> },
-              { key: 'trucks' as VehicleFilter, label: 'Trucks', icon: <Truck size={12} /> },
-            ]).map((option) => {
-              const isActive = vehicleFilter === option.key
-              const isAllHighlight = option.key === 'all' && isActive && showAllRow
-              const btnStyle = isAllHighlight
-                ? { ...segBtn(true), color: '#2563eb', backgroundColor: '#eff6ff' }
-                : segBtn(isActive)
-              return (
-                <button
-                  key={option.key}
-                  onClick={() => {
-                    if (option.key === 'all' && vehicleFilter === 'all') {
-                      // Already on All — toggle the summary row
-                      setShowAllRow((prev) => !prev)
-                    } else {
-                      onVehicleFilterChange(option.key)
-                    }
-                  }}
-                  style={btnStyle}
-                >
-                  {option.icon && (
-                    <span style={{ color: isActive ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
-                      {option.icon}
-                    </span>
-                  )}
-                  {option.label}
-                </button>
-              )
-            })}
+          <Flex align="center" gap="2">
+            <Flex
+              align="center"
+              gap="0"
+              style={{
+                backgroundColor: '#e5e7eb',
+                borderRadius: '6px',
+                padding: '2px',
+              }}
+            >
+              {([
+                { key: 'all' as VehicleFilter, label: 'All', icon: null },
+                { key: 'drones' as VehicleFilter, label: 'Drones', icon: <Drone size={12} /> },
+                { key: 'trucks' as VehicleFilter, label: 'Trucks', icon: <Truck size={12} /> },
+              ]).map((option) => {
+                const isActive = vehicleFilter === option.key
+                const isAllHighlight = option.key === 'all' && isActive && showAllRow
+                const btnStyle = isAllHighlight
+                  ? { ...segBtn(true), color: '#2563eb', backgroundColor: '#eff6ff' }
+                  : segBtn(isActive)
+                return (
+                  <button
+                    key={option.key}
+                    onClick={() => {
+                      if (option.key === 'all' && vehicleFilter === 'all') {
+                        setShowAllRow((prev) => !prev)
+                      } else {
+                        onVehicleFilterChange(option.key)
+                      }
+                    }}
+                    style={btnStyle}
+                  >
+                    {option.icon && (
+                      <span style={{ color: isActive ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
+                        {option.icon}
+                      </span>
+                    )}
+                    {option.label}
+                  </button>
+                )
+              })}
+            </Flex>
+
+            {/* Divider */}
+            <div style={{ width: '1px', height: '20px', backgroundColor: '#d1d5db' }} />
+
+            {/* Driver toggle */}
+            <Flex
+              align="center"
+              gap="0"
+              style={{
+                backgroundColor: '#e5e7eb',
+                borderRadius: '6px',
+                padding: '2px',
+              }}
+            >
+              <button
+                onClick={() => onVehicleFilterChange('driver')}
+                style={{
+                  ...segBtn(vehicleFilter === 'driver'),
+                  ...(vehicleFilter === 'driver' ? { backgroundColor: '#fb923c', color: 'white' } : {}),
+                }}
+              >
+                <span style={{ color: vehicleFilter === 'driver' ? 'white' : '#9ca3af', display: 'flex' }}>
+                  <User size={12} />
+                </span>
+                Drivers
+              </button>
+            </Flex>
+
+            {/* Truck/Drone sub-toggles — always visible, greyed out when not in driver mode */}
+            <Flex
+              align="center"
+              gap="0"
+              style={{
+                backgroundColor: '#e5e7eb',
+                borderRadius: '6px',
+                padding: '2px',
+                opacity: vehicleFilter === 'driver' ? 1 : 0.4,
+                pointerEvents: vehicleFilter === 'driver' ? 'auto' : 'none',
+              }}
+            >
+              <button
+                onClick={() => setShowTrucksInDriver((prev) => !prev)}
+                style={segBtn(vehicleFilter === 'driver' && showTrucksInDriver)}
+                title={showTrucksInDriver ? 'Hide truck rows' : 'Show truck rows'}
+              >
+                <span style={{ color: vehicleFilter === 'driver' && showTrucksInDriver ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
+                  <Truck size={12} />
+                </span>
+              </button>
+              <div style={{ width: '1px', height: '16px', backgroundColor: '#d1d5db' }} />
+              <button
+                onClick={() => setShowDronesInDriver((prev) => !prev)}
+                style={segBtn(vehicleFilter === 'driver' && showDronesInDriver)}
+                title={showDronesInDriver ? 'Hide drone rows' : 'Show drone rows'}
+              >
+                <span style={{ color: vehicleFilter === 'driver' && showDronesInDriver ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
+                  <Drone size={12} />
+                </span>
+              </button>
+            </Flex>
           </Flex>
         )}
 
@@ -420,23 +508,29 @@ const GanttChart: FC<Props> = ({
 
             {/* Vehicle rows */}
             <Box style={{ position: 'relative' }}>
-              {filteredVehicles.map((vehicle, index) => (
-                <GanttRow
-                  key={vehicle.id}
-                  vehicle={vehicle}
-                  pixelsPerUnit={pixelsPerUnit}
-                  totalDuration={data.totalDuration}
-                  totalDistance={data.totalDistance}
-                  axisMode={axisMode}
-                  rowIndex={index}
-                  isGreyed={state === 'empty-fleet'}
-                  gridIntervalPx={gridIntervalPx}
-                  onStopClick={onStopClick}
-                  onStopDoubleClick={onStopDoubleClick}
-                  onVehicleClick={onVehicleClick}
-                  onVehicleDoubleClick={onVehicleDoubleClick}
-                />
-              ))}
+              {sortedVehicles.map((vehicle, index) => {
+                // Detect group start: first truck in a new group (not the first row overall)
+                const isGroupStart = vehicleFilter === 'driver' && vehicle.type === 'truck' && vehicle.groupId != null && index > 0
+
+                return (
+                  <GanttRow
+                    key={vehicle.id}
+                    vehicle={vehicle}
+                    pixelsPerUnit={pixelsPerUnit}
+                    totalDuration={data.totalDuration}
+                    totalDistance={data.totalDistance}
+                    axisMode={axisMode}
+                    rowIndex={index}
+                    isGreyed={state === 'empty-fleet'}
+                    gridIntervalPx={gridIntervalPx}
+                    isGroupStart={isGroupStart}
+                    onStopClick={onStopClick}
+                    onStopDoubleClick={onStopDoubleClick}
+                    onVehicleClick={onVehicleClick}
+                    onVehicleDoubleClick={onVehicleDoubleClick}
+                  />
+                )
+              })}
 
               {/* Current time marker - only show during mission in duration mode */}
               {currentTime > 0 && (
@@ -444,7 +538,7 @@ const GanttChart: FC<Props> = ({
                   <GanttCurrentTimeMarker
                     currentTime={currentTime}
                     pixelsPerSecond={isDistanceMode ? 0 : pixelsPerUnit}
-                    height={filteredVehicles.length * rowHeight}
+                    height={sortedVehicles.length * rowHeight}
                     axisMode={axisMode}
                   />
                 </Box>
@@ -455,7 +549,7 @@ const GanttChart: FC<Props> = ({
       ) : (
         <Box style={{ flex: 1, overflow: 'hidden' }}>
           <GanttListView
-            vehicles={filteredVehicles}
+            vehicles={sortedVehicles}
             axisMode={axisMode}
             onStopClick={onStopClick}
             onStopDoubleClick={onStopDoubleClick}

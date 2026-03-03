@@ -62,6 +62,8 @@ interface FlightPlannerContextType {
   setFleetMode: (mode: 'truck-drone' | 'truck-only' | 'drones-only') => void
   droneCount: number
   setDroneCount: (count: number) => void
+  truckCount: number
+  setTruckCount: (count: number) => void
 
   // Map state
   mapCenter: Point
@@ -121,8 +123,11 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setFocusNodeId(id)
     setFocusNodeCounter(c => c + 1)
   }
-  const [fleetMode, setFleetMode] = useState<'truck-drone' | 'truck-only' | 'drones-only'>('truck-drone')
   const [droneCount, setDroneCount] = useState<number>(2)
+  const [truckCount, setTruckCount] = useState<number>(1)
+  // Derive fleetMode from counts — trucks always >= 1, drones optional
+  const fleetMode: 'truck-drone' | 'truck-only' | 'drones-only' = droneCount > 0 ? 'truck-drone' : 'truck-only'
+  const setFleetMode = (_mode: 'truck-drone' | 'truck-only' | 'drones-only') => {} // no-op, derived from counts
   const [missionLaunched, setMissionLaunched] = useState(false)
   const [missionPaused, setMissionPaused] = useState(false)
   const [mapCenter, setMapCenter] = useState<Point>({ lat: 38.9404, lng: -92.3277 })
@@ -644,6 +649,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setFleetMode,
     droneCount,
     setDroneCount,
+    truckCount,
+    setTruckCount,
     createNewMission,
     saveMission,
     loadMission,

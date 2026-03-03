@@ -4,7 +4,7 @@
 export type GanttStopType = 'depot' | 'delivery' | 'launch' | 'return' | 'charging' | 'travel'
 
 // Vehicle type
-export type GanttVehicleType = 'all' | 'truck' | 'drone'
+export type GanttVehicleType = 'all' | 'truck' | 'drone' | 'driver'
 
 // Axis mode for toggling between duration and distance
 export type GanttAxisMode = 'duration' | 'distance'
@@ -36,6 +36,7 @@ export interface GanttVehicle {
   color: string
   stops: GanttStop[]
   sortieNumber?: number // For drones, which sortie they represent
+  groupId?: number // Links truck+driver pairs (1, 2, 3...)
 }
 
 // Gantt chart data
@@ -54,6 +55,7 @@ export type GanttChartState = 'no-plan' | 'empty-fleet' | 'loaded'
 export const GANTT_COLORS = {
   all: '#4b5563', // gray-600 for combined "All" row
   truck: '#1e3a8a', // Dark blue for truck
+  driver: '#065f46', // Dark green (emerald-800) for driver instructions
   sortieColors: [
     '#3b82f6', // blue
     '#8b5cf6', // purple

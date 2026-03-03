@@ -23,6 +23,8 @@ export function useGanttData(
     const { events, summary } = timelineResult
 
     const vehicles: GanttVehicle[] = []
+    // Map droneNum → groupId for linking drones to their interacting truck/driver group
+    const truckDroneInteractions = new Map<number, number>()
 
     // Helper to map timeline event type to Gantt stop type
     const mapEventTypeToStopType = (eventType: string): GanttStopType => {
@@ -92,10 +94,106 @@ export function useGanttData(
 
       vehicles.push({
         id: 'truck-1',
-        name: 'Truck',
+        name: 'Truck 1',
         type: 'truck',
         color: GANTT_COLORS.truck,
         stops: truckStops,
+        groupId: 1,
+      })
+
+      // Build Driver instruction row from the same truck events
+      const driverStops: GanttStop[] = truckEvents.map((event) => {
+        let label: string
+        let description: string | undefined
+        const droneNum = event.sortieNumber
+          ? ((event.sortieNumber - 1) % droneCount) + 1
+          : undefined
+
+        switch (event.type) {
+          case 'truck_depart':
+            label = 'Depart from depot'
+            description = 'Begin mission — pull out of depot and head to first stop'
+            break
+          case 'truck_travel':
+            label = event.distance
+              ? `Drive ${(event.distance / 1000).toFixed(1)} km to next stop`
+              : 'Drive to next stop'
+            description = event.estimatedDuration
+              ? `Estimated drive time: ${Math.ceil(event.estimatedDuration / 60)} min`
+              : undefined
+            break
+          case 'truck_delivery':
+            label = `Deliver package${event.orderName ? ` to ${event.orderName}` : ''}`
+            description = `Park and complete delivery${event.estimatedDuration ? ` — approx ${Math.ceil(event.estimatedDuration / 60)} min` : ''}`
+            break
+          case 'truck_drone_launch':
+            label = `Stop and launch Drone ${droneNum || '?'}${event.orderName ? ` for ${event.orderName}` : ''}`
+            description = 'Come to a stop, prepare drone payload, and launch'
+            break
+          case 'truck_drone_recover':
+            label = `Wait for Drone ${droneNum || '?'} to return${event.orderName ? ` from ${event.orderName}` : ''}`
+            description = 'Stay at location and recover drone upon arrival'
+            break
+          case 'drone_return':
+            label = `Drone ${droneNum || '?'} returning — prepare for recovery`
+            description = `Drone inbound${event.orderName ? ` from ${event.orderName}` : ''} — be ready to receive`
+            break
+          case 'truck_charging':
+            label = 'Stop at charging station'
+            description = event.estimatedDuration
+              ? `Charge for approx ${Math.ceil(event.estimatedDuration / 60)} min`
+              : 'Charge vehicle battery'
+            break
+          case 'truck_return':
+            label = 'Return to depot'
+            description = 'Mission complete — head back to depot'
+            break
+          default:
+            label = event.label
+            description = event.description
+        }
+
+        return {
+          id: `driver-${event.id}`,
+          type: mapEventTypeToStopType(event.type),
+          time: event.cumulativeTime,
+          duration: event.estimatedDuration,
+          label,
+          description,
+          orderName: event.orderName,
+          orderId: event.orderId,
+          sortieNumber: event.sortieNumber,
+          distance: event.distance,
+          nodeId: event.nodeId,
+        }
+      })
+
+      // Compute cumulative distance for driver stops
+      let driverCumDist = 0
+      driverStops.forEach((stop) => {
+        driverCumDist += stop.distance || 0
+        stop.cumulativeDistance = driverCumDist
+      })
+
+      vehicles.push({
+        id: 'driver-1',
+        name: 'Driver 1',
+        type: 'driver',
+        color: GANTT_COLORS.driver,
+        stops: driverStops,
+        groupId: 1,
+      })
+
+      // Determine which drones this truck interacts with (via launch/recover events)
+      const interactingDroneNums = new Set<number>()
+      truckEvents.forEach((event) => {
+        if (event.sortieNumber && (event.type === 'truck_drone_launch' || event.type === 'truck_drone_recover' || event.type === 'drone_return')) {
+          interactingDroneNums.add(((event.sortieNumber - 1) % droneCount) + 1)
+        }
+      })
+      // Store for use when building drone vehicles below
+      interactingDroneNums.forEach((droneNum) => {
+        truckDroneInteractions.set(droneNum, 1) // groupId 1 for truck 1
       })
     }
 
@@ -165,13 +263,15 @@ export function useGanttData(
           color: getDroneColor(droneNum),
           stops: droneStops,
           sortieNumber: droneNum,
+          groupId: truckDroneInteractions.get(droneNum),
         })
       }
     }
 
-    // Build the "All" row by merging stops from every vehicle,
+    // Build the "All" row by merging stops from every vehicle (excluding driver to avoid duplicates),
     // tagging each stop with its source vehicle name and color
     const allStops: GanttStop[] = vehicles
+      .filter((v) => v.type !== 'driver')
       .flatMap((v) => v.stops.map((s) => ({ ...s, vehicleName: v.name, vehicleColor: v.color })))
       .sort((a, b) => a.time - b.time)
 
@@ -249,15 +349,25 @@ export function generateEmptyGanttData(
   if (fleetMode === 'truck-drone' || fleetMode === 'truck-only') {
     vehicles.push({
       id: 'truck-1',
-      name: 'Truck',
+      name: 'Truck 1',
       type: 'truck',
       color: GANTT_COLORS.truck,
       stops: [],
+      groupId: 1,
+    })
+    vehicles.push({
+      id: 'driver-1',
+      name: 'Driver 1',
+      type: 'driver',
+      color: GANTT_COLORS.driver,
+      stops: [],
+      groupId: 1,
     })
   }
 
   // Add drones if in fleet
   if (fleetMode === 'truck-drone' || fleetMode === 'drones-only') {
+    const hasTruck = fleetMode === 'truck-drone'
     for (let i = 1; i <= droneCount; i++) {
       vehicles.push({
         id: `drone-${i}`,
@@ -266,6 +376,7 @@ export function generateEmptyGanttData(
         color: getDroneColor(i),
         stops: [],
         sortieNumber: i,
+        groupId: hasTruck ? 1 : undefined, // All drones interact with truck 1 by default
       })
     }
   }

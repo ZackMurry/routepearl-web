@@ -19,6 +19,7 @@ import {
   AlertCircle,
   CheckCircle,
   Plus,
+  Minus,
   Trash2,
   X,
   LogOut,
@@ -88,6 +89,8 @@ export function BottomPanel() {
     setFleetMode,
     droneCount,
     setDroneCount,
+    truckCount,
+    setTruckCount,
     missionLaunched,
     missionPaused,
     launchMission,
@@ -107,7 +110,7 @@ export function BottomPanel() {
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   const [missionTab, setMissionTab] = useState<'gantt' | 'orders' | 'missionSites' | 'routes' | 'vehicles'>('gantt')
-  const [vehicleFilter, setVehicleFilter] = useState<'all' | 'drones' | 'trucks'>('all')
+  const [vehicleFilter, setVehicleFilter] = useState<'all' | 'drones' | 'trucks' | 'driver'>('all')
   const [nodeTab, setNodeTab] = useState<'overview' | 'orders' | 'missionSites'>('overview')
 
   const [csvImporting, setCsvImporting] = useState(false)
@@ -740,27 +743,29 @@ export function BottomPanel() {
         <Card className="rounded-none shadow-xl" style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
           <Flex direction="column">
             <Flex align="center" className="p-4" style={{ gap: '12px' }}>
-              {/* Mission name + status badges */}
+              {/* Mission name + status badges — fixed width so right side stays put */}
               {isFlightPlannerMode ? (
-                <Flex align="center" gap="2" style={{ flexShrink: 0 }}>
-                  <Route size={16} />
+                <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden' }}>
+                  <Route size={16} style={{ flexShrink: 0, color: '#6b7280' }} />
                   <TextField.Root
                     value={missionConfig.missionName}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       updateMissionConfig({ missionName: e.target.value })
                     }
-                    placeholder="Mission name"
-                    size="1"
-                    style={{ width: '160px' }}
+                    placeholder="Mission name..."
+                    size="2"
+                    variant="soft"
+                    color="gray"
+                    style={{ flex: 1 }}
                   />
                   <Badge size="1" color={hasUnassignedWaypoints ? 'red' : hasRoute ? 'green' : orderNodes.length > 0 ? 'orange' : 'gray'} variant={hasRoute ? 'soft' : 'outline'}>
                     {hasUnassignedWaypoints ? 'Blocked' : hasRoute ? 'Route Ready' : orderNodes.length > 0 ? 'Route Required' : 'Pending'}
                   </Badge>
                 </Flex>
               ) : (
-                <Flex align="center" gap="2" style={{ flexShrink: 0 }}>
-                  <FileText size={16} />
-                  <Text size="2" weight="bold">
+                <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden' }}>
+                  <FileText size={16} style={{ flexShrink: 0 }} />
+                  <Text size="2" weight="bold" style={{ whiteSpace: 'nowrap' }}>
                     {missionConfig.missionName || 'Untitled Mission'}
                   </Text>
                   <Badge size="1" color={getStatusColor(missionStatus)}>{missionStatus}</Badge>
@@ -776,6 +781,8 @@ export function BottomPanel() {
                   )}
                 </Flex>
               )}
+
+              <Box className="w-px h-6 bg-gray-300" style={{ flexShrink: 0 }} />
 
               <DateTimeDisplay />
 
@@ -900,22 +907,26 @@ export function BottomPanel() {
           <Flex direction="column" className="h-full">
             {/* Header */}
             <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px' }}>
-              {/* Mission name + route status badge */}
-              <Flex align="center" gap="2" style={{ flexShrink: 0 }}>
-                <Route size={16} />
+              {/* Mission name + route status badge — fixed width so right side stays put */}
+              <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden' }}>
+                <Route size={16} style={{ flexShrink: 0, color: '#6b7280' }} />
                 <TextField.Root
                   value={missionConfig.missionName}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     updateMissionConfig({ missionName: e.target.value })
                   }
-                  placeholder="Mission name"
-                  size="1"
-                  style={{ width: '160px' }}
+                  placeholder="Mission name..."
+                  size="2"
+                  variant="soft"
+                  color="gray"
+                  style={{ flex: 1 }}
                 />
                 <Badge size="1" color={hasUnassignedWaypoints ? 'red' : hasRoute ? 'green' : orderNodes.length > 0 ? 'orange' : 'gray'} variant={hasRoute ? 'soft' : 'outline'}>
                   {hasUnassignedWaypoints ? 'Blocked' : hasRoute ? 'Route Ready' : orderNodes.length > 0 ? 'Route Required' : 'Pending'}
                 </Badge>
               </Flex>
+
+              <Box className="w-px h-6 bg-gray-300" style={{ flexShrink: 0 }} />
 
               <DateTimeDisplay />
 
@@ -1686,65 +1697,75 @@ export function BottomPanel() {
                       Clear route to change fleet configuration.
                     </Text>
                   )}
-                  <Flex direction="column" gap="4" style={{ opacity: hasRoute ? 0.5 : 1 }}>
-                    <Button
-                      size="2"
-                      variant={fleetMode === 'truck-drone' ? 'solid' : 'soft'}
-                      color={fleetMode === 'truck-drone' ? undefined : 'gray'}
-                      className="w-full justify-between"
-                      onClick={() => !hasRoute && setFleetMode('truck-drone')}
-                      disabled={hasRoute}
-                    >
+                  <Flex direction="column" gap="3" style={{ opacity: hasRoute ? 0.5 : 1, pointerEvents: hasRoute ? 'none' : 'auto' }}>
+                    {/* Trucks */}
+                    <Flex align="center" justify="between">
                       <Flex align="center" gap="2">
-                        <Truck size={16} />
-                        <Drone size={16} />
-                        <Text size="2">1 Truck + Drones</Text>
+                        <Truck size={16} style={{ color: '#6b7280' }} />
+                        <Text size="2" weight="medium">Trucks</Text>
                       </Flex>
-                      <TextField.Root
-                        type="number"
-                        value={droneCount}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDroneCount(Math.max(1, parseInt(e.target.value) || 1))}
-                        size="1"
-                        style={{ width: '50px' }}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                        disabled={hasRoute || fleetMode !== 'truck-drone'}
-                      />
-                    </Button>
-                    <Button
-                      size="2"
-                      variant={fleetMode === 'truck-only' ? 'solid' : 'soft'}
-                      color={fleetMode === 'truck-only' ? undefined : 'gray'}
-                      className="w-full justify-center"
-                      onClick={() => !hasRoute && setFleetMode('truck-only')}
-                      disabled={hasRoute}
-                    >
+                      <Flex align="center" gap="1">
+                        <IconButton
+                          size="1"
+                          variant="soft"
+                          color="gray"
+                          onClick={() => setTruckCount(Math.max(1, truckCount - 1))}
+                          disabled={truckCount <= 1}
+                          style={{ cursor: truckCount <= 1 ? 'not-allowed' : 'pointer' }}
+                        >
+                          <Minus size={12} />
+                        </IconButton>
+                        <TextField.Root
+                          type="number"
+                          value={truckCount}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTruckCount(Math.max(1, parseInt(e.target.value) || 1))}
+                          size="1"
+                          style={{ width: '48px', textAlign: 'center' }}
+                        />
+                        <IconButton
+                          size="1"
+                          variant="soft"
+                          color="gray"
+                          onClick={() => setTruckCount(truckCount + 1)}
+                        >
+                          <Plus size={12} />
+                        </IconButton>
+                      </Flex>
+                    </Flex>
+                    {/* Drones */}
+                    <Flex align="center" justify="between">
                       <Flex align="center" gap="2">
-                        <Truck size={16} />
-                        <Text size="2">Truck Only</Text>
+                        <Drone size={16} style={{ color: '#6b7280' }} />
+                        <Text size="2" weight="medium">Drones</Text>
                       </Flex>
-                    </Button>
-                    <Button
-                      size="2"
-                      variant={fleetMode === 'drones-only' ? 'solid' : 'soft'}
-                      color={fleetMode === 'drones-only' ? undefined : 'gray'}
-                      className="w-full justify-between"
-                      onClick={() => !hasRoute && setFleetMode('drones-only')}
-                      disabled={hasRoute}
-                    >
-                      <Flex align="center" gap="2">
-                        <Drone size={16} />
-                        <Text size="2">Drones Only</Text>
+                      <Flex align="center" gap="1">
+                        <IconButton
+                          size="1"
+                          variant="soft"
+                          color="gray"
+                          onClick={() => setDroneCount(Math.max(0, droneCount - 1))}
+                          disabled={droneCount <= 0}
+                          style={{ cursor: droneCount <= 0 ? 'not-allowed' : 'pointer' }}
+                        >
+                          <Minus size={12} />
+                        </IconButton>
+                        <TextField.Root
+                          type="number"
+                          value={droneCount}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDroneCount(Math.max(0, parseInt(e.target.value) || 0))}
+                          size="1"
+                          style={{ width: '48px', textAlign: 'center' }}
+                        />
+                        <IconButton
+                          size="1"
+                          variant="soft"
+                          color="gray"
+                          onClick={() => setDroneCount(droneCount + 1)}
+                        >
+                          <Plus size={12} />
+                        </IconButton>
                       </Flex>
-                      <TextField.Root
-                        type="number"
-                        value={droneCount}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDroneCount(Math.max(1, parseInt(e.target.value) || 1))}
-                        size="1"
-                        style={{ width: '50px' }}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                        disabled={hasRoute || fleetMode !== 'drones-only'}
-                      />
-                    </Button>
+                    </Flex>
                   </Flex>
                 </Box>
 
@@ -1820,16 +1841,18 @@ export function BottomPanel() {
             <Flex direction="column" className="h-full">
               {/* Header */}
               <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px' }}>
-                {/* Mission name + status badges */}
-                <Flex align="center" gap="2" style={{ flexShrink: 0 }}>
-                  <FileText size={16} />
-                  <Text size="2" weight="bold">
+                {/* Mission name + status badges — fixed width so right side stays put */}
+                <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden' }}>
+                  <FileText size={16} style={{ flexShrink: 0 }} />
+                  <Text size="2" weight="bold" style={{ whiteSpace: 'nowrap' }}>
                     {missionConfig.missionName || 'Untitled Mission'}
                   </Text>
                   <Badge size="1" color={missionPaused ? 'orange' : 'green'} variant="solid">
                     {missionPaused ? 'Paused' : 'Running'}
                   </Badge>
                 </Flex>
+
+                <Box className="w-px h-6 bg-gray-300" style={{ flexShrink: 0 }} />
 
                 <DateTimeDisplay />
 
@@ -2265,10 +2288,10 @@ export function BottomPanel() {
         <Flex direction="column" className="h-full">
           {/* Header */}
           <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px' }}>
-            {/* Mission name + status badges */}
-            <Flex align="center" gap="2" style={{ flexShrink: 0 }}>
-              <FileText size={16} />
-              <Text size="2" weight="bold">
+            {/* Mission name + status badges — fixed width so right side stays put */}
+            <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden' }}>
+              <FileText size={16} style={{ flexShrink: 0 }} />
+              <Text size="2" weight="bold" style={{ whiteSpace: 'nowrap' }}>
                 {missionConfig.missionName || 'Untitled Mission'}
               </Text>
               <Badge size="1" color={getStatusColor(missionStatus)}>{missionStatus}</Badge>
@@ -2283,6 +2306,8 @@ export function BottomPanel() {
                 </>
               )}
             </Flex>
+
+            <Box className="w-px h-6 bg-gray-300" style={{ flexShrink: 0 }} />
 
             <DateTimeDisplay />
 
