@@ -2,8 +2,8 @@
 
 import React, { useRef, useState, useEffect, useMemo } from 'react'
 import { useFlightPlanner } from './FlightPlannerContext'
-import { MissionSite } from '@/lib/types'
-import { Box, Card, Flex, Text, Button, Badge, IconButton, ScrollArea, TextField, Progress, Tabs, Select } from '@radix-ui/themes'
+import { MissionSite, RoutingAlgorithm } from '@/lib/types'
+import { Box, Card, Flex, Text, Button, Badge, IconButton, ScrollArea, TextField, Progress, Tabs, Select, AlertDialog } from '@radix-ui/themes'
 import {
   ChevronUp,
   ChevronDown,
@@ -89,6 +89,12 @@ export function BottomPanel() {
     droneCount,
     setDroneCount,
     missionLaunched,
+    missionPaused,
+    launchMission,
+    pauseMission,
+    stopMission,
+    hasUnassignedWaypoints,
+    hasUnroutedNodes,
     mapCenter,
   } = useFlightPlanner()
 
@@ -102,7 +108,7 @@ export function BottomPanel() {
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   const [missionTab, setMissionTab] = useState<'gantt' | 'orders' | 'missionSites' | 'routes' | 'vehicles'>('gantt')
   const [vehicleFilter, setVehicleFilter] = useState<'all' | 'drones' | 'trucks'>('all')
-  const [nodeTab, setNodeTab] = useState<'orders' | 'missionSites'>('orders')
+  const [nodeTab, setNodeTab] = useState<'overview' | 'orders' | 'missionSites'>('overview')
 
   const [csvImporting, setCsvImporting] = useState(false)
 
@@ -478,6 +484,20 @@ export function BottomPanel() {
     setIsFlightPlannerMode(false)
   }
 
+  const handleOverviewDoubleClick = (nodeId: string) => {
+    const node = missionConfig.nodes.find(n => n.id === nodeId)
+    if (!node) return
+    const targetTab = node.type === 'order' ? 'orders' : 'missionSites'
+    setNodeTab(targetTab as 'overview' | 'orders' | 'missionSites')
+    setSelectedNodeId(nodeId)
+    setTimeout(() => {
+      const el = document.querySelector(`[data-node-id="${nodeId}"]`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 150)
+  }
+
   const missionStatus = currentMission?.status || 'Idle'
   const hasRoute = truckRoute.length > 0 || droneRoutes.length > 0
   const orderNodes = missionConfig.nodes.filter((n) => n.type === 'order')
@@ -719,55 +739,120 @@ export function BottomPanel() {
         >
         <Card className="rounded-none shadow-xl" style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
           <Flex direction="column">
-            <Flex justify="between" align="center" className="p-3">
-              <Flex gap="4" align="center">
-                {isFlightPlannerMode ? (
-                  <Flex align="center" gap="2">
-                    <Route size={18} />
-                    <TextField.Root
-                      value={missionConfig.missionName}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        updateMissionConfig({ missionName: e.target.value })
-                      }
-                      placeholder="Mission name"
-                      size="1"
-                      style={{ width: '180px' }}
-                    />
-                  </Flex>
-                ) : (
-                  <Flex align="center" gap="2">
-                    <FileText size={18} />
-                    <Text size="2" weight="bold">
-                      {missionConfig.missionName || 'Untitled Mission'}
-                    </Text>
-                    <Badge color={getStatusColor(missionStatus)}>{missionStatus}</Badge>
-                  </Flex>
-                )}
-                <DateTimeDisplay />
-                <Flex gap="5" align="center" className="text-gray-600">
-                  <Flex gap="1" align="center" title="Time Elapsed / Estimated">
-                    <Clock size={14} />
-                    <Text size="1">00:00/{estimatedTime}</Text>
-                  </Flex>
-                  <Flex gap="1" align="center" title="Deliveries">
-                    <Package size={14} />
-                    <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
-                  </Flex>
-                  <Flex gap="1" align="center" title="Distance Covered / Total">
-                    <Route size={14} />
-                    <Text size="1">{coveredDistance}/{totalDistance}</Text>
-                  </Flex>
+            <Flex align="center" className="p-4" style={{ gap: '12px' }}>
+              {/* Mission name + status badges */}
+              {isFlightPlannerMode ? (
+                <Flex align="center" gap="2" style={{ flexShrink: 0 }}>
+                  <Route size={16} />
+                  <TextField.Root
+                    value={missionConfig.missionName}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      updateMissionConfig({ missionName: e.target.value })
+                    }
+                    placeholder="Mission name"
+                    size="1"
+                    style={{ width: '160px' }}
+                  />
+                  <Badge size="1" color={hasUnassignedWaypoints ? 'red' : hasRoute ? 'green' : orderNodes.length > 0 ? 'orange' : 'gray'} variant={hasRoute ? 'soft' : 'outline'}>
+                    {hasUnassignedWaypoints ? 'Blocked' : hasRoute ? 'Route Ready' : orderNodes.length > 0 ? 'Route Required' : 'Pending'}
+                  </Badge>
+                </Flex>
+              ) : (
+                <Flex align="center" gap="2" style={{ flexShrink: 0 }}>
+                  <FileText size={16} />
+                  <Text size="2" weight="bold">
+                    {missionConfig.missionName || 'Untitled Mission'}
+                  </Text>
+                  <Badge size="1" color={getStatusColor(missionStatus)}>{missionStatus}</Badge>
+                  {!missionLaunched && (
+                    <>
+                      <Badge size="1" color={missionConfig.nodes.length > 0 ? 'green' : 'gray'} variant={missionConfig.nodes.length > 0 ? 'soft' : 'outline'}>
+                        {missionConfig.nodes.length > 0 ? 'Plan Loaded' : 'No Plan'}
+                      </Badge>
+                      <Badge size="1" color={hasRoute ? 'green' : missionConfig.nodes.length > 0 ? 'orange' : 'gray'} variant={hasRoute ? 'soft' : 'outline'}>
+                        {hasRoute ? 'Route Ready' : missionConfig.nodes.length > 0 ? 'Route Required' : 'No Route'}
+                      </Badge>
+                    </>
+                  )}
+                </Flex>
+              )}
+
+              <DateTimeDisplay />
+
+              {/* Stats */}
+              <Flex gap="5" align="center" className="text-gray-600" style={{ flexShrink: 0 }}>
+                <Flex gap="1" align="center" title="Time Elapsed / Estimated">
+                  <Clock size={14} />
+                  <Text size="1">00:00/{estimatedTime}</Text>
+                </Flex>
+                <Flex gap="1" align="center" title="Deliveries">
+                  <Package size={14} />
+                  <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
+                </Flex>
+                <Flex gap="1" align="center" title="Distance Covered / Total">
+                  <Route size={14} />
+                  <Text size="1">{coveredDistance}/{totalDistance}</Text>
                 </Flex>
               </Flex>
+
+              {/* Spacer */}
+              <div style={{ flex: 1 }} />
+
+              {/* Center zone: control buttons (between stats and action buttons) */}
+              <Flex gap="2" align="center" justify="center" style={{ flexShrink: 0, minWidth: '280px' }}>
+                {isFlightPlannerMode ? (
+                  <Button size="2" style={{ paddingLeft: '16px', paddingRight: '16px' }} onClick={generateRoute} loading={isGeneratingRoute} disabled={hasUnassignedWaypoints || isGeneratingRoute} title={hasUnassignedWaypoints ? 'Assign all waypoints a type first' : 'Generate Optimal Route'}>
+                    <Route size={14} /> Generate Route
+                  </Button>
+                ) : (
+                  <>
+                    <Button size="2" color="green" disabled={!missionConfig.nodes.length || (truckRoute.length === 0 && droneRoutes.length === 0) || hasUnroutedNodes || missionLaunched} onClick={launchMission} title={hasUnroutedNodes ? 'Unrouted points exist' : 'Launch Mission'}>
+                      <Play size={14} /> Launch
+                    </Button>
+                    <Button size="2" color="orange" variant="soft" disabled={!missionLaunched} onClick={pauseMission}>
+                      <Pause size={14} /> {missionPaused ? 'Resume' : 'Pause'}
+                    </Button>
+                    <Button size="2" color="red" variant="soft" disabled={!missionLaunched} onClick={stopMission}>
+                      <Square size={14} /> Stop
+                    </Button>
+                  </>
+                )}
+              </Flex>
+
+              <Box className="w-px h-6 bg-gray-300" style={{ flexShrink: 0 }} />
+
+              {/* Right zone: action buttons next to collapse */}
+              {isFlightPlannerMode ? (
+                <Flex gap="2" align="center" style={{ flexShrink: 0, width: '250px' }}>
+                  <Button size="2" variant="soft" color="gray" style={{ flex: 1 }} onClick={handleExitFlightPlanner}>
+                    <LogOut size={14} /> Exit
+                  </Button>
+                  <Button size="2" variant="soft" style={{ flex: 1 }} onClick={handleExport}>
+                    <Download size={14} /> Save
+                  </Button>
+                </Flex>
+              ) : (
+                <Flex gap="2" align="center" style={{ flexShrink: 0, width: '250px' }}>
+                  <Button size="2" style={{ flex: 1 }} onClick={() => setIsFlightPlannerMode(true)} disabled={missionLaunched}>
+                    {missionConfig.nodes.length > 0 ? <><Settings size={14} /> Edit Plan</> : <><Plus size={14} /> Make Plan</>}
+                  </Button>
+                  <Button size="2" variant="soft" style={{ flex: 1 }} onClick={handleImport} disabled={missionLaunched}>
+                    <FolderOpen size={14} /> Load Plan
+                  </Button>
+                </Flex>
+              )}
 
               <IconButton size="3" variant="ghost" onClick={() => setBottomPanelExpanded(true)} style={{ cursor: 'pointer' }}>
                 <ChevronUp size={24} />
               </IconButton>
             </Flex>
-            <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} />
+            <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} truckRoutePoints={truckRoute.length} droneSorties={droneRoutes.length} isFlightPlannerMode={isFlightPlannerMode} />
           </Flex>
         </Card>
         </div>
+        {/* Hidden file inputs */}
+        <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
+        <input ref={csvInputRef} type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
         <ToastUI />
       </>
     )
@@ -814,59 +899,80 @@ export function BottomPanel() {
         <Card className="h-full rounded-none shadow-xl" style={{ height: '100%' }}>
           <Flex direction="column" className="h-full">
             {/* Header */}
-            <Flex justify="between" align="center" className="p-3 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)' }}>
-              <Flex gap="4" align="center">
-                <Flex align="center" gap="2">
-                  <Route size={18} />
-                  <TextField.Root
-                    value={missionConfig.missionName}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      updateMissionConfig({ missionName: e.target.value })
-                    }
-                    placeholder="Mission name"
-                    size="2"
-                    style={{ width: '200px' }}
-                  />
+            <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px' }}>
+              {/* Mission name + route status badge */}
+              <Flex align="center" gap="2" style={{ flexShrink: 0 }}>
+                <Route size={16} />
+                <TextField.Root
+                  value={missionConfig.missionName}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    updateMissionConfig({ missionName: e.target.value })
+                  }
+                  placeholder="Mission name"
+                  size="1"
+                  style={{ width: '160px' }}
+                />
+                <Badge size="1" color={hasUnassignedWaypoints ? 'red' : hasRoute ? 'green' : orderNodes.length > 0 ? 'orange' : 'gray'} variant={hasRoute ? 'soft' : 'outline'}>
+                  {hasUnassignedWaypoints ? 'Blocked' : hasRoute ? 'Route Ready' : orderNodes.length > 0 ? 'Route Required' : 'Pending'}
+                </Badge>
+              </Flex>
+
+              <DateTimeDisplay />
+
+              {/* Stats */}
+              <Flex gap="5" align="center" className="text-gray-600" style={{ flexShrink: 0 }}>
+                <Flex gap="1" align="center" title="Time Elapsed / Estimated">
+                  <Clock size={14} />
+                  <Text size="1">00:00/{estimatedTime}</Text>
                 </Flex>
-                {hasRoute && (
-                  <Flex gap="1" align="center">
-                    <CheckCircle size={14} className="text-green-500" />
-                    <Text size="1" color="green">
-                      Route ready
-                    </Text>
-                  </Flex>
-                )}
-                <DateTimeDisplay />
-                <Flex gap="5" align="center" className="text-gray-600">
-                  <Flex gap="1" align="center" title="Time Elapsed / Estimated">
-                    <Clock size={14} />
-                    <Text size="1">00:00/{estimatedTime}</Text>
-                  </Flex>
-                  <Flex gap="1" align="center" title="Deliveries">
-                    <Package size={14} />
-                    <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
-                  </Flex>
-                  <Flex gap="1" align="center" title="Distance Covered / Total">
-                    <Route size={14} />
-                    <Text size="1">{coveredDistance}/{totalDistance}</Text>
-                  </Flex>
+                <Flex gap="1" align="center" title="Deliveries">
+                  <Package size={14} />
+                  <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
+                </Flex>
+                <Flex gap="1" align="center" title="Distance Covered / Total">
+                  <Route size={14} />
+                  <Text size="1">{coveredDistance}/{totalDistance}</Text>
                 </Flex>
               </Flex>
 
-              <IconButton size="2" variant="ghost" onClick={() => setBottomPanelExpanded(false)}>
-                <ChevronDown size={20} />
+              {/* Spacer */}
+              <div style={{ flex: 1 }} />
+
+              {/* Center: Generate Route button */}
+              <Button size="2" style={{ paddingLeft: '16px', paddingRight: '16px' }} onClick={generateRoute} loading={isGeneratingRoute} disabled={hasUnassignedWaypoints || isGeneratingRoute} title={hasUnassignedWaypoints ? 'Assign all waypoints a type first' : 'Generate Optimal Route'}>
+                <Route size={14} /> Generate Route
+              </Button>
+
+              <Box className="w-px h-6 bg-gray-300" style={{ flexShrink: 0 }} />
+
+              {/* Right: Exit/Save buttons next to collapse */}
+              <Flex gap="2" align="center" style={{ flexShrink: 0, width: '250px' }}>
+                <Button size="2" variant="soft" color="gray" style={{ flex: 1 }} onClick={handleExitFlightPlanner}>
+                  <LogOut size={14} /> Exit
+                </Button>
+                <Button size="2" variant="soft" style={{ flex: 1 }} onClick={handleExport}>
+                  <Download size={14} /> Save
+                </Button>
+              </Flex>
+
+              <IconButton size="3" variant="ghost" onClick={() => setBottomPanelExpanded(false)} style={{ cursor: 'pointer' }}>
+                <ChevronDown size={24} />
               </IconButton>
             </Flex>
 
             {/* Stats Bar */}
-            <MissionStatsBar missionConfig={missionConfig} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} />
+            <MissionStatsBar missionConfig={missionConfig} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} truckRoutePoints={truckRoute.length} droneSorties={droneRoutes.length} isFlightPlannerMode={true} />
 
             <Flex className="flex-1" style={{ minHeight: 0, backgroundColor: 'white' }}>
               {/* Left: Nodes with Tabs */}
               <Box className="flex-1 border-r" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                <Tabs.Root value={nodeTab} onValueChange={(v: string) => { setNodeTab(v as 'orders' | 'missionSites'); setSelectedNodeId(null); }} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Tabs.Root value={nodeTab} onValueChange={(v: string) => { setNodeTab(v as 'overview' | 'orders' | 'missionSites'); setSelectedNodeId(null); }} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                   <Flex justify="between" align="center" className="px-4 pt-3">
                     <Tabs.List>
+                      <Tabs.Trigger value="overview">
+                        <LayoutGrid size={14} className="mr-1" />
+                        Overview ({missionConfig.nodes.length})
+                      </Tabs.Trigger>
                       <Tabs.Trigger value="orders">
                         <MapPin size={14} className="mr-1" />
                         Order Points ({orderNodes.length})
@@ -881,7 +987,39 @@ export function BottomPanel() {
                         {globalDisplayMode === 'coords' ? <MapPinned size={14} /> : <Hash size={14} />}
                       </IconButton>
                       <ViewToggle viewMode={viewMode} onToggle={toggleViewMode} />
-                      {nodeTab === 'orders' ? (
+                      {nodeTab === 'overview' ? (
+                        <>
+                          <Button size="1" variant="soft" onClick={handleImportCSV} disabled={csvImporting}>
+                            <Upload size={14} /> {csvImporting ? 'Importing...' : 'Import Addresses (CSV)'}
+                          </Button>
+                          <Button size="1" variant="soft" onClick={handleExportCSV} disabled={missionConfig.nodes.length === 0}>
+                            <Download size={14} /> Export Addresses (CSV)
+                          </Button>
+                          <AlertDialog.Root>
+                            <AlertDialog.Trigger>
+                              <Button size="1" variant="soft" color="red" disabled={missionConfig.nodes.length === 0}>
+                                <Trash2 size={14} /> Reset Flight Plan
+                              </Button>
+                            </AlertDialog.Trigger>
+                            <AlertDialog.Content maxWidth="400px">
+                              <AlertDialog.Title>Reset Flight Plan</AlertDialog.Title>
+                              <AlertDialog.Description size="2">
+                                This will remove all nodes and routes from the current flight plan. This action cannot be undone.
+                              </AlertDialog.Description>
+                              <Flex gap="3" mt="4" justify="end">
+                                <AlertDialog.Cancel>
+                                  <Button variant="soft" color="gray">Cancel</Button>
+                                </AlertDialog.Cancel>
+                                <AlertDialog.Action>
+                                  <Button variant="solid" color="red" onClick={() => updateMissionConfig({ nodes: [], routes: undefined })}>
+                                    Reset
+                                  </Button>
+                                </AlertDialog.Action>
+                              </Flex>
+                            </AlertDialog.Content>
+                          </AlertDialog.Root>
+                        </>
+                      ) : nodeTab === 'orders' ? (
                         <>
                           <Button
                             size="1"
@@ -912,6 +1050,247 @@ export function BottomPanel() {
                       )}
                     </Flex>
                   </Flex>
+
+                  {/* Overview Tab (read-only) */}
+                  <Tabs.Content value="overview" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'hidden' }}>
+                    {viewMode === 'table' ? (
+                      <ScrollArea style={{ height: '100%' }}>
+                        {missionConfig.nodes.length === 0 ? (
+                          <Box className="text-center p-6 bg-gray-50 rounded">
+                            <Text size="2" color="gray">
+                              No nodes added yet. Use &quot;Import Addresses (CSV)&quot; to bulk import, or switch to the Order Points / Mission Sites tabs to add individually.
+                            </Text>
+                          </Box>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            {/* Orders Table (read-only) */}
+                            {orderNodes.length > 0 && (
+                              <Box>
+                                <Flex align="center" gap="2" className="mb-2">
+                                  <MapPin size={14} className="text-green-600" />
+                                  <Text size="2" weight="bold">Order Points ({orderNodes.length})</Text>
+                                </Flex>
+                                <table className="data-table" style={{ tableLayout: 'fixed' }}>
+                                  <thead>
+                                    <tr>
+                                      <th className="col-id">#</th>
+                                      <th className="col-flex">Location</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {orderNodes.map((order) => {
+                                      const isLoading = geocodingLoading.get(order.id) || false
+                                      const location = globalDisplayMode === 'coords'
+                                        ? `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
+                                        : isLoading ? 'Loading...' : order.address || `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
+                                      const isSelected = selectedNodeId === order.id
+                                      return (
+                                        <tr
+                                          key={order.id}
+                                          data-node-id={order.id}
+                                          className={isSelected ? 'selected' : ''}
+                                          onClick={() => setSelectedNodeId(isSelected ? null : order.id)}
+                                          onDoubleClick={() => handleOverviewDoubleClick(order.id)}
+                                          style={{ cursor: 'pointer' }}
+                                        >
+                                          <td className="accent-cell" style={{ '--accent-color': '#22c55e' } as React.CSSProperties}>
+                                            <Flex align="center" gap="1">
+                                              <MapPin size={12} style={{ color: '#22c55e', flexShrink: 0 }} />
+                                              <span style={{ fontWeight: 600 }}>{order.orderId || '?'}</span>
+                                            </Flex>
+                                          </td>
+                                          <td className="cell-truncate" style={{ color: '#374151' }}>
+                                            {location}
+                                          </td>
+                                        </tr>
+                                      )
+                                    })}
+                                  </tbody>
+                                </table>
+                              </Box>
+                            )}
+                            {/* Mission Sites Table (read-only) */}
+                            {missionSites.length > 0 && (
+                              <Box>
+                                <Flex align="center" gap="2" className="mb-2">
+                                  <Layers size={14} className="text-blue-600" />
+                                  <Text size="2" weight="bold">Mission Sites ({missionSites.length})</Text>
+                                </Flex>
+                                <table className="data-table" style={{ tableLayout: 'fixed' }}>
+                                  <thead>
+                                    <tr>
+                                      <th className="col-id">#</th>
+                                      <th className="col-flex">Name</th>
+                                      <th className="col-flex">Location</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {missionSites.map((node) => {
+                                      const typeColor = node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6'
+                                      const isLoading = geocodingLoading.get(node.id) || false
+                                      const location = globalDisplayMode === 'coords'
+                                        ? `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
+                                        : isLoading ? 'Loading...' : node.address || `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
+                                      const isSelected = selectedNodeId === node.id
+                                      return (
+                                        <tr
+                                          key={node.id}
+                                          data-node-id={node.id}
+                                          className={isSelected ? 'selected' : ''}
+                                          onClick={() => setSelectedNodeId(isSelected ? null : node.id)}
+                                          onDoubleClick={() => handleOverviewDoubleClick(node.id)}
+                                          style={{ cursor: 'pointer' }}
+                                        >
+                                          <td className="accent-cell" style={{ '--accent-color': typeColor } as React.CSSProperties}>
+                                            <Flex align="center" gap="1">
+                                              <span style={{ fontWeight: 600 }}>{node.siteId || '?'}</span>
+                                            </Flex>
+                                          </td>
+                                          <td>
+                                            <span style={{ fontWeight: 600 }}>Site ID: {node.siteId || '?'}</span>
+                                            <span style={{ color: typeColor, fontWeight: 500 }}> — {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {nodeTypeNumberMap.get(node.id) || ''}</span>
+                                          </td>
+                                          <td className="cell-truncate" style={{ color: '#374151' }}>
+                                            {location}
+                                          </td>
+                                        </tr>
+                                      )
+                                    })}
+                                  </tbody>
+                                </table>
+                              </Box>
+                            )}
+                          </div>
+                        )}
+                      </ScrollArea>
+                    ) : (
+                    <ScrollArea style={{ height: '100%' }}>
+                      {missionConfig.nodes.length === 0 ? (
+                        <Box className="text-center p-6 bg-gray-50 rounded">
+                          <Text size="2" color="gray">
+                            No nodes added yet. Use &quot;Import Addresses (CSV)&quot; to bulk import, or switch to the Order Points / Mission Sites tabs to add individually.
+                          </Text>
+                        </Box>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {/* Order Points Section */}
+                          {orderNodes.length > 0 && (
+                            <Box>
+                              <Flex align="center" gap="2" className="mb-2">
+                                <MapPin size={14} className="text-green-600" />
+                                <Text size="2" weight="bold">Order Points ({orderNodes.length})</Text>
+                              </Flex>
+                              <div
+                                style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                  gap: '6px',
+                                }}
+                              >
+                                {orderNodes.map((node) => {
+                                  const displayMode = getDisplayMode(node.id)
+                                  const isLoading = geocodingLoading.get(node.id) || false
+                                  return (
+                                  <Card
+                                    key={node.id}
+                                    data-node-id={node.id}
+                                    className="p-2"
+                                    style={{
+                                      backgroundColor: selectedNodeId === node.id ? '#eff6ff' : 'white',
+                                      border: selectedNodeId === node.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                                      cursor: 'pointer',
+                                    }}
+                                    onClick={() => setSelectedNodeId(selectedNodeId === node.id ? null : node.id)}
+                                    onDoubleClick={() => handleOverviewDoubleClick(node.id)}
+                                  >
+                                    <Flex direction="column" gap="2">
+                                      <Flex align="center" gap="2">
+                                        <MapPin size={14} className="text-green-600" />
+                                        <Badge color="green" size="2" style={{ fontWeight: 'bold' }}>
+                                          Order ID: {node.orderId || '?'}
+                                        </Badge>
+                                      </Flex>
+                                      {displayMode === 'coords' ? (
+                                        <Text size="1" color="gray">
+                                          {node.lat.toFixed(6)}, {node.lng.toFixed(6)}
+                                        </Text>
+                                      ) : (
+                                        <Text size="1" color="gray" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {isLoading ? 'Looking up address...' : node.address || `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`}
+                                        </Text>
+                                      )}
+                                    </Flex>
+                                  </Card>
+                                  )
+                                })}
+                              </div>
+                            </Box>
+                          )}
+
+                          {/* Mission Sites Section */}
+                          {missionSites.length > 0 && (
+                            <Box>
+                              <Flex align="center" gap="2" className="mb-2">
+                                <Layers size={14} className="text-blue-600" />
+                                <Text size="2" weight="bold">Mission Sites ({missionSites.length})</Text>
+                              </Flex>
+                              <div
+                                style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                                  gap: '6px',
+                                }}
+                              >
+                                {missionSites.map((node) => {
+                                  const displayMode = getDisplayMode(node.id)
+                                  const isLoading = geocodingLoading.get(node.id) || false
+                                  return (
+                                  <Card
+                                    key={node.id}
+                                    data-node-id={node.id}
+                                    className="p-2"
+                                    style={{
+                                      backgroundColor: selectedNodeId === node.id ? '#eff6ff' : 'white',
+                                      border: selectedNodeId === node.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                                      cursor: 'pointer',
+                                    }}
+                                    onClick={() => setSelectedNodeId(selectedNodeId === node.id ? null : node.id)}
+                                    onDoubleClick={() => handleOverviewDoubleClick(node.id)}
+                                  >
+                                    <Flex direction="column" gap="2">
+                                      <Flex align="center" gap="1">
+                                        <Text size="2" weight="bold">Site ID: {node.siteId || '?'}</Text>
+                                        <Text size="2" color="gray">—</Text>
+                                        <Text size="2" weight="medium" style={{ color: node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6' }}>
+                                          {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {nodeTypeNumberMap.get(node.id) || ''}
+                                        </Text>
+                                        {node.type === 'hazard' && node.severity && (
+                                          <Badge size="1" variant="soft" color={getHazardColor(node.severity)} style={{ marginLeft: '4px' }}>
+                                            {node.severity}
+                                          </Badge>
+                                        )}
+                                      </Flex>
+                                      {displayMode === 'coords' ? (
+                                        <Text size="1" color="gray">
+                                          {node.lat.toFixed(6)}, {node.lng.toFixed(6)}
+                                        </Text>
+                                      ) : (
+                                        <Text size="1" color="gray" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {isLoading ? 'Looking up address...' : node.address || `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`}
+                                        </Text>
+                                      )}
+                                    </Flex>
+                                  </Card>
+                                  )
+                                })}
+                              </div>
+                            </Box>
+                          )}
+                        </div>
+                      )}
+                    </ScrollArea>
+                    )}
+                  </Tabs.Content>
 
                   {/* Order Points Tab */}
                   <Tabs.Content value="orders" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'hidden' }}>
@@ -1122,7 +1501,7 @@ export function BottomPanel() {
                             <Flex justify="between" align="start" className="mb-2">
                               <Box>
                                 <Flex align="center" gap="1">
-                                  <Text size="2" weight="bold">Mission Site {node.siteId || '?'}</Text>
+                                  <Text size="2" weight="bold">Site ID: {node.siteId || '?'}</Text>
                                   <Text size="2" color="gray">—</Text>
                                   <Text size="2" weight="medium" style={{ color: node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6' }}>
                                     {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {nodeTypeNumberMap.get(node.id) || ''}
@@ -1271,83 +1650,104 @@ export function BottomPanel() {
                 </Tabs.Root>
               </Box>
 
-              {/* Right: Fleet Control */}
-              <Box className="w-72 p-4 border-l">
-                <Flex align="center" gap="2" className="mb-3">
-                  <Text size="2" weight="bold">
-                    Fleet Control
+              {/* Right: Config Panel */}
+              <Box className="w-72 p-4 border-l" style={{ overflow: 'hidden' }}>
+                {/* Routing Algorithm */}
+                <Box className="mb-4">
+                  <Text size="2" weight="bold" className="mb-2 block">
+                    Routing Algorithm
                   </Text>
+                  <Select.Root
+                    value={missionConfig.algorithm}
+                    onValueChange={(value: string) => updateMissionConfig({ algorithm: value as RoutingAlgorithm })}
+                  >
+                    <Select.Trigger style={{ width: '100%' }} />
+                    <Select.Content>
+                      <Select.Item value="alns">Default Routing Engine</Select.Item>
+                      <Select.Item value="custom">Custom</Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </Box>
+
+                {/* Fleet Control */}
+                <Box className="mb-4 border-t pt-4">
+                  <Flex align="center" gap="2" className="mb-3">
+                    <Text size="2" weight="bold">
+                      Fleet Control
+                    </Text>
+                    {hasRoute && (
+                      <Badge color="orange" size="1">
+                        <Lock size={10} /> Locked
+                      </Badge>
+                    )}
+                  </Flex>
                   {hasRoute && (
-                    <Badge color="orange" size="1">
-                      <Lock size={10} /> Locked
-                    </Badge>
+                    <Text size="1" color="gray" style={{ display: 'block', marginBottom: '8px' }}>
+                      Clear route to change fleet configuration.
+                    </Text>
                   )}
-                </Flex>
-                {hasRoute && (
-                  <Text size="1" color="gray" style={{ display: 'block', marginBottom: '8px' }}>
-                    Clear route to change fleet configuration.
-                  </Text>
-                )}
-                <Flex direction="column" gap="4" style={{ opacity: hasRoute ? 0.5 : 1 }}>
-                  <Button
-                    size="2"
-                    variant={fleetMode === 'truck-drone' ? 'solid' : 'soft'}
-                    color={fleetMode === 'truck-drone' ? 'blue' : 'gray'}
-                    className="w-full justify-between"
-                    onClick={() => !hasRoute && setFleetMode('truck-drone')}
-                    disabled={hasRoute}
-                  >
-                    <Flex align="center" gap="2">
-                      <Truck size={16} />
-                      <Drone size={16} />
-                      <Text size="2">1 Truck + Drones</Text>
-                    </Flex>
-                    <TextField.Root
-                      type="number"
-                      value={droneCount}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDroneCount(Math.max(1, parseInt(e.target.value) || 1))}
-                      size="1"
-                      style={{ width: '50px' }}
-                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                      disabled={hasRoute || fleetMode !== 'truck-drone'}
-                    />
-                  </Button>
-                  <Button
-                    size="2"
-                    variant={fleetMode === 'truck-only' ? 'solid' : 'soft'}
-                    color={fleetMode === 'truck-only' ? 'blue' : 'gray'}
-                    className="w-full justify-center"
-                    onClick={() => !hasRoute && setFleetMode('truck-only')}
-                    disabled={hasRoute}
-                  >
-                    <Flex align="center" gap="2">
-                      <Truck size={16} />
-                      <Text size="2">Truck Only</Text>
-                    </Flex>
-                  </Button>
-                  <Button
-                    size="2"
-                    variant={fleetMode === 'drones-only' ? 'solid' : 'soft'}
-                    color={fleetMode === 'drones-only' ? 'blue' : 'gray'}
-                    className="w-full justify-between"
-                    onClick={() => !hasRoute && setFleetMode('drones-only')}
-                    disabled={hasRoute}
-                  >
-                    <Flex align="center" gap="2">
-                      <Drone size={16} />
-                      <Text size="2">Drones Only</Text>
-                    </Flex>
-                    <TextField.Root
-                      type="number"
-                      value={droneCount}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDroneCount(Math.max(1, parseInt(e.target.value) || 1))}
-                      size="1"
-                      style={{ width: '50px' }}
-                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                      disabled={hasRoute || fleetMode !== 'drones-only'}
-                    />
-                  </Button>
-                </Flex>
+                  <Flex direction="column" gap="4" style={{ opacity: hasRoute ? 0.5 : 1 }}>
+                    <Button
+                      size="2"
+                      variant={fleetMode === 'truck-drone' ? 'solid' : 'soft'}
+                      color={fleetMode === 'truck-drone' ? undefined : 'gray'}
+                      className="w-full justify-between"
+                      onClick={() => !hasRoute && setFleetMode('truck-drone')}
+                      disabled={hasRoute}
+                    >
+                      <Flex align="center" gap="2">
+                        <Truck size={16} />
+                        <Drone size={16} />
+                        <Text size="2">1 Truck + Drones</Text>
+                      </Flex>
+                      <TextField.Root
+                        type="number"
+                        value={droneCount}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDroneCount(Math.max(1, parseInt(e.target.value) || 1))}
+                        size="1"
+                        style={{ width: '50px' }}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                        disabled={hasRoute || fleetMode !== 'truck-drone'}
+                      />
+                    </Button>
+                    <Button
+                      size="2"
+                      variant={fleetMode === 'truck-only' ? 'solid' : 'soft'}
+                      color={fleetMode === 'truck-only' ? undefined : 'gray'}
+                      className="w-full justify-center"
+                      onClick={() => !hasRoute && setFleetMode('truck-only')}
+                      disabled={hasRoute}
+                    >
+                      <Flex align="center" gap="2">
+                        <Truck size={16} />
+                        <Text size="2">Truck Only</Text>
+                      </Flex>
+                    </Button>
+                    <Button
+                      size="2"
+                      variant={fleetMode === 'drones-only' ? 'solid' : 'soft'}
+                      color={fleetMode === 'drones-only' ? undefined : 'gray'}
+                      className="w-full justify-between"
+                      onClick={() => !hasRoute && setFleetMode('drones-only')}
+                      disabled={hasRoute}
+                    >
+                      <Flex align="center" gap="2">
+                        <Drone size={16} />
+                        <Text size="2">Drones Only</Text>
+                      </Flex>
+                      <TextField.Root
+                        type="number"
+                        value={droneCount}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDroneCount(Math.max(1, parseInt(e.target.value) || 1))}
+                        size="1"
+                        style={{ width: '50px' }}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                        disabled={hasRoute || fleetMode !== 'drones-only'}
+                      />
+                    </Button>
+                  </Flex>
+                </Box>
+
               </Box>
             </Flex>
           </Flex>
@@ -1419,37 +1819,66 @@ export function BottomPanel() {
           <Card className="h-full rounded-none shadow-xl" style={{ height: '100%' }}>
             <Flex direction="column" className="h-full">
               {/* Header */}
-              <Flex justify="between" align="center" className="p-3 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)' }}>
-                <Flex gap="4" align="center">
-                  <Flex align="center" gap="2">
-                    <FileText size={18} />
-                    <Text size="3" weight="bold">
-                      {missionConfig.missionName || 'Untitled Mission'}
-                    </Text>
-                    <Badge color="green" size="2">
-                      Running
-                    </Badge>
-                  </Flex>
+              <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px' }}>
+                {/* Mission name + status badges */}
+                <Flex align="center" gap="2" style={{ flexShrink: 0 }}>
+                  <FileText size={16} />
+                  <Text size="2" weight="bold">
+                    {missionConfig.missionName || 'Untitled Mission'}
+                  </Text>
+                  <Badge size="1" color={missionPaused ? 'orange' : 'green'} variant="solid">
+                    {missionPaused ? 'Paused' : 'Running'}
+                  </Badge>
+                </Flex>
 
-                  <DateTimeDisplay />
-                  <Flex gap="5" align="center" className="text-gray-600">
-                    <Flex gap="1" align="center" title="Time Elapsed / Estimated">
-                      <Clock size={14} />
-                      <Text size="1">00:00/{estimatedTime}</Text>
-                    </Flex>
-                    <Flex gap="1" align="center" title="Deliveries">
-                      <Package size={14} />
-                      <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
-                    </Flex>
-                    <Flex gap="1" align="center" title="Distance Covered / Total">
-                      <Route size={14} />
-                      <Text size="1">{coveredDistance}/{totalDistance}</Text>
-                    </Flex>
+                <DateTimeDisplay />
+
+                {/* Stats */}
+                <Flex gap="5" align="center" className="text-gray-600" style={{ flexShrink: 0 }}>
+                  <Flex gap="1" align="center" title="Time Elapsed / Estimated">
+                    <Clock size={14} />
+                    <Text size="1">00:00/{estimatedTime}</Text>
+                  </Flex>
+                  <Flex gap="1" align="center" title="Deliveries">
+                    <Package size={14} />
+                    <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
+                  </Flex>
+                  <Flex gap="1" align="center" title="Distance Covered / Total">
+                    <Route size={14} />
+                    <Text size="1">{coveredDistance}/{totalDistance}</Text>
                   </Flex>
                 </Flex>
 
-                <IconButton size="2" variant="ghost" onClick={() => setBottomPanelExpanded(false)}>
-                  <ChevronDown size={20} />
+                {/* Spacer */}
+                <div style={{ flex: 1 }} />
+
+                {/* Center: Flight control buttons */}
+                <Flex gap="2" align="center" style={{ flexShrink: 0 }}>
+                  <Button size="2" color="green" disabled>
+                    <Play size={14} /> Launch
+                  </Button>
+                  <Button size="2" color="orange" variant="soft" onClick={pauseMission}>
+                    <Pause size={14} /> {missionPaused ? 'Resume' : 'Pause'}
+                  </Button>
+                  <Button size="2" color="red" variant="soft" onClick={stopMission}>
+                    <Square size={14} /> Stop
+                  </Button>
+                </Flex>
+
+                <Box className="w-px h-6 bg-gray-300" style={{ flexShrink: 0 }} />
+
+                {/* Right: Make/Edit + Load (disabled during mission) next to collapse */}
+                <Flex gap="2" align="center" style={{ flexShrink: 0, width: '250px' }}>
+                  <Button size="2" style={{ flex: 1 }} disabled>
+                    <Settings size={14} /> Edit Plan
+                  </Button>
+                  <Button size="2" variant="soft" style={{ flex: 1 }} disabled>
+                    <FolderOpen size={14} /> Load Plan
+                  </Button>
+                </Flex>
+
+                <IconButton size="3" variant="ghost" onClick={() => setBottomPanelExpanded(false)} style={{ cursor: 'pointer' }}>
+                  <ChevronDown size={24} />
                 </IconButton>
               </Flex>
 
@@ -1458,8 +1887,8 @@ export function BottomPanel() {
 
               {/* Tabs */}
               <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'missionSites' | 'routes' | 'vehicles'); setSelectedNodeId(null); setSelectedRouteId(null); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                <Flex align="center" justify="between" className="px-4 pt-2">
-                  <Tabs.List style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
+                <Flex align="center" justify="between" className="px-4 pt-3">
+                  <Tabs.List size="2" style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
                     <Tabs.Trigger value="gantt">
                       <MapIcon size={16} className="mr-1" />
                       Itinerary
@@ -1584,7 +2013,7 @@ export function BottomPanel() {
                                 <Flex justify="between" align="center" style={{ marginBottom: '6px' }}>
                                   <Flex align="center" gap="2">
                                     <MapPin size={14} style={{ color: accentColor === '#d1d5db' ? '#9ca3af' : accentColor }} />
-                                    <Text size="2" weight="bold">Order {order.orderId || '?'}</Text>
+                                    <Text size="2" weight="bold">Order ID: {order.orderId || '?'}</Text>
                                   </Flex>
                                   <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={() => toggleCardDisplayMode(order.id, order)} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
                                     {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
@@ -1702,7 +2131,7 @@ export function BottomPanel() {
                                       <MapPin size={14} style={{ color: nodeColor, flexShrink: 0 }} />
                                     )}
                                     <Box>
-                                      <Text size="2" weight="bold">Mission Site {node.siteId || '?'}</Text>
+                                      <Text size="2" weight="bold">Site ID: {node.siteId || '?'}</Text>
                                       <Text size="1" style={{ color: nodeColor, fontWeight: 500, display: 'block', marginTop: '-1px' }}>
                                         {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {typeNum}
                                       </Text>
@@ -1789,6 +2218,7 @@ export function BottomPanel() {
           </Card>
         </div>
         <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
+        <input ref={csvInputRef} type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
         <ToastUI />
       </>
     )
@@ -1834,33 +2264,70 @@ export function BottomPanel() {
       <Card className="h-full rounded-none shadow-xl" style={{ height: '100%' }}>
         <Flex direction="column" className="h-full">
           {/* Header */}
-          <Flex justify="between" align="center" className="p-3 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)' }}>
-            <Flex gap="4" align="center">
-              <Flex align="center" gap="2">
-                <FileText size={18} />
-                <Text size="3" weight="bold">
-                  {missionConfig.missionName || 'Untitled Mission'}
-                </Text>
-                <Badge color={getStatusColor(missionStatus)} size="2">
-                  {missionStatus}
-                </Badge>
-              </Flex>
+          <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px' }}>
+            {/* Mission name + status badges */}
+            <Flex align="center" gap="2" style={{ flexShrink: 0 }}>
+              <FileText size={16} />
+              <Text size="2" weight="bold">
+                {missionConfig.missionName || 'Untitled Mission'}
+              </Text>
+              <Badge size="1" color={getStatusColor(missionStatus)}>{missionStatus}</Badge>
+              {!missionLaunched && (
+                <>
+                  <Badge size="1" color={missionConfig.nodes.length > 0 ? 'green' : 'gray'} variant={missionConfig.nodes.length > 0 ? 'soft' : 'outline'}>
+                    {missionConfig.nodes.length > 0 ? 'Plan Loaded' : 'No Plan'}
+                  </Badge>
+                  <Badge size="1" color={hasRoute ? 'green' : missionConfig.nodes.length > 0 ? 'orange' : 'gray'} variant={hasRoute ? 'soft' : 'outline'}>
+                    {hasRoute ? 'Route Ready' : missionConfig.nodes.length > 0 ? 'Route Required' : 'No Route'}
+                  </Badge>
+                </>
+              )}
+            </Flex>
 
-              <DateTimeDisplay />
-              <Flex gap="5" align="center" className="text-gray-600">
-                <Flex gap="1" align="center" title="Time Elapsed / Estimated">
-                  <Clock size={14} />
-                  <Text size="1">00:00/{estimatedTime}</Text>
-                </Flex>
-                <Flex gap="1" align="center" title="Deliveries">
-                  <Package size={14} />
-                  <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
-                </Flex>
-                <Flex gap="1" align="center" title="Distance Covered / Total">
-                  <Route size={14} />
-                  <Text size="1">{coveredDistance}/{totalDistance}</Text>
-                </Flex>
+            <DateTimeDisplay />
+
+            {/* Stats */}
+            <Flex gap="5" align="center" className="text-gray-600" style={{ flexShrink: 0 }}>
+              <Flex gap="1" align="center" title="Time Elapsed / Estimated">
+                <Clock size={14} />
+                <Text size="1">00:00/{estimatedTime}</Text>
               </Flex>
+              <Flex gap="1" align="center" title="Deliveries">
+                <Package size={14} />
+                <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
+              </Flex>
+              <Flex gap="1" align="center" title="Distance Covered / Total">
+                <Route size={14} />
+                <Text size="1">{coveredDistance}/{totalDistance}</Text>
+              </Flex>
+            </Flex>
+
+            {/* Spacer */}
+            <div style={{ flex: 1 }} />
+
+            {/* Center: Flight control buttons */}
+            <Flex gap="2" align="center" style={{ flexShrink: 0 }}>
+              <Button size="2" color="green" disabled={!missionConfig.nodes.length || (truckRoute.length === 0 && droneRoutes.length === 0) || hasUnroutedNodes || missionLaunched} onClick={launchMission} title={hasUnroutedNodes ? 'Unrouted points exist' : 'Launch Mission'}>
+                <Play size={14} /> Launch
+              </Button>
+              <Button size="2" color="orange" variant="soft" disabled={!missionLaunched} onClick={pauseMission}>
+                <Pause size={14} /> {missionPaused ? 'Resume' : 'Pause'}
+              </Button>
+              <Button size="2" color="red" variant="soft" disabled={!missionLaunched} onClick={stopMission}>
+                <Square size={14} /> Stop
+              </Button>
+            </Flex>
+
+            <Box className="w-px h-6 bg-gray-300" style={{ flexShrink: 0 }} />
+
+            {/* Right: Make/Edit + Load buttons next to collapse */}
+            <Flex gap="2" align="center" style={{ flexShrink: 0, width: '250px' }}>
+              <Button size="2" style={{ flex: 1 }} onClick={() => setIsFlightPlannerMode(true)} disabled={missionLaunched}>
+                {missionConfig.nodes.length > 0 ? <><Settings size={14} /> Edit Plan</> : <><Plus size={14} /> Make Plan</>}
+              </Button>
+              <Button size="2" variant="soft" style={{ flex: 1 }} onClick={handleImport} disabled={missionLaunched}>
+                <FolderOpen size={14} /> Load Plan
+              </Button>
             </Flex>
 
             <IconButton size="3" variant="ghost" onClick={() => setBottomPanelExpanded(false)} style={{ cursor: 'pointer' }}>
@@ -1873,8 +2340,8 @@ export function BottomPanel() {
 
           {/* Tabs */}
           <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'missionSites' | 'routes' | 'vehicles'); setSelectedNodeId(null); setSelectedRouteId(null); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            <Flex align="center" justify="between" className="px-4 pt-2">
-              <Tabs.List style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
+            <Flex align="center" justify="between" className="px-4 pt-3">
+              <Tabs.List size="2" style={!hasRoute ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
                 <Tabs.Trigger value="gantt">
                   <MapIcon size={16} className="mr-1" />
                   Itinerary
@@ -1999,7 +2466,7 @@ export function BottomPanel() {
                             <Flex justify="between" align="center" style={{ marginBottom: '6px' }}>
                               <Flex align="center" gap="2">
                                 <MapPin size={14} style={{ color: accentColor === '#d1d5db' ? '#9ca3af' : accentColor }} />
-                                <Text size="2" weight="bold">Order {order.orderId || '?'}</Text>
+                                <Text size="2" weight="bold">Order ID: {order.orderId || '?'}</Text>
                               </Flex>
                               <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={() => toggleCardDisplayMode(order.id, order)} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
                                 {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
@@ -2117,7 +2584,7 @@ export function BottomPanel() {
                                   <MapPin size={14} style={{ color: nodeColor, flexShrink: 0 }} />
                                 )}
                                 <Box>
-                                  <Text size="2" weight="bold">Mission Site {node.siteId || '?'}</Text>
+                                  <Text size="2" weight="bold">Site ID: {node.siteId || '?'}</Text>
                                   <Text size="1" style={{ color: nodeColor, fontWeight: 500, display: 'block', marginTop: '-1px' }}>
                                     {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {typeNum}
                                   </Text>
@@ -2204,6 +2671,7 @@ export function BottomPanel() {
       </Card>
       </div>
       <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
+      <input ref={csvInputRef} type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
       <ToastUI />
     </>
   )
@@ -2220,6 +2688,9 @@ function MissionStatsBar({
   timelineSummary,
   droneDeliveries: droneDeliveriesProp,
   truckDeliveries: truckDeliveriesProp,
+  truckRoutePoints,
+  droneSorties,
+  isFlightPlannerMode,
 }: {
   missionConfig: {
     nodes: { type: string }[]
@@ -2234,6 +2705,9 @@ function MissionStatsBar({
   timelineSummary?: TimelineSummary
   droneDeliveries?: number
   truckDeliveries?: number
+  truckRoutePoints?: number
+  droneSorties?: number
+  isFlightPlannerMode?: boolean
 }) {
   const orderCount = missionConfig.nodes.filter((n) => n.type === 'order').length
   const depotCount = missionConfig.nodes.filter((n) => n.type === 'depot').length
@@ -2283,6 +2757,24 @@ function MissionStatsBar({
           {hasRoute && hasDrones ? droneCount : '-'}
         </Text>
       </Flex>
+      {/* Truck route / drone sorties info (flight planner mode) */}
+      {isFlightPlannerMode && (
+        <>
+          <Box className="w-px h-4 bg-gray-300" />
+          <Flex gap="1" align="center" title={`Truck Route: ${truckRoutePoints ? `${truckRoutePoints} pts` : '--'}`} style={{ opacity: hasTruck ? 1 : 0.35 }}>
+            <Truck size={12} style={{ color: hasTruck && truckRoutePoints ? '#374151' : '#9ca3af' }} />
+            <Text size="1" weight="medium" style={{ color: hasTruck && truckRoutePoints ? undefined : '#9ca3af' }}>
+              {hasTruck && truckRoutePoints ? `${truckRoutePoints} pts` : '--'}
+            </Text>
+          </Flex>
+          <Flex gap="1" align="center" title={`Drone Sorties: ${droneSorties ? `${droneSorties} sorties` : '--'}`} style={{ opacity: hasDrones ? 1 : 0.35 }}>
+            <Drone size={12} style={{ color: hasDrones && droneSorties ? '#3b82f6' : '#9ca3af' }} />
+            <Text size="1" weight="medium" style={{ color: hasDrones && droneSorties ? undefined : '#9ca3af' }}>
+              {hasDrones && droneSorties ? `${droneSorties} sorties` : '--'}
+            </Text>
+          </Flex>
+        </>
+      )}
       {/* Vehicle-specific stats from timeline summary */}
       {timelineSummary && (
         <>

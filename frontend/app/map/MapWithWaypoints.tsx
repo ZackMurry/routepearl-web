@@ -9,7 +9,6 @@ import TextMarker from '@/components/TextMarker'
 import ArrowheadPolyline from '@/components/ArrowheadPolyline'
 import chroma from 'chroma-js'
 import { FlightPlannerProvider, useFlightPlanner } from './FlightPlannerContext'
-import { FlightPlannerSidebar } from './FlightPlannerSidebar'
 import { BottomPanel } from './BottomPanel'
 import MissionSiteMarker from './MissionSiteMarker'
 import SortieFlightPath from './SortieFlightPath'
@@ -464,8 +463,7 @@ function MapContent() {
           ))}
         </MapContainer>
 
-        {/* Sidebar and Bottom Panel */}
-        <FlightPlannerSidebar />
+        {/* Bottom Panel */}
         <BottomPanel />
       </div>
     </>
