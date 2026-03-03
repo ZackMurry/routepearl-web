@@ -187,8 +187,8 @@ export function BottomPanel() {
       }}
       title={timeMode === 'clock' ? 'Click for mission time' : 'Click for clock time'}
     >
-      <Calendar size={13} style={{ color: missionLaunched ? '#10b981' : '#6b7280' }} />
-      <Text size="1" style={{ color: missionLaunched ? '#10b981' : '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
+      <Calendar size={16} style={{ color: missionLaunched ? '#10b981' : '#6b7280' }} />
+      <Text size="2" style={{ color: missionLaunched ? '#10b981' : '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
         {timeMode === 'clock' ? formatClockTime(currentTime) : formatMissionElapsed(missionElapsedTime)}
       </Text>
     </Flex>
@@ -505,6 +505,9 @@ export function BottomPanel() {
   const hasRoute = truckRoute.length > 0 || droneRoutes.length > 0
   const orderNodes = missionConfig.nodes.filter((n) => n.type === 'order')
   const missionSites = missionConfig.nodes.filter((n) => n.type !== 'order')
+  const hasDepot = missionConfig.nodes.some((n) => n.type === 'depot')
+  const canGenerateRoute = hasDepot && orderNodes.length > 0
+  const canSave = missionConfig.nodes.length > 0
 
   // When a node is selected, expand the bottom panel if collapsed
   useEffect(() => {
@@ -665,7 +668,7 @@ export function BottomPanel() {
   }, [hasRoute, missionSites, timelineResult.events])
 
   // Generate Gantt chart data - always call hooks unconditionally
-  const ganttDataFromHook = useGanttData(timelineResult, fleetMode, droneCount)
+  const ganttDataFromHook = useGanttData(timelineResult, fleetMode, droneCount, missionConfig.nodes)
   const ganttData = hasRoute ? ganttDataFromHook : generateEmptyGanttData(fleetMode, droneCount)
 
   // Generate route details for Routes tab
@@ -742,10 +745,11 @@ export function BottomPanel() {
         >
         <Card className="rounded-none shadow-xl" style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
           <Flex direction="column">
-            <Flex align="center" className="p-4" style={{ gap: '12px' }}>
-              {/* Mission name + status badges — fixed width so right side stays put */}
+            <Flex align="center" className="p-4" style={{ gap: '12px', paddingTop: '24px' }}>
+              {/* Mode label + Mission name + status badges — fixed width so right side stays put */}
               {isFlightPlannerMode ? (
-                <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden' }}>
+                <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+                  <Text size="1" weight="medium" style={{ position: 'absolute', top: '-16px', left: 0, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Route Planner</Text>
                   <Route size={16} style={{ flexShrink: 0, color: '#6b7280' }} />
                   <TextField.Root
                     value={missionConfig.missionName}
@@ -763,7 +767,8 @@ export function BottomPanel() {
                   </Badge>
                 </Flex>
               ) : (
-                <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden' }}>
+                <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+                  <Text size="1" weight="medium" style={{ position: 'absolute', top: '-16px', left: 0, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Mission Control</Text>
                   <FileText size={16} style={{ flexShrink: 0 }} />
                   <Text size="2" weight="bold" style={{ whiteSpace: 'nowrap' }}>
                     {missionConfig.missionName || 'Untitled Mission'}
@@ -789,16 +794,16 @@ export function BottomPanel() {
               {/* Stats */}
               <Flex gap="5" align="center" className="text-gray-600" style={{ flexShrink: 0 }}>
                 <Flex gap="1" align="center" title="Time Elapsed / Estimated">
-                  <Clock size={14} />
-                  <Text size="1">00:00/{estimatedTime}</Text>
+                  <Clock size={16} />
+                  <Text size="2">00:00/{estimatedTime}</Text>
                 </Flex>
                 <Flex gap="1" align="center" title="Deliveries">
-                  <Package size={14} />
-                  <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
+                  <Package size={16} />
+                  <Text size="2">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
                 </Flex>
                 <Flex gap="1" align="center" title="Distance Covered / Total">
-                  <Route size={14} />
-                  <Text size="1">{coveredDistance}/{totalDistance}</Text>
+                  <Route size={16} />
+                  <Text size="2">{coveredDistance}/{totalDistance}</Text>
                 </Flex>
               </Flex>
 
@@ -808,7 +813,7 @@ export function BottomPanel() {
               {/* Center zone: control buttons (between stats and action buttons) */}
               <Flex gap="2" align="center" justify="center" style={{ flexShrink: 0, minWidth: '280px' }}>
                 {isFlightPlannerMode ? (
-                  <Button size="2" style={{ paddingLeft: '16px', paddingRight: '16px' }} onClick={generateRoute} loading={isGeneratingRoute} disabled={hasUnassignedWaypoints || isGeneratingRoute} title={hasUnassignedWaypoints ? 'Assign all waypoints a type first' : 'Generate Optimal Route'}>
+                  <Button size="2" style={{ paddingLeft: '16px', paddingRight: '16px' }} onClick={generateRoute} loading={isGeneratingRoute} disabled={!canGenerateRoute || hasUnassignedWaypoints || isGeneratingRoute} title={!canGenerateRoute ? 'Requires at least 1 depot and 1 order' : hasUnassignedWaypoints ? 'Assign all waypoints a type first' : 'Generate Optimal Route'}>
                     <Route size={14} /> Generate Route
                   </Button>
                 ) : (
@@ -834,7 +839,7 @@ export function BottomPanel() {
                   <Button size="2" variant="soft" color="gray" style={{ flex: 1 }} onClick={handleExitFlightPlanner}>
                     <LogOut size={14} /> Exit
                   </Button>
-                  <Button size="2" variant="soft" style={{ flex: 1 }} onClick={handleExport}>
+                  <Button size="2" variant="soft" style={{ flex: 1 }} onClick={handleExport} disabled={!canSave} title={!canSave ? 'Add at least 1 node or order to save' : 'Save mission'}>
                     <Download size={14} /> Save
                   </Button>
                 </Flex>
@@ -906,9 +911,10 @@ export function BottomPanel() {
         <Card className="h-full rounded-none shadow-xl" style={{ height: '100%' }}>
           <Flex direction="column" className="h-full">
             {/* Header */}
-            <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px' }}>
-              {/* Mission name + route status badge — fixed width so right side stays put */}
-              <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden' }}>
+            <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px', paddingTop: '24px' }}>
+              {/* Mode label + Mission name + route status badge — fixed width so right side stays put */}
+              <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+                <Text size="1" weight="medium" style={{ position: 'absolute', top: '-16px', left: 0, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Route Planner</Text>
                 <Route size={16} style={{ flexShrink: 0, color: '#6b7280' }} />
                 <TextField.Root
                   value={missionConfig.missionName}
@@ -933,16 +939,16 @@ export function BottomPanel() {
               {/* Stats */}
               <Flex gap="5" align="center" className="text-gray-600" style={{ flexShrink: 0 }}>
                 <Flex gap="1" align="center" title="Time Elapsed / Estimated">
-                  <Clock size={14} />
-                  <Text size="1">00:00/{estimatedTime}</Text>
+                  <Clock size={16} />
+                  <Text size="2">00:00/{estimatedTime}</Text>
                 </Flex>
                 <Flex gap="1" align="center" title="Deliveries">
-                  <Package size={14} />
-                  <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
+                  <Package size={16} />
+                  <Text size="2">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
                 </Flex>
                 <Flex gap="1" align="center" title="Distance Covered / Total">
-                  <Route size={14} />
-                  <Text size="1">{coveredDistance}/{totalDistance}</Text>
+                  <Route size={16} />
+                  <Text size="2">{coveredDistance}/{totalDistance}</Text>
                 </Flex>
               </Flex>
 
@@ -950,7 +956,7 @@ export function BottomPanel() {
               <div style={{ flex: 1 }} />
 
               {/* Center: Generate Route button */}
-              <Button size="2" style={{ paddingLeft: '16px', paddingRight: '16px' }} onClick={generateRoute} loading={isGeneratingRoute} disabled={hasUnassignedWaypoints || isGeneratingRoute} title={hasUnassignedWaypoints ? 'Assign all waypoints a type first' : 'Generate Optimal Route'}>
+              <Button size="2" style={{ paddingLeft: '16px', paddingRight: '16px' }} onClick={generateRoute} loading={isGeneratingRoute} disabled={!canGenerateRoute || hasUnassignedWaypoints || isGeneratingRoute} title={!canGenerateRoute ? 'Requires at least 1 depot and 1 order' : hasUnassignedWaypoints ? 'Assign all waypoints a type first' : 'Generate Optimal Route'}>
                 <Route size={14} /> Generate Route
               </Button>
 
@@ -961,7 +967,7 @@ export function BottomPanel() {
                 <Button size="2" variant="soft" color="gray" style={{ flex: 1 }} onClick={handleExitFlightPlanner}>
                   <LogOut size={14} /> Exit
                 </Button>
-                <Button size="2" variant="soft" style={{ flex: 1 }} onClick={handleExport}>
+                <Button size="2" variant="soft" style={{ flex: 1 }} onClick={handleExport} disabled={!canSave} title={!canSave ? 'Add at least 1 node or order to save' : 'Save mission'}>
                   <Download size={14} /> Save
                 </Button>
               </Flex>
@@ -1215,11 +1221,16 @@ export function BottomPanel() {
                                     onDoubleClick={() => handleOverviewDoubleClick(node.id)}
                                   >
                                     <Flex direction="column" gap="2">
-                                      <Flex align="center" gap="2">
-                                        <MapPin size={14} className="text-green-600" />
-                                        <Badge color="green" size="2" style={{ fontWeight: 'bold' }}>
-                                          Order ID: {node.orderId || '?'}
-                                        </Badge>
+                                      <Flex justify="between" align="center">
+                                        <Flex align="center" gap="2">
+                                          <MapPin size={14} className="text-green-600" />
+                                          <Badge color="green" size="2" style={{ fontWeight: 'bold' }}>
+                                            Order ID: {node.orderId || '?'}
+                                          </Badge>
+                                        </Flex>
+                                        <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={(e) => { e.stopPropagation(); toggleCardDisplayMode(node.id, node) }} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
+                                          {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
+                                        </IconButton>
                                       </Flex>
                                       {displayMode === 'coords' ? (
                                         <Text size="1" color="gray">
@@ -1269,17 +1280,22 @@ export function BottomPanel() {
                                     onDoubleClick={() => handleOverviewDoubleClick(node.id)}
                                   >
                                     <Flex direction="column" gap="2">
-                                      <Flex align="center" gap="1">
-                                        <Text size="2" weight="bold">Site ID: {node.siteId || '?'}</Text>
-                                        <Text size="2" color="gray">—</Text>
-                                        <Text size="2" weight="medium" style={{ color: node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6' }}>
-                                          {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {nodeTypeNumberMap.get(node.id) || ''}
-                                        </Text>
-                                        {node.type === 'hazard' && node.severity && (
-                                          <Badge size="1" variant="soft" color={getHazardColor(node.severity)} style={{ marginLeft: '4px' }}>
-                                            {node.severity}
-                                          </Badge>
-                                        )}
+                                      <Flex justify="between" align="center">
+                                        <Flex align="center" gap="1">
+                                          <Text size="2" weight="bold">Site ID: {node.siteId || '?'}</Text>
+                                          <Text size="2" color="gray">—</Text>
+                                          <Text size="2" weight="medium" style={{ color: node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6' }}>
+                                            {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {nodeTypeNumberMap.get(node.id) || ''}
+                                          </Text>
+                                          {node.type === 'hazard' && node.severity && (
+                                            <Badge size="1" variant="soft" color={getHazardColor(node.severity)} style={{ marginLeft: '4px' }}>
+                                              {node.severity}
+                                            </Badge>
+                                          )}
+                                        </Flex>
+                                        <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={(e) => { e.stopPropagation(); toggleCardDisplayMode(node.id, node) }} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
+                                          {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
+                                        </IconButton>
                                       </Flex>
                                       {displayMode === 'coords' ? (
                                         <Text size="1" color="gray">
@@ -1317,6 +1333,8 @@ export function BottomPanel() {
                         addressSearchInputs={addressSearchInputs}
                         onAddressSearchInputChange={(nodeId, value) => setAddressSearchInputs(prev => new Map(prev).set(nodeId, value))}
                         onAddressSearch={handleAddressSearch}
+                        getDisplayMode={getDisplayMode}
+                        onToggleDisplayMode={toggleCardDisplayMode}
                       />
                     ) : (
                     <ScrollArea style={{ height: '100%' }}>
@@ -1483,6 +1501,8 @@ export function BottomPanel() {
                         addressSearchInputs={addressSearchInputs}
                         onAddressSearchInputChange={(nodeId, value) => setAddressSearchInputs(prev => new Map(prev).set(nodeId, value))}
                         onAddressSearch={handleAddressSearch}
+                        getDisplayMode={getDisplayMode}
+                        onToggleDisplayMode={toggleCardDisplayMode}
                       />
                     ) : (
                     <ScrollArea style={{ height: '100%' }}>
@@ -1510,20 +1530,27 @@ export function BottomPanel() {
                             onClick={() => setSelectedNodeId(selectedNodeId === node.id ? null : node.id)}
                           >
                             <Flex justify="between" align="start" className="mb-2">
-                              <Box>
-                                <Flex align="center" gap="1">
-                                  <Text size="2" weight="bold">Site ID: {node.siteId || '?'}</Text>
-                                  <Text size="2" color="gray">—</Text>
-                                  <Text size="2" weight="medium" style={{ color: node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6' }}>
-                                    {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {nodeTypeNumberMap.get(node.id) || ''}
-                                  </Text>
-                                  {node.type === 'hazard' && node.severity && (
-                                    <Badge size="1" variant="soft" color={getHazardColor(node.severity)} style={{ marginLeft: '4px' }}>
-                                      {node.severity}
-                                    </Badge>
-                                  )}
-                                </Flex>
-                              </Box>
+                              <Flex align="center" gap="1">
+                                <Text size="2" weight="bold">Site ID: {node.siteId || '?'}</Text>
+                                <Text size="2" color="gray">—</Text>
+                                <Text size="2" weight="medium" style={{ color: node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6' }}>
+                                  {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {nodeTypeNumberMap.get(node.id) || ''}
+                                </Text>
+                                {node.type === 'hazard' && node.severity && (
+                                  <Badge size="1" variant="soft" color={getHazardColor(node.severity)} style={{ marginLeft: '4px' }}>
+                                    {node.severity}
+                                  </Badge>
+                                )}
+                                <IconButton
+                                  size="1" variant="ghost"
+                                  color={displayMode === 'address' ? 'blue' : 'gray'}
+                                  onClick={(e) => { e.stopPropagation(); toggleCardDisplayMode(node.id, node) }}
+                                  title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'}
+                                  style={{ minWidth: '20px', minHeight: '20px', padding: '2px' }}
+                                >
+                                  {displayMode === 'coords' ? <MapPinned size={12} /> : <Hash size={12} />}
+                                </IconButton>
+                              </Flex>
                               <IconButton size="1" variant="ghost" color="red" onClick={() => removeNode(node.id)}>
                                 <Trash2 size={14} />
                               </IconButton>
@@ -1665,19 +1692,34 @@ export function BottomPanel() {
               <Box className="w-79 p-4 border-l" style={{ overflow: 'hidden' }}>
                 {/* Routing Algorithm */}
                 <Box className="mb-4">
-                  <Text size="2" weight="bold" style={{ display: 'block', marginBottom: '12px' }}>
-                    Routing Algorithm
-                  </Text>
-                  <Select.Root
-                    value={missionConfig.algorithm}
-                    onValueChange={(value: string) => updateMissionConfig({ algorithm: value as RoutingAlgorithm })}
-                  >
-                    <Select.Trigger style={{ width: '100%' }} />
-                    <Select.Content>
-                      <Select.Item value="alns">Default Routing Engine</Select.Item>
-                      <Select.Item value="custom">Custom</Select.Item>
-                    </Select.Content>
-                  </Select.Root>
+                  <Flex align="center" gap="2" style={{ display: 'flex', marginBottom: '12px' }}>
+                    <Text size="2" weight="bold">
+                      Routing Algorithm
+                    </Text>
+                    {hasRoute && (
+                      <Badge color="orange" size="1">
+                        <Lock size={10} /> Locked
+                      </Badge>
+                    )}
+                  </Flex>
+                  {hasRoute && (
+                    <Text size="1" color="gray" style={{ display: 'block', marginBottom: '8px' }}>
+                      Clear route to change algorithm.
+                    </Text>
+                  )}
+                  <Box style={{ opacity: hasRoute ? 0.5 : 1, pointerEvents: hasRoute ? 'none' : 'auto' }}>
+                    <Select.Root
+                      value={missionConfig.algorithm}
+                      onValueChange={(value: string) => updateMissionConfig({ algorithm: value as RoutingAlgorithm })}
+                      disabled={hasRoute}
+                    >
+                      <Select.Trigger style={{ width: '100%' }} />
+                      <Select.Content>
+                        <Select.Item value="alns">Default Routing Engine</Select.Item>
+                        <Select.Item value="custom">Custom</Select.Item>
+                      </Select.Content>
+                    </Select.Root>
+                  </Box>
                 </Box>
 
                 {/* Fleet Control */}
@@ -1840,9 +1882,10 @@ export function BottomPanel() {
           <Card className="h-full rounded-none shadow-xl" style={{ height: '100%' }}>
             <Flex direction="column" className="h-full">
               {/* Header */}
-              <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px' }}>
-                {/* Mission name + status badges — fixed width so right side stays put */}
-                <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden' }}>
+              <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px', paddingTop: '24px' }}>
+                {/* Mode label + Mission name + status badges — fixed width so right side stays put */}
+                <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+                  <Text size="1" weight="medium" style={{ position: 'absolute', top: '-16px', left: 0, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Mission Control</Text>
                   <FileText size={16} style={{ flexShrink: 0 }} />
                   <Text size="2" weight="bold" style={{ whiteSpace: 'nowrap' }}>
                     {missionConfig.missionName || 'Untitled Mission'}
@@ -1859,16 +1902,16 @@ export function BottomPanel() {
                 {/* Stats */}
                 <Flex gap="5" align="center" className="text-gray-600" style={{ flexShrink: 0 }}>
                   <Flex gap="1" align="center" title="Time Elapsed / Estimated">
-                    <Clock size={14} />
-                    <Text size="1">00:00/{estimatedTime}</Text>
+                    <Clock size={16} />
+                    <Text size="2">00:00/{estimatedTime}</Text>
                   </Flex>
                   <Flex gap="1" align="center" title="Deliveries">
-                    <Package size={14} />
-                    <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
+                    <Package size={16} />
+                    <Text size="2">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
                   </Flex>
                   <Flex gap="1" align="center" title="Distance Covered / Total">
-                    <Route size={14} />
-                    <Text size="1">{coveredDistance}/{totalDistance}</Text>
+                    <Route size={16} />
+                    <Text size="2">{coveredDistance}/{totalDistance}</Text>
                   </Flex>
                 </Flex>
 
@@ -1906,7 +1949,7 @@ export function BottomPanel() {
               </Flex>
 
               {/* Stats Bar */}
-              <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} />
+              <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} truckRoutePoints={truckRoute.length} droneSorties={droneRoutes.length} />
 
               {/* Tabs */}
               <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'missionSites' | 'routes' | 'vehicles'); setSelectedNodeId(null); setSelectedRouteId(null); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -1999,6 +2042,8 @@ export function BottomPanel() {
                       geocodingLoading={geocodingLoading}
                       selectedNodeId={selectedNodeId}
                       onSelectNode={(id) => setSelectedNodeId(id)}
+                      getDisplayMode={getDisplayMode}
+                      onToggleDisplayMode={toggleCardDisplayMode}
                     />
                   ) : (
                   <ScrollArea style={{ height: '100%' }}>
@@ -2107,6 +2152,8 @@ export function BottomPanel() {
                       nodeEventCountMap={nodeEventCountMap}
                       selectedNodeId={selectedNodeId}
                       onSelectNode={(id) => setSelectedNodeId(id)}
+                      getDisplayMode={getDisplayMode}
+                      onToggleDisplayMode={toggleCardDisplayMode}
                     />
                   ) : (
                   <ScrollArea style={{ height: '100%' }}>
@@ -2160,11 +2207,16 @@ export function BottomPanel() {
                                       </Text>
                                     </Box>
                                   </Flex>
-                                  {node.type === 'hazard' && node.severity && (
-                                    <Badge size="1" variant="soft" color={getHazardColor(node.severity)}>
-                                      {node.severity}
-                                    </Badge>
-                                  )}
+                                  <Flex align="center" gap="1">
+                                    {node.type === 'hazard' && node.severity && (
+                                      <Badge size="1" variant="soft" color={getHazardColor(node.severity)}>
+                                        {node.severity}
+                                      </Badge>
+                                    )}
+                                    <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={(e) => { e.stopPropagation(); toggleCardDisplayMode(node.id, node) }} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
+                                      {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
+                                    </IconButton>
+                                  </Flex>
                                 </Flex>
                                 <Text size="1" color="gray" style={{ display: 'block', marginBottom: '6px' }}>
                                   {displayMode === 'coords'
@@ -2287,9 +2339,10 @@ export function BottomPanel() {
       <Card className="h-full rounded-none shadow-xl" style={{ height: '100%' }}>
         <Flex direction="column" className="h-full">
           {/* Header */}
-          <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px' }}>
-            {/* Mission name + status badges — fixed width so right side stays put */}
-            <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden' }}>
+          <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px', paddingTop: '24px' }}>
+            {/* Mode label + Mission name + status badges — fixed width so right side stays put */}
+            <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+              <Text size="1" weight="medium" style={{ position: 'absolute', top: '-16px', left: 0, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Mission Control</Text>
               <FileText size={16} style={{ flexShrink: 0 }} />
               <Text size="2" weight="bold" style={{ whiteSpace: 'nowrap' }}>
                 {missionConfig.missionName || 'Untitled Mission'}
@@ -2314,16 +2367,16 @@ export function BottomPanel() {
             {/* Stats */}
             <Flex gap="5" align="center" className="text-gray-600" style={{ flexShrink: 0 }}>
               <Flex gap="1" align="center" title="Time Elapsed / Estimated">
-                <Clock size={14} />
-                <Text size="1">00:00/{estimatedTime}</Text>
+                <Clock size={16} />
+                <Text size="2">00:00/{estimatedTime}</Text>
               </Flex>
               <Flex gap="1" align="center" title="Deliveries">
-                <Package size={14} />
-                <Text size="1">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
+                <Package size={16} />
+                <Text size="2">{deliveredPackages}/{hasRoute ? totalOrders : '-'}</Text>
               </Flex>
               <Flex gap="1" align="center" title="Distance Covered / Total">
-                <Route size={14} />
-                <Text size="1">{coveredDistance}/{totalDistance}</Text>
+                <Route size={16} />
+                <Text size="2">{coveredDistance}/{totalDistance}</Text>
               </Flex>
             </Flex>
 
@@ -2361,7 +2414,7 @@ export function BottomPanel() {
           </Flex>
 
           {/* Stats Bar */}
-          <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} />
+          <MissionStatsBar missionConfig={missionConfig} missionLaunched={missionLaunched} fleetMode={fleetMode} droneCount={droneCount} hasRoute={hasRoute} timelineSummary={hasRoute ? timelineResult.summary : undefined} droneDeliveries={droneDeliveryCount} truckDeliveries={truckDeliveryCount} truckRoutePoints={truckRoute.length} droneSorties={droneRoutes.length} />
 
           {/* Tabs */}
           <Tabs.Root value={hasRoute ? missionTab : 'gantt'} onValueChange={(v: string) => { if (!hasRoute) return; setMissionTab(v as 'gantt' | 'orders' | 'missionSites' | 'routes' | 'vehicles'); setSelectedNodeId(null); setSelectedRouteId(null); }} className="flex-1" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -2454,6 +2507,8 @@ export function BottomPanel() {
                   geocodingLoading={geocodingLoading}
                   selectedNodeId={selectedNodeId}
                   onSelectNode={(id) => setSelectedNodeId(id)}
+                  getDisplayMode={getDisplayMode}
+                  onToggleDisplayMode={toggleCardDisplayMode}
                 />
               ) : (
               <ScrollArea style={{ height: '100%' }}>
@@ -2562,6 +2617,8 @@ export function BottomPanel() {
                   nodeEventCountMap={nodeEventCountMap}
                   selectedNodeId={selectedNodeId}
                   onSelectNode={(id) => setSelectedNodeId(id)}
+                  getDisplayMode={getDisplayMode}
+                  onToggleDisplayMode={toggleCardDisplayMode}
                 />
               ) : (
               <ScrollArea style={{ height: '100%' }}>
@@ -2615,11 +2672,16 @@ export function BottomPanel() {
                                   </Text>
                                 </Box>
                               </Flex>
-                              {node.type === 'hazard' && node.severity && (
-                                <Badge size="1" variant="soft" color={getHazardColor(node.severity)}>
-                                  {node.severity}
-                                </Badge>
-                              )}
+                              <Flex align="center" gap="1">
+                                {node.type === 'hazard' && node.severity && (
+                                  <Badge size="1" variant="soft" color={getHazardColor(node.severity)}>
+                                    {node.severity}
+                                  </Badge>
+                                )}
+                                <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={(e) => { e.stopPropagation(); toggleCardDisplayMode(node.id, node) }} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
+                                  {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
+                                </IconButton>
+                              </Flex>
                             </Flex>
                             <Text size="1" color="gray" style={{ display: 'block', marginBottom: '6px' }}>
                               {displayMode === 'coords'
@@ -2782,24 +2844,6 @@ function MissionStatsBar({
           {hasRoute && hasDrones ? droneCount : '-'}
         </Text>
       </Flex>
-      {/* Truck route / drone sorties info (flight planner mode) */}
-      {isFlightPlannerMode && (
-        <>
-          <Box className="w-px h-4 bg-gray-300" />
-          <Flex gap="1" align="center" title={`Truck Route: ${truckRoutePoints ? `${truckRoutePoints} pts` : '--'}`} style={{ opacity: hasTruck ? 1 : 0.35 }}>
-            <Truck size={12} style={{ color: hasTruck && truckRoutePoints ? '#374151' : '#9ca3af' }} />
-            <Text size="1" weight="medium" style={{ color: hasTruck && truckRoutePoints ? undefined : '#9ca3af' }}>
-              {hasTruck && truckRoutePoints ? `${truckRoutePoints} pts` : '--'}
-            </Text>
-          </Flex>
-          <Flex gap="1" align="center" title={`Drone Sorties: ${droneSorties ? `${droneSorties} sorties` : '--'}`} style={{ opacity: hasDrones ? 1 : 0.35 }}>
-            <Drone size={12} style={{ color: hasDrones && droneSorties ? '#3b82f6' : '#9ca3af' }} />
-            <Text size="1" weight="medium" style={{ color: hasDrones && droneSorties ? undefined : '#9ca3af' }}>
-              {hasDrones && droneSorties ? `${droneSorties} sorties` : '--'}
-            </Text>
-          </Flex>
-        </>
-      )}
       {/* Vehicle-specific stats from timeline summary */}
       {timelineSummary && (
         <>
@@ -2816,6 +2860,36 @@ function MissionStatsBar({
               <Drone size={12} style={{ color: hasDrones ? '#3b82f6' : '#9ca3af' }} />
               <Text size="1" weight="medium" style={{ color: hasDrones ? undefined : '#9ca3af' }}>{hasDrones ? formatDistanceTimeline(timelineSummary.droneDistance) : '--'}</Text>
             </Flex>
+          <Flex gap="1" align="center" title="Routes (truck / drone)">
+              <Route size={12} className="text-gray-500" />
+              <Flex
+                gap="1"
+                align="center"
+                style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '4px',
+                  padding: '1px 6px',
+                  backgroundColor: '#f8fafc',
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 2, opacity: hasTruck ? 1 : 0.35 }}>
+                  <Truck size={11} style={{ color: hasTruck ? '#374151' : '#9ca3af' }} />
+                  <Text size="1" weight="medium" style={{ color: hasTruck ? undefined : '#9ca3af' }}>{hasTruck && truckRoutePoints ? 1 : 0}</Text>
+                  {truckRoutePoints != null && truckRoutePoints > 0 && (
+                    <Text size="1" style={{ color: '#9ca3af', fontSize: '10px' }}>({truckRoutePoints} pts)</Text>
+                  )}
+                </span>
+                <Text size="1" style={{ color: '#cbd5e1' }}>/</Text>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 2, opacity: hasDrones ? 1 : 0.35 }}>
+                  <Drone size={11} style={{ color: hasDrones ? '#3b82f6' : '#9ca3af' }} />
+                  <Text size="1" weight="medium" style={{ color: hasDrones ? undefined : '#9ca3af' }}>{hasDrones && droneSorties ? droneSorties : 0}</Text>
+                  {droneSorties != null && droneSorties > 0 && (
+                    <Text size="1" style={{ color: '#9ca3af', fontSize: '10px' }}>({droneSorties} sorties)</Text>
+                  )}
+                </span>
+              </Flex>
+            </Flex>
+          <Box className="w-px h-4 bg-gray-300" />
           <Flex gap="1" align="center" title="Deliveries (drone / truck)">
               <Package size={12} className="text-gray-500" />
               <Flex
