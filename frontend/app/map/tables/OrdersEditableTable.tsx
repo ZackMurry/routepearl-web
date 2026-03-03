@@ -2,7 +2,7 @@
 
 import React, { FC } from 'react'
 import { Badge, Flex, IconButton, TextField, Button, ScrollArea } from '@radix-ui/themes'
-import { Trash2, Search, ChevronUp, ChevronDown } from 'lucide-react'
+import { Trash2, Search, ChevronUp, ChevronDown, MapPinned, Hash } from 'lucide-react'
 import { MissionSite } from '@/lib/types'
 
 interface Props {
@@ -16,11 +16,14 @@ interface Props {
   addressSearchInputs: Map<string, string>
   onAddressSearchInputChange: (nodeId: string, value: string) => void
   onAddressSearch: (nodeId: string) => void
+  getDisplayMode?: (id: string) => 'coords' | 'address'
+  onToggleDisplayMode?: (id: string, node: MissionSite) => void
 }
 
 const OrdersEditableTable: FC<Props> = ({
   orders, selectedNodeId, onSelectNode, displayMode, geocodingLoading,
   updateNode, removeNode, addressSearchInputs, onAddressSearchInputChange, onAddressSearch,
+  getDisplayMode, onToggleDisplayMode,
 }) => {
   if (orders.length === 0) {
     return (
@@ -36,14 +39,8 @@ const OrdersEditableTable: FC<Props> = ({
         <thead>
           <tr>
             <th className="col-id">#</th>
-            {displayMode === 'coords' ? (
-              <>
-                <th className="col-flex">Latitude</th>
-                <th className="col-flex">Longitude</th>
-              </>
-            ) : (
-              <th className="col-flex">Address</th>
-            )}
+            <th className="col-flex">Latitude</th>
+            <th className="col-flex">Longitude</th>
             <th className="col-action"></th>
           </tr>
         </thead>
@@ -51,15 +48,23 @@ const OrdersEditableTable: FC<Props> = ({
           {orders.map((order) => {
             const isSelected = selectedNodeId === order.id
             const isLoading = geocodingLoading.get(order.id) || false
+            const rowDisplayMode = getDisplayMode ? getDisplayMode(order.id) : displayMode
 
             return (
               <tr key={order.id} data-node-id={order.id} className={isSelected ? 'selected' : ''} onClick={() => onSelectNode?.(isSelected ? null : order.id)} style={{ cursor: 'pointer' }}>
                 <td>
-                  <Badge color="green" size="1" style={{ fontWeight: 'bold' }}>
-                    {order.orderId || '?'}
-                  </Badge>
+                  <Flex align="center" gap="1">
+                    <Badge color="green" size="1" style={{ fontWeight: 'bold' }}>
+                      {order.orderId || '?'}
+                    </Badge>
+                    {onToggleDisplayMode && (
+                      <IconButton size="1" variant="ghost" color={rowDisplayMode === 'address' ? 'blue' : 'gray'} onClick={(e) => { e.stopPropagation(); onToggleDisplayMode(order.id, order) }} title={rowDisplayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '16px', minHeight: '16px', padding: '1px' }}>
+                        {rowDisplayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
+                      </IconButton>
+                    )}
+                  </Flex>
                 </td>
-                {displayMode === 'coords' ? (
+                {rowDisplayMode === 'coords' ? (
                   <>
                     <td>
                       <Flex align="center" gap="1">
@@ -125,7 +130,7 @@ const OrdersEditableTable: FC<Props> = ({
                     </td>
                   </>
                 ) : (
-                  <td>
+                  <td colSpan={2}>
                     <Flex gap="2" align="center">
                       <TextField.Root
                         value={addressSearchInputs.get(order.id) ?? order.address ?? ''}

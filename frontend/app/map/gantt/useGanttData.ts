@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { TimelineEvent, TimelineResult } from '../timeline/timeline.types'
+import { MissionSite } from '@/lib/types'
 import {
   GanttData,
   GanttVehicle,
@@ -17,10 +18,19 @@ import {
 export function useGanttData(
   timelineResult: TimelineResult,
   fleetMode: 'truck-drone' | 'truck-only' | 'drones-only',
-  droneCount: number
+  droneCount: number,
+  nodes?: MissionSite[]
 ): GanttData {
   return useMemo(() => {
     const { events, summary } = timelineResult
+
+    // Build nodeId → address lookup map
+    const addressMap = new Map<string, string>()
+    if (nodes) {
+      for (const node of nodes) {
+        if (node.address) addressMap.set(node.id, node.address)
+      }
+    }
 
     const vehicles: GanttVehicle[] = []
     // Map droneNum → groupId for linking drones to their interacting truck/driver group
@@ -82,6 +92,7 @@ export function useGanttData(
           sortieNumber: event.sortieNumber,
           distance: event.distance,
           nodeId: event.nodeId,
+          address: event.nodeId ? addressMap.get(event.nodeId) : undefined,
         }
       })
 
@@ -165,6 +176,7 @@ export function useGanttData(
           sortieNumber: event.sortieNumber,
           distance: event.distance,
           nodeId: event.nodeId,
+          address: event.nodeId ? addressMap.get(event.nodeId) : undefined,
         }
       })
 
@@ -324,7 +336,7 @@ export function useGanttData(
       totalDistance: summary.totalDistance,
       startTime: new Date(),
     }
-  }, [timelineResult, fleetMode, droneCount])
+  }, [timelineResult, fleetMode, droneCount, nodes])
 }
 
 /**

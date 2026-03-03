@@ -22,6 +22,7 @@ export interface GanttStop {
   sortieNumber?: number
   distance?: number // Distance of this segment in meters
   cumulativeDistance?: number // Cumulative distance from mission start in meters
+  address?: string // Street address of the stop location
   nodeId?: string // Original MissionSite node ID for map selection
   pixelOffset?: number // Horizontal pixel nudge for overlapping stops in the "All" row
   vehicleName?: string // Source vehicle name (set on "All" row stops)

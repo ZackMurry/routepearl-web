@@ -1,8 +1,8 @@
 'use client'
 
 import React, { FC, useMemo } from 'react'
-import { Flex, ScrollArea } from '@radix-ui/themes'
-import { House, Zap, AlertTriangle, MapPin } from 'lucide-react'
+import { Flex, IconButton, ScrollArea } from '@radix-ui/themes'
+import { House, Zap, AlertTriangle, MapPin, MapPinned, Hash } from 'lucide-react'
 import { MissionSite } from '@/lib/types'
 import { formatDistance, formatDuration } from '../timeline/timeline.types'
 
@@ -21,9 +21,11 @@ interface Props {
   nodeEventCountMap?: Map<string, number>
   selectedNodeId?: string | null
   onSelectNode?: (id: string | null) => void
+  getDisplayMode?: (id: string) => 'coords' | 'address'
+  onToggleDisplayMode?: (id: string, node: MissionSite) => void
 }
 
-const MissionSitesTable: FC<Props> = ({ nodes, displayMode, geocodingLoading, nodeEtaMap, nodeEventCountMap, selectedNodeId, onSelectNode }) => {
+const MissionSitesTable: FC<Props> = ({ nodes, displayMode, geocodingLoading, nodeEtaMap, nodeEventCountMap, selectedNodeId, onSelectNode, getDisplayMode, onToggleDisplayMode }) => {
   // Compute per-type numbering
   const typeNumberMap = useMemo(() => {
     const map = new Map<string, number>()
@@ -61,7 +63,8 @@ const MissionSitesTable: FC<Props> = ({ nodes, displayMode, geocodingLoading, no
             const config = NODE_TYPE_CONFIG[node.type] || NODE_TYPE_CONFIG.waypoint
             const Icon = config.icon
             const isLoading = geocodingLoading.get(node.id) || false
-            const location = displayMode === 'coords'
+            const rowDisplayMode = getDisplayMode ? getDisplayMode(node.id) : displayMode
+            const location = rowDisplayMode === 'coords'
               ? `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
               : isLoading ? 'Loading...' : node.address || `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
             const etaInfo = nodeEtaMap?.get(node.id)
@@ -76,6 +79,11 @@ const MissionSitesTable: FC<Props> = ({ nodes, displayMode, geocodingLoading, no
                   <Flex align="center" gap="1">
                     <Icon size={12} style={{ color: config.accentColor, flexShrink: 0 }} />
                     <span style={{ fontWeight: 600 }}>{node.siteId || '?'}</span>
+                    {onToggleDisplayMode && (
+                      <IconButton size="1" variant="ghost" color={rowDisplayMode === 'address' ? 'blue' : 'gray'} onClick={(e) => { e.stopPropagation(); onToggleDisplayMode(node.id, node) }} title={rowDisplayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '16px', minHeight: '16px', padding: '1px', marginLeft: '2px' }}>
+                        {rowDisplayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
+                      </IconButton>
+                    )}
                   </Flex>
                 </td>
                 <td>

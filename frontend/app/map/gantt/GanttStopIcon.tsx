@@ -168,6 +168,11 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDura
           }}
         >
           <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{stop.label}</div>
+          {stop.address && (
+            <div style={{ color: '#fbbf24', marginBottom: '2px', fontSize: '11px', maxWidth: '280px', whiteSpace: 'normal' }}>
+              {stop.address}
+            </div>
+          )}
           {/* Always show time */}
           <div style={{ color: '#9ca3af' }}>
             Time: {formatGanttTime(stop.time)}

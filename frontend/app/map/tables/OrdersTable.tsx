@@ -1,8 +1,8 @@
 'use client'
 
 import React, { FC } from 'react'
-import { Badge, Flex, ScrollArea } from '@radix-ui/themes'
-import { MapPin, Drone, Truck } from 'lucide-react'
+import { Badge, Flex, IconButton, ScrollArea } from '@radix-ui/themes'
+import { MapPin, MapPinned, Hash, Drone, Truck } from 'lucide-react'
 import { MissionSite } from '@/lib/types'
 import { formatDistance, formatDuration } from '../timeline/timeline.types'
 
@@ -14,9 +14,11 @@ interface Props {
   geocodingLoading: Map<string, boolean>
   selectedNodeId?: string | null
   onSelectNode?: (id: string | null) => void
+  getDisplayMode?: (id: string) => 'coords' | 'address'
+  onToggleDisplayMode?: (id: string, node: MissionSite) => void
 }
 
-const OrdersTable: FC<Props> = ({ orders, orderDeliveryMap, orderEtaMap, displayMode, geocodingLoading, selectedNodeId, onSelectNode }) => {
+const OrdersTable: FC<Props> = ({ orders, orderDeliveryMap, orderEtaMap, displayMode, geocodingLoading, selectedNodeId, onSelectNode, getDisplayMode, onToggleDisplayMode }) => {
   if (orders.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '24px', color: '#6b7280', fontSize: '13px' }}>
@@ -44,7 +46,8 @@ const OrdersTable: FC<Props> = ({ orders, orderDeliveryMap, orderEtaMap, display
             const accentColor = vehicle === 'drone' ? '#facc15' : vehicle === 'truck' ? '#3b82f6' : '#d1d5db'
             const isLoading = geocodingLoading.get(order.id) || false
             const isSelected = selectedNodeId === order.id
-            const location = displayMode === 'coords'
+            const rowDisplayMode = getDisplayMode ? getDisplayMode(order.id) : displayMode
+            const location = rowDisplayMode === 'coords'
               ? `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
               : isLoading ? 'Loading...' : order.address || `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
 
@@ -60,6 +63,11 @@ const OrdersTable: FC<Props> = ({ orders, orderDeliveryMap, orderEtaMap, display
                   <Flex align="center" gap="1">
                     <MapPin size={12} style={{ color: accentColor === '#d1d5db' ? '#9ca3af' : accentColor, flexShrink: 0 }} />
                     <span style={{ fontWeight: 600 }}>{order.orderId || '?'}</span>
+                    {onToggleDisplayMode && (
+                      <IconButton size="1" variant="ghost" color={rowDisplayMode === 'address' ? 'blue' : 'gray'} onClick={(e) => { e.stopPropagation(); onToggleDisplayMode(order.id, order) }} title={rowDisplayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '16px', minHeight: '16px', padding: '1px', marginLeft: '2px' }}>
+                        {rowDisplayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
+                      </IconButton>
+                    )}
                   </Flex>
                 </td>
                 <td className="cell-truncate" style={{ color: '#374151' }}>

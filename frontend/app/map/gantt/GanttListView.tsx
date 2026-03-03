@@ -109,6 +109,7 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, onStopClick, onStopDoubl
                       <th className="col-stat-sm">#</th>
                       <th style={{ width: '52px', minWidth: '52px' }}>Type</th>
                       <th className="col-flex">Event</th>
+                      <th className="col-flex">Location</th>
                       <th className="col-stat">Order</th>
                       <th className="col-stat" style={isDuration ? emphStyle : dimStyle}>Time</th>
                       <th className="col-stat" style={isDuration ? emphStyle : dimStyle}>Duration</th>
@@ -147,6 +148,9 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, onStopClick, onStopDoubl
                               #{stop.sortieNumber}
                             </span>
                           )}
+                        </td>
+                        <td className="cell-truncate" style={{ color: '#6b7280', fontSize: '11px' }}>
+                          {stop.address || '--'}
                         </td>
                         <td>
                           {stop.orderName ? (
