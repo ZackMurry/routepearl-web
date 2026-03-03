@@ -37,6 +37,7 @@ import {
   AlertTriangle,
   Settings,
   Lock,
+  Unlock,
   Hash,
   MapPinned,
   Search,
@@ -503,6 +504,9 @@ export function BottomPanel() {
 
   const missionStatus = currentMission?.status || 'Idle'
   const hasRoute = truckRoute.length > 0 || droneRoutes.length > 0
+  // Lock algorithm & fleet controls only when a route exists AND all points are routed.
+  // If a new unrouted point is added, unlock so the user can reconfigure and re-route.
+  const isConfigLocked = hasRoute && !hasUnroutedNodes
   const orderNodes = missionConfig.nodes.filter((n) => n.type === 'order')
   const missionSites = missionConfig.nodes.filter((n) => n.type !== 'order')
   const hasDepot = missionConfig.nodes.some((n) => n.type === 'depot')
@@ -1696,22 +1700,32 @@ export function BottomPanel() {
                     <Text size="2" weight="bold">
                       Routing Algorithm
                     </Text>
-                    {hasRoute && (
+                    {isConfigLocked && (
                       <Badge color="orange" size="1">
                         <Lock size={10} /> Locked
                       </Badge>
                     )}
+                    {hasRoute && hasUnroutedNodes && (
+                      <Badge color="blue" size="1">
+                        <Unlock size={10} /> Unlocked
+                      </Badge>
+                    )}
                   </Flex>
-                  {hasRoute && (
+                  {isConfigLocked && (
                     <Text size="1" color="gray" style={{ display: 'block', marginBottom: '8px' }}>
                       Clear route to change algorithm.
                     </Text>
                   )}
-                  <Box style={{ opacity: hasRoute ? 0.5 : 1, pointerEvents: hasRoute ? 'none' : 'auto' }}>
+                  {hasRoute && hasUnroutedNodes && (
+                    <Text size="1" color="blue" style={{ display: 'block', marginBottom: '8px' }}>
+                      New unrouted points detected — reconfigure and re-route.
+                    </Text>
+                  )}
+                  <Box style={{ opacity: isConfigLocked ? 0.5 : 1, pointerEvents: isConfigLocked ? 'none' : 'auto' }}>
                     <Select.Root
                       value={missionConfig.algorithm}
                       onValueChange={(value: string) => updateMissionConfig({ algorithm: value as RoutingAlgorithm })}
-                      disabled={hasRoute}
+                      disabled={isConfigLocked}
                     >
                       <Select.Trigger style={{ width: '100%' }} />
                       <Select.Content>
@@ -1728,18 +1742,28 @@ export function BottomPanel() {
                     <Text size="2" weight="bold">
                       Fleet Control
                     </Text>
-                    {hasRoute && (
+                    {isConfigLocked && (
                       <Badge color="orange" size="1">
                         <Lock size={10} /> Locked
                       </Badge>
                     )}
+                    {hasRoute && hasUnroutedNodes && (
+                      <Badge color="blue" size="1">
+                        <Unlock size={10} /> Unlocked
+                      </Badge>
+                    )}
                   </Flex>
-                  {hasRoute && (
+                  {isConfigLocked && (
                     <Text size="1" color="gray" style={{ display: 'block', marginBottom: '8px' }}>
                       Clear route to change fleet configuration.
                     </Text>
                   )}
-                  <Flex direction="column" gap="3" style={{ opacity: hasRoute ? 0.5 : 1, pointerEvents: hasRoute ? 'none' : 'auto' }}>
+                  {hasRoute && hasUnroutedNodes && (
+                    <Text size="1" color="blue" style={{ display: 'block', marginBottom: '8px' }}>
+                      New unrouted points detected — reconfigure and re-route.
+                    </Text>
+                  )}
+                  <Flex direction="column" gap="3" style={{ opacity: isConfigLocked ? 0.5 : 1, pointerEvents: isConfigLocked ? 'none' : 'auto' }}>
                     {/* Trucks */}
                     <Flex align="center" justify="between">
                       <Flex align="center" gap="2">
