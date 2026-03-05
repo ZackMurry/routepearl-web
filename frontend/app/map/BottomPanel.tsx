@@ -45,6 +45,8 @@ import {
   Table2,
   Calendar,
   Layers,
+  Gavel,
+  TowerControl,
 } from 'lucide-react'
 import { useTimelineGenerator } from './timeline/useTimelineGenerator'
 import { TimelineSummary, formatDistance as formatDistanceTimeline, formatDuration as formatDurationTimeline, DEFAULT_TIMELINE_CONFIG } from './timeline/timeline.types'
@@ -513,6 +515,37 @@ export function BottomPanel() {
   const canGenerateRoute = hasDepot && orderNodes.length > 0
   const canSave = missionConfig.nodes.length > 0
 
+  // Drag-to-scroll and edge fade for badge-scroll containers
+  useEffect(() => {
+    const updateScrollClass = (el: HTMLElement) => {
+      const canScroll = el.scrollWidth > el.clientWidth
+      if (!canScroll) { el.classList.add('scroll-none'); el.classList.remove('scroll-start', 'scroll-end'); return }
+      el.classList.remove('scroll-none')
+      const atStart = el.scrollLeft <= 1
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1
+      el.classList.toggle('scroll-start', atStart && !atEnd)
+      el.classList.toggle('scroll-end', atEnd && !atStart)
+      if (!atStart && !atEnd) { el.classList.remove('scroll-start', 'scroll-end') }
+      if (atStart && atEnd) { el.classList.add('scroll-none') }
+    }
+    const els = document.querySelectorAll<HTMLElement>('.badge-scroll')
+    const cleanups: (() => void)[] = []
+    els.forEach((el) => {
+      updateScrollClass(el)
+      let isDown = false, startX = 0, scrollLeft = 0
+      const onMouseDown = (e: MouseEvent) => { isDown = true; startX = e.pageX - el.offsetLeft; scrollLeft = el.scrollLeft; el.style.cursor = 'grabbing' }
+      const onMouseUp = () => { isDown = false; el.style.cursor = 'grab' }
+      const onMouseMove = (e: MouseEvent) => { if (!isDown) return; e.preventDefault(); el.scrollLeft = scrollLeft - (e.pageX - el.offsetLeft - startX) }
+      const onScroll = () => updateScrollClass(el)
+      el.addEventListener('mousedown', onMouseDown)
+      window.addEventListener('mouseup', onMouseUp)
+      window.addEventListener('mousemove', onMouseMove)
+      el.addEventListener('scroll', onScroll)
+      cleanups.push(() => { el.removeEventListener('mousedown', onMouseDown); window.removeEventListener('mouseup', onMouseUp); window.removeEventListener('mousemove', onMouseMove); el.removeEventListener('scroll', onScroll) })
+    })
+    return () => cleanups.forEach((fn) => fn())
+  })
+
   // When a node is selected, expand the bottom panel if collapsed
   useEffect(() => {
     if (!selectedNodeId) return
@@ -752,42 +785,46 @@ export function BottomPanel() {
             <Flex align="center" className="p-4" style={{ gap: '12px', paddingTop: '24px' }}>
               {/* Mode label + Mission name + status badges — fixed width so right side stays put */}
               {isFlightPlannerMode ? (
-                <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+                <Flex align="center" gap="2" style={{ width: '300px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
                   <Text size="1" weight="medium" style={{ position: 'absolute', top: '-16px', left: 0, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Route Planner</Text>
-                  <Route size={16} style={{ flexShrink: 0, color: '#6b7280' }} />
+                  <Gavel size={16} style={{ flexShrink: 0, color: '#000000' }} />
                   <TextField.Root
                     value={missionConfig.missionName}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       updateMissionConfig({ missionName: e.target.value })
                     }
-                    placeholder="Mission name..."
-                    size="2"
+                    placeholder="Untitled Mission"
+                    size="1"
                     variant="soft"
                     color="gray"
-                    style={{ flex: 1 }}
+                    style={{ flex: 1, height: '28px', fontWeight: 700, fontSize: '14px', letterSpacing: '-0.01em', color: '#4b5563', flexShrink: 0 }}
                   />
-                  <Badge size="1" color={hasUnassignedWaypoints ? 'red' : hasRoute ? 'green' : orderNodes.length > 0 ? 'orange' : 'gray'} variant={hasRoute ? 'soft' : 'outline'}>
-                    {hasUnassignedWaypoints ? 'Blocked' : hasRoute ? 'Route Ready' : orderNodes.length > 0 ? 'Route Required' : 'Pending'}
-                  </Badge>
+                  <div className="badge-scroll" style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', overflowY: 'hidden', minWidth: 0, flexShrink: 1 }}>
+                    <Badge size="1" style={{ fontSize: '10px', flexShrink: 0 }} color={hasUnassignedWaypoints ? 'red' : hasRoute ? 'green' : orderNodes.length > 0 ? 'orange' : 'gray'} variant={hasRoute ? 'soft' : 'outline'}>
+                      {hasUnassignedWaypoints ? 'Blocked' : hasRoute ? 'Route Ready' : orderNodes.length > 0 ? 'Route Required' : 'Pending'}
+                    </Badge>
+                  </div>
                 </Flex>
               ) : (
-                <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+                <Flex align="center" gap="2" style={{ width: '300px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
                   <Text size="1" weight="medium" style={{ position: 'absolute', top: '-16px', left: 0, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Mission Control</Text>
-                  <FileText size={16} style={{ flexShrink: 0 }} />
-                  <Text size="2" weight="bold" style={{ whiteSpace: 'nowrap' }}>
+                  <TowerControl size={16} style={{ flexShrink: 0 }} />
+                  <Text size="2" weight="bold" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
                     {missionConfig.missionName || 'Untitled Mission'}
                   </Text>
-                  <Badge size="1" color={getStatusColor(missionStatus)}>{missionStatus}</Badge>
-                  {!missionLaunched && (
-                    <>
-                      <Badge size="1" color={missionConfig.nodes.length > 0 ? 'green' : 'gray'} variant={missionConfig.nodes.length > 0 ? 'soft' : 'outline'}>
-                        {missionConfig.nodes.length > 0 ? 'Plan Loaded' : 'No Plan'}
-                      </Badge>
-                      <Badge size="1" color={hasRoute ? 'green' : missionConfig.nodes.length > 0 ? 'orange' : 'gray'} variant={hasRoute ? 'soft' : 'outline'}>
-                        {hasRoute ? 'Route Ready' : missionConfig.nodes.length > 0 ? 'Route Required' : 'No Route'}
-                      </Badge>
-                    </>
-                  )}
+                  <div className="badge-scroll" style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', overflowY: 'hidden', minWidth: 0, flexShrink: 1 }}>
+                    <Badge size="1" style={{ fontSize: '10px', flexShrink: 0 }} color={getStatusColor(missionStatus)}>{missionStatus}</Badge>
+                    {!missionLaunched && (
+                      <>
+                        <Badge size="1" style={{ fontSize: '10px', flexShrink: 0 }} color={missionConfig.nodes.length > 0 ? 'green' : 'gray'} variant={missionConfig.nodes.length > 0 ? 'soft' : 'outline'}>
+                          {missionConfig.nodes.length > 0 ? 'Plan Loaded' : 'No Plan'}
+                        </Badge>
+                        <Badge size="1" style={{ fontSize: '10px', flexShrink: 0 }} color={hasRoute ? 'green' : missionConfig.nodes.length > 0 ? 'orange' : 'gray'} variant={hasRoute ? 'soft' : 'outline'}>
+                          {hasRoute ? 'Route Ready' : missionConfig.nodes.length > 0 ? 'Route Required' : 'No Route'}
+                        </Badge>
+                      </>
+                    )}
+                  </div>
                 </Flex>
               )}
 
@@ -917,23 +954,25 @@ export function BottomPanel() {
             {/* Header */}
             <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px', paddingTop: '24px' }}>
               {/* Mode label + Mission name + route status badge — fixed width so right side stays put */}
-              <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+              <Flex align="center" gap="2" style={{ width: '300px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
                 <Text size="1" weight="medium" style={{ position: 'absolute', top: '-16px', left: 0, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Route Planner</Text>
-                <Route size={16} style={{ flexShrink: 0, color: '#6b7280' }} />
+                <Gavel size={16} style={{ flexShrink: 0, color: '#000000' }} />
                 <TextField.Root
                   value={missionConfig.missionName}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     updateMissionConfig({ missionName: e.target.value })
                   }
-                  placeholder="Mission name..."
-                  size="2"
+                  placeholder="Untitled Mission"
+                  size="1"
                   variant="soft"
                   color="gray"
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, height: '28px', fontWeight: 700, fontSize: '14px', letterSpacing: '-0.01em', color: '#4b5563', flexShrink: 0 }}
                 />
-                <Badge size="1" color={hasUnassignedWaypoints ? 'red' : hasRoute ? 'green' : orderNodes.length > 0 ? 'orange' : 'gray'} variant={hasRoute ? 'soft' : 'outline'}>
-                  {hasUnassignedWaypoints ? 'Blocked' : hasRoute ? 'Route Ready' : orderNodes.length > 0 ? 'Route Required' : 'Pending'}
-                </Badge>
+                <div className="badge-scroll" style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', overflowY: 'hidden', minWidth: 0, flexShrink: 1 }}>
+                  <Badge size="1" style={{ fontSize: '10px', flexShrink: 0 }} color={hasUnassignedWaypoints ? 'red' : hasRoute ? 'green' : orderNodes.length > 0 ? 'orange' : 'gray'} variant={hasRoute ? 'soft' : 'outline'}>
+                    {hasUnassignedWaypoints ? 'Blocked' : hasRoute ? 'Route Ready' : orderNodes.length > 0 ? 'Route Required' : 'Pending'}
+                  </Badge>
+                </div>
               </Flex>
 
               <Box className="w-px h-6 bg-gray-300" style={{ flexShrink: 0 }} />
@@ -1073,9 +1112,9 @@ export function BottomPanel() {
                   </Flex>
 
                   {/* Overview Tab (read-only) */}
-                  <Tabs.Content value="overview" className="flex-1 p-4" style={{ minHeight: 0, overflow: 'hidden' }}>
+                  <Tabs.Content value="overview" className="flex-1 p-3" style={{ minHeight: 0, overflow: 'hidden' }}>
                     {viewMode === 'table' ? (
-                      <ScrollArea style={{ height: '100%' }}>
+                      <ScrollArea style={{ height: '100%', paddingRight: '8px' }}>
                         {missionConfig.nodes.length === 0 ? (
                           <Box className="text-center p-6 bg-gray-50 rounded">
                             <Text size="2" color="gray">
@@ -1083,13 +1122,13 @@ export function BottomPanel() {
                             </Text>
                           </Box>
                         ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {/* Orders Table (read-only) */}
                             {orderNodes.length > 0 && (
                               <Box>
-                                <Flex align="center" gap="2" className="mb-2">
-                                  <MapPin size={14} className="text-green-600" />
-                                  <Text size="2" weight="bold">Order Points ({orderNodes.length})</Text>
+                                <Flex align="center" gap="1" style={{ marginBottom: '4px' }}>
+                                  <MapPin size={12} className="text-green-600" />
+                                  <Text size="1" weight="bold">Order Points ({orderNodes.length})</Text>
                                 </Flex>
                                 <table className="data-table" style={{ tableLayout: 'fixed' }}>
                                   <thead>
@@ -1100,8 +1139,9 @@ export function BottomPanel() {
                                   </thead>
                                   <tbody>
                                     {orderNodes.map((order) => {
+                                      const rowDisplayMode = getDisplayMode(order.id)
                                       const isLoading = geocodingLoading.get(order.id) || false
-                                      const location = globalDisplayMode === 'coords'
+                                      const location = rowDisplayMode === 'coords'
                                         ? `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
                                         : isLoading ? 'Loading...' : order.address || `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
                                       const isSelected = selectedNodeId === order.id
@@ -1118,6 +1158,9 @@ export function BottomPanel() {
                                             <Flex align="center" gap="1">
                                               <MapPin size={12} style={{ color: '#22c55e', flexShrink: 0 }} />
                                               <span style={{ fontWeight: 600 }}>{order.orderId || '?'}</span>
+                                              <IconButton size="1" variant="ghost" color={rowDisplayMode === 'address' ? 'blue' : 'gray'} onClick={(e) => { e.stopPropagation(); toggleCardDisplayMode(order.id, order) }} title={rowDisplayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
+                                                {rowDisplayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
+                                              </IconButton>
                                             </Flex>
                                           </td>
                                           <td className="cell-truncate" style={{ color: '#374151' }}>
@@ -1133,9 +1176,9 @@ export function BottomPanel() {
                             {/* Mission Sites Table (read-only) */}
                             {missionSites.length > 0 && (
                               <Box>
-                                <Flex align="center" gap="2" className="mb-2">
-                                  <Layers size={14} className="text-blue-600" />
-                                  <Text size="2" weight="bold">Mission Sites ({missionSites.length})</Text>
+                                <Flex align="center" gap="1" style={{ marginBottom: '4px' }}>
+                                  <Layers size={12} className="text-blue-600" />
+                                  <Text size="1" weight="bold">Mission Sites ({missionSites.length})</Text>
                                 </Flex>
                                 <table className="data-table" style={{ tableLayout: 'fixed' }}>
                                   <thead>
@@ -1148,8 +1191,9 @@ export function BottomPanel() {
                                   <tbody>
                                     {missionSites.map((node) => {
                                       const typeColor = node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6'
+                                      const rowDisplayMode = getDisplayMode(node.id)
                                       const isLoading = geocodingLoading.get(node.id) || false
-                                      const location = globalDisplayMode === 'coords'
+                                      const location = rowDisplayMode === 'coords'
                                         ? `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
                                         : isLoading ? 'Loading...' : node.address || `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
                                       const isSelected = selectedNodeId === node.id
@@ -1165,11 +1209,13 @@ export function BottomPanel() {
                                           <td className="accent-cell" style={{ '--accent-color': typeColor } as React.CSSProperties}>
                                             <Flex align="center" gap="1">
                                               <span style={{ fontWeight: 600 }}>{node.siteId || '?'}</span>
+                                              <IconButton size="1" variant="ghost" color={rowDisplayMode === 'address' ? 'blue' : 'gray'} onClick={(e) => { e.stopPropagation(); toggleCardDisplayMode(node.id, node) }} title={rowDisplayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
+                                                {rowDisplayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
+                                              </IconButton>
                                             </Flex>
                                           </td>
                                           <td>
-                                            <span style={{ fontWeight: 600 }}>Site ID: {node.siteId || '?'}</span>
-                                            <span style={{ color: typeColor, fontWeight: 500 }}> — {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {nodeTypeNumberMap.get(node.id) || ''}</span>
+                                            <span style={{ color: typeColor, fontWeight: 600 }}>{node.type.charAt(0).toUpperCase() + node.type.slice(1)} {nodeTypeNumberMap.get(node.id) || ''}</span>
                                           </td>
                                           <td className="cell-truncate" style={{ color: '#374151' }}>
                                             {location}
@@ -1185,7 +1231,7 @@ export function BottomPanel() {
                         )}
                       </ScrollArea>
                     ) : (
-                    <ScrollArea style={{ height: '100%' }}>
+                    <ScrollArea style={{ height: '100%', paddingRight: '8px' }}>
                       {missionConfig.nodes.length === 0 ? (
                         <Box className="text-center p-6 bg-gray-50 rounded">
                           <Text size="2" color="gray">
@@ -1193,18 +1239,18 @@ export function BottomPanel() {
                           </Text>
                         </Box>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           {/* Order Points Section */}
                           {orderNodes.length > 0 && (
                             <Box>
-                              <Flex align="center" gap="2" className="mb-2">
-                                <MapPin size={14} className="text-green-600" />
-                                <Text size="2" weight="bold">Order Points ({orderNodes.length})</Text>
+                              <Flex align="center" gap="1" style={{ marginBottom: '4px' }}>
+                                <MapPin size={12} className="text-green-600" />
+                                <Text size="1" weight="bold">Order Points ({orderNodes.length})</Text>
                               </Flex>
                               <div
                                 style={{
                                   display: 'grid',
-                                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                  gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
                                   gap: '6px',
                                 }}
                               >
@@ -1215,36 +1261,30 @@ export function BottomPanel() {
                                   <Card
                                     key={node.id}
                                     data-node-id={node.id}
-                                    className="p-2"
+                                    className="p-0"
                                     style={{
                                       backgroundColor: selectedNodeId === node.id ? '#eff6ff' : 'white',
-                                      border: selectedNodeId === node.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                                      border: selectedNodeId === node.id ? '2px solid #3b82f6' : undefined,
                                       cursor: 'pointer',
+                                      overflow: 'hidden',
                                     }}
                                     onClick={() => setSelectedNodeId(selectedNodeId === node.id ? null : node.id)}
                                     onDoubleClick={() => handleOverviewDoubleClick(node.id)}
                                   >
-                                    <Flex direction="column" gap="2">
-                                      <Flex justify="between" align="center">
-                                        <Flex align="center" gap="2">
-                                          <MapPin size={14} className="text-green-600" />
-                                          <Badge color="green" size="2" style={{ fontWeight: 'bold' }}>
-                                            Order ID: {node.orderId || '?'}
-                                          </Badge>
-                                        </Flex>
-                                        <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={(e) => { e.stopPropagation(); toggleCardDisplayMode(node.id, node) }} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
+                                    <Flex>
+                                      <div style={{ width: '3px', minHeight: '100%', backgroundColor: '#22c55e', flexShrink: 0 }} />
+                                      <Flex align="center" gap="1" style={{ flex: 1, padding: '5px 8px', minWidth: 0 }}>
+                                        <MapPin size={11} style={{ color: '#22c55e', flexShrink: 0 }} />
+                                        <Text size="1" weight="bold" style={{ flexShrink: 0 }}>Order {node.orderId || '?'}</Text>
+                                        <Text size="1" color="gray" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginLeft: '2px' }}>
+                                          {displayMode === 'coords'
+                                            ? `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
+                                            : isLoading ? 'Looking up...' : node.address || `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`}
+                                        </Text>
+                                        <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={(e) => { e.stopPropagation(); toggleCardDisplayMode(node.id, node) }} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '16px', minHeight: '16px', padding: '1px', flexShrink: 0, marginLeft: 'auto' }}>
                                           {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
                                         </IconButton>
                                       </Flex>
-                                      {displayMode === 'coords' ? (
-                                        <Text size="1" color="gray">
-                                          {node.lat.toFixed(6)}, {node.lng.toFixed(6)}
-                                        </Text>
-                                      ) : (
-                                        <Text size="1" color="gray" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          {isLoading ? 'Looking up address...' : node.address || `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`}
-                                        </Text>
-                                      )}
                                     </Flex>
                                   </Card>
                                   )
@@ -1256,60 +1296,59 @@ export function BottomPanel() {
                           {/* Mission Sites Section */}
                           {missionSites.length > 0 && (
                             <Box>
-                              <Flex align="center" gap="2" className="mb-2">
-                                <Layers size={14} className="text-blue-600" />
-                                <Text size="2" weight="bold">Mission Sites ({missionSites.length})</Text>
+                              <Flex align="center" gap="1" style={{ marginBottom: '4px' }}>
+                                <Layers size={12} className="text-blue-600" />
+                                <Text size="1" weight="bold">Mission Sites ({missionSites.length})</Text>
                               </Flex>
                               <div
                                 style={{
                                   display: 'grid',
-                                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                                  gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
                                   gap: '6px',
                                 }}
                               >
                                 {missionSites.map((node) => {
                                   const displayMode = getDisplayMode(node.id)
                                   const isLoading = geocodingLoading.get(node.id) || false
+                                  const typeColor = node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6'
                                   return (
                                   <Card
                                     key={node.id}
                                     data-node-id={node.id}
-                                    className="p-2"
+                                    className="p-0"
                                     style={{
                                       backgroundColor: selectedNodeId === node.id ? '#eff6ff' : 'white',
-                                      border: selectedNodeId === node.id ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                                      border: selectedNodeId === node.id ? '2px solid #3b82f6' : undefined,
                                       cursor: 'pointer',
+                                      overflow: 'hidden',
                                     }}
                                     onClick={() => setSelectedNodeId(selectedNodeId === node.id ? null : node.id)}
                                     onDoubleClick={() => handleOverviewDoubleClick(node.id)}
                                   >
-                                    <Flex direction="column" gap="2">
-                                      <Flex justify="between" align="center">
+                                    <Flex>
+                                      <div style={{ width: '3px', minHeight: '100%', backgroundColor: typeColor, flexShrink: 0 }} />
+                                      <Flex direction="column" style={{ flex: 1, padding: '5px 8px', minWidth: 0, gap: '1px' }}>
                                         <Flex align="center" gap="1">
-                                          <Text size="2" weight="bold">Site ID: {node.siteId || '?'}</Text>
-                                          <Text size="2" color="gray">—</Text>
-                                          <Text size="2" weight="medium" style={{ color: node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6' }}>
+                                          <Text size="1" weight="bold" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>Site ID: {node.siteId || '?'}</Text>
+                                          <Text size="1" color="gray">-</Text>
+                                          <Text size="1" weight="medium" style={{ color: typeColor, whiteSpace: 'nowrap', flexShrink: 0 }}>
                                             {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {nodeTypeNumberMap.get(node.id) || ''}
                                           </Text>
                                           {node.type === 'hazard' && node.severity && (
-                                            <Badge size="1" variant="soft" color={getHazardColor(node.severity)} style={{ marginLeft: '4px' }}>
+                                            <Badge size="1" variant="soft" color={getHazardColor(node.severity)} style={{ marginLeft: '2px', flexShrink: 0 }}>
                                               {node.severity}
                                             </Badge>
                                           )}
+                                          <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={(e) => { e.stopPropagation(); toggleCardDisplayMode(node.id, node) }} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '16px', minHeight: '16px', padding: '1px', flexShrink: 0, marginLeft: 'auto' }}>
+                                            {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
+                                          </IconButton>
                                         </Flex>
-                                        <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={(e) => { e.stopPropagation(); toggleCardDisplayMode(node.id, node) }} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
-                                          {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
-                                        </IconButton>
+                                        <Text size="1" color="gray" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '11px' }}>
+                                          {displayMode === 'coords'
+                                            ? `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
+                                            : isLoading ? 'Looking up...' : node.address || `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`}
+                                        </Text>
                                       </Flex>
-                                      {displayMode === 'coords' ? (
-                                        <Text size="1" color="gray">
-                                          {node.lat.toFixed(6)}, {node.lng.toFixed(6)}
-                                        </Text>
-                                      ) : (
-                                        <Text size="1" color="gray" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          {isLoading ? 'Looking up address...' : node.address || `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`}
-                                        </Text>
-                                      )}
                                     </Flex>
                                   </Card>
                                   )
@@ -1345,8 +1384,8 @@ export function BottomPanel() {
                       <div
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                          gap: '8px',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                          gap: '6px',
                           paddingRight: '8px',
                         }}
                       >
@@ -1357,29 +1396,34 @@ export function BottomPanel() {
                           <Card
                             key={node.id}
                             data-node-id={node.id}
-                            className="p-2"
+                            className="p-0"
                             style={{
                               backgroundColor: selectedNodeId === node.id ? '#eff6ff' : 'white',
                               border: selectedNodeId === node.id ? '2px solid #3b82f6' : undefined,
                               cursor: 'pointer',
+                              overflow: 'hidden',
                             }}
                             onClick={() => setSelectedNodeId(selectedNodeId === node.id ? null : node.id)}
                           >
-                            <Flex justify="between" align="start">
-                              <Flex direction="column" gap="2" className="flex-1 mr-2">
-                                <Flex align="center" gap="2">
-                                  <MapPin size={14} className="text-green-600" />
-                                  <Badge color="green" size="2" style={{ fontWeight: 'bold' }}>
-                                    Order ID: {node.orderId || '?'}
-                                  </Badge>
-                                  <IconButton
-                                    size="1" variant="ghost"
-                                    color={displayMode === 'address' ? 'blue' : 'gray'}
-                                    onClick={() => toggleCardDisplayMode(node.id, node)}
-                                    title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'}
-                                    style={{ minWidth: '20px', minHeight: '20px', padding: '2px' }}
-                                  >
-                                    {displayMode === 'coords' ? <MapPinned size={12} /> : <Hash size={12} />}
+                            <Flex>
+                              <div style={{ width: '3px', minHeight: '100%', backgroundColor: '#22c55e', flexShrink: 0 }} />
+                              <Flex direction="column" gap="1" style={{ flex: 1, padding: '8px 10px' }}>
+                                <Flex justify="between" align="center">
+                                  <Flex align="center" gap="1">
+                                    <MapPin size={12} style={{ color: '#22c55e', flexShrink: 0 }} />
+                                    <Text size="1" weight="bold">Order {node.orderId || '?'}</Text>
+                                    <IconButton
+                                      size="1" variant="ghost"
+                                      color={displayMode === 'address' ? 'blue' : 'gray'}
+                                      onClick={(e) => { e.stopPropagation(); toggleCardDisplayMode(node.id, node) }}
+                                      title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'}
+                                      style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}
+                                    >
+                                      {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
+                                    </IconButton>
+                                  </Flex>
+                                  <IconButton size="1" variant="ghost" color="red" onClick={(e) => { e.stopPropagation(); removeNode(node.id) }} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
+                                    <Trash2 size={12} />
                                   </IconButton>
                                 </Flex>
                                 {displayMode === 'coords' ? (
@@ -1467,14 +1511,6 @@ export function BottomPanel() {
                                 </Flex>
                                 )}
                               </Flex>
-                              <IconButton
-                                size="1"
-                                variant="ghost"
-                                color="red"
-                                onClick={() => removeNode(node.id)}
-                              >
-                                <Trash2 size={14} />
-                              </IconButton>
                             </Flex>
                           </Card>
                           )
@@ -1513,54 +1549,59 @@ export function BottomPanel() {
                       <div
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                          gap: '8px',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                          gap: '6px',
                           paddingRight: '8px',
                         }}
                       >
                         {missionSites.map((node, index) => {
                           const displayMode = getDisplayMode(node.id)
                           const isLoading = geocodingLoading.get(node.id) || false
+                          const typeColor = node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6'
                           return (
                           <Card
                             key={node.id}
                             data-node-id={node.id}
-                            className="p-2"
+                            className="p-0"
                             style={{
                               backgroundColor: selectedNodeId === node.id ? '#eff6ff' : 'white',
                               border: selectedNodeId === node.id ? '2px solid #3b82f6' : undefined,
                               cursor: 'pointer',
+                              overflow: 'hidden',
                             }}
                             onClick={() => setSelectedNodeId(selectedNodeId === node.id ? null : node.id)}
                           >
-                            <Flex justify="between" align="start" className="mb-2">
-                              <Flex align="center" gap="1">
-                                <Text size="2" weight="bold">Site ID: {node.siteId || '?'}</Text>
-                                <Text size="2" color="gray">—</Text>
-                                <Text size="2" weight="medium" style={{ color: node.type === 'depot' ? '#3b82f6' : node.type === 'station' ? '#f97316' : node.type === 'hazard' ? '#ef4444' : '#8b5cf6' }}>
-                                  {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {nodeTypeNumberMap.get(node.id) || ''}
-                                </Text>
-                                {node.type === 'hazard' && node.severity && (
-                                  <Badge size="1" variant="soft" color={getHazardColor(node.severity)} style={{ marginLeft: '4px' }}>
-                                    {node.severity}
-                                  </Badge>
-                                )}
-                                <IconButton
-                                  size="1" variant="ghost"
-                                  color={displayMode === 'address' ? 'blue' : 'gray'}
-                                  onClick={(e) => { e.stopPropagation(); toggleCardDisplayMode(node.id, node) }}
-                                  title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'}
-                                  style={{ minWidth: '20px', minHeight: '20px', padding: '2px' }}
-                                >
-                                  {displayMode === 'coords' ? <MapPinned size={12} /> : <Hash size={12} />}
-                                </IconButton>
-                              </Flex>
-                              <IconButton size="1" variant="ghost" color="red" onClick={() => removeNode(node.id)}>
-                                <Trash2 size={14} />
-                              </IconButton>
-                            </Flex>
+                            <Flex>
+                              <div style={{ width: '3px', minHeight: '100%', backgroundColor: typeColor, flexShrink: 0 }} />
+                              <Flex direction="column" gap="1" style={{ flex: 1, padding: '8px 10px' }}>
+                                <Flex justify="between" align="center">
+                                  <Flex align="center" gap="1" style={{ minWidth: 0 }}>
+                                    <Text size="1" weight="bold" style={{ whiteSpace: 'nowrap' }}>Site ID: {node.siteId || '?'}</Text>
+                                    <Text size="1" color="gray">-</Text>
+                                    <Text size="1" weight="medium" style={{ color: typeColor, whiteSpace: 'nowrap' }}>
+                                      {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {nodeTypeNumberMap.get(node.id) || ''}
+                                    </Text>
+                                    {node.type === 'hazard' && node.severity && (
+                                      <Badge size="1" variant="soft" color={getHazardColor(node.severity)} style={{ fontSize: '9px' }}>
+                                        {node.severity}
+                                      </Badge>
+                                    )}
+                                    <IconButton
+                                      size="1" variant="ghost"
+                                      color={displayMode === 'address' ? 'blue' : 'gray'}
+                                      onClick={(e) => { e.stopPropagation(); toggleCardDisplayMode(node.id, node) }}
+                                      title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'}
+                                      style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}
+                                    >
+                                      {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
+                                    </IconButton>
+                                  </Flex>
+                                  <IconButton size="1" variant="ghost" color="red" onClick={(e) => { e.stopPropagation(); removeNode(node.id) }} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
+                                    <Trash2 size={12} />
+                                  </IconButton>
+                                </Flex>
 
-                            <Box className="space-y-2">
+                            <Box style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                               <Select.Root
                                 value={node.type}
                                 onValueChange={(value: string) => {
@@ -1675,6 +1716,8 @@ export function BottomPanel() {
                               )}
 
                             </Box>
+                              </Flex>
+                            </Flex>
                           </Card>
                           )
                         })}
@@ -1693,7 +1736,7 @@ export function BottomPanel() {
               </Box>
 
               {/* Right: Config Panel */}
-              <Box className="w-79 p-4 border-l" style={{ overflow: 'hidden' }}>
+              <Box className="w-79 p-4 border-l config-scroll" style={{ overflowY: 'auto', overflowX: 'hidden' }}>
                 {/* Routing Algorithm */}
                 <Box className="mb-4">
                   <Flex align="center" gap="2" style={{ display: 'flex', marginBottom: '12px' }}>
@@ -1908,15 +1951,17 @@ export function BottomPanel() {
               {/* Header */}
               <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px', paddingTop: '24px' }}>
                 {/* Mode label + Mission name + status badges — fixed width so right side stays put */}
-                <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+                <Flex align="center" gap="2" style={{ width: '300px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
                   <Text size="1" weight="medium" style={{ position: 'absolute', top: '-16px', left: 0, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Mission Control</Text>
-                  <FileText size={16} style={{ flexShrink: 0 }} />
-                  <Text size="2" weight="bold" style={{ whiteSpace: 'nowrap' }}>
+                  <TowerControl size={16} style={{ flexShrink: 0 }} />
+                  <Text size="2" weight="bold" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
                     {missionConfig.missionName || 'Untitled Mission'}
                   </Text>
-                  <Badge size="1" color={missionPaused ? 'orange' : 'green'} variant="solid">
-                    {missionPaused ? 'Paused' : 'Running'}
-                  </Badge>
+                  <div className="badge-scroll" style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', overflowY: 'hidden', minWidth: 0, flexShrink: 1 }}>
+                    <Badge size="1" style={{ fontSize: '10px', flexShrink: 0 }} color={missionPaused ? 'orange' : 'green'} variant="solid">
+                      {missionPaused ? 'Paused' : 'Running'}
+                    </Badge>
+                  </div>
                 </Flex>
 
                 <Box className="w-px h-6 bg-gray-300" style={{ flexShrink: 0 }} />
@@ -2075,7 +2120,7 @@ export function BottomPanel() {
                       style={{
                         display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                        gap: '8px',
+                        gap: '6px',
                         padding: '16px',
                         paddingRight: '24px',
                       }}
@@ -2100,25 +2145,25 @@ export function BottomPanel() {
                             onClick={() => setSelectedNodeId(selectedNodeId === order.id ? null : order.id)}
                           >
                             <Flex>
-                              <div style={{ width: '4px', minHeight: '100%', backgroundColor: accentColor, flexShrink: 0 }} />
-                              <Box style={{ padding: '10px 12px', flex: 1 }}>
-                                <Flex justify="between" align="center" style={{ marginBottom: '6px' }}>
+                              <div style={{ width: '3px', minHeight: '100%', backgroundColor: accentColor, flexShrink: 0 }} />
+                              <Box style={{ padding: '8px 10px', flex: 1 }}>
+                                <Flex justify="between" align="center" style={{ marginBottom: '4px' }}>
                                   <Flex align="center" gap="2">
-                                    <MapPin size={14} style={{ color: accentColor === '#d1d5db' ? '#9ca3af' : accentColor }} />
-                                    <Text size="2" weight="bold">Order ID: {order.orderId || '?'}</Text>
+                                    <MapPin size={12} style={{ color: accentColor === '#d1d5db' ? '#9ca3af' : accentColor, flexShrink: 0 }} />
+                                    <Text size="1" weight="bold">Order {order.orderId || '?'}</Text>
                                   </Flex>
                                   <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={() => toggleCardDisplayMode(order.id, order)} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
                                     {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
                                   </IconButton>
                                 </Flex>
-                                <Text size="1" color="gray" style={{ display: 'block', marginBottom: '6px' }}>
+                                <Text size="1" color="gray" style={{ display: 'block', marginBottom: '4px' }}>
                                   {displayMode === 'coords'
                                     ? `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
                                     : isLoading ? 'Loading address...' : order.address || `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
                                   }
                                 </Text>
                                 {etaInfo && (
-                                  <Flex gap="3" style={{ marginBottom: '6px' }}>
+                                  <Flex gap="3" style={{ marginBottom: '4px' }}>
                                     <Flex align="center" gap="1">
                                       <Clock size={10} style={{ color: '#6b7280' }} />
                                       <Text size="1" color="gray">ETA: <span style={{ fontWeight: 500, color: '#374151' }}>{formatDurationTimeline(etaInfo.eta)}</span></Text>
@@ -2185,7 +2230,7 @@ export function BottomPanel() {
                       style={{
                         display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                        gap: '8px',
+                        gap: '6px',
                         padding: '16px',
                         paddingRight: '24px',
                       }}
@@ -2211,25 +2256,24 @@ export function BottomPanel() {
                             onClick={() => setSelectedNodeId(selectedNodeId === node.id ? null : node.id)}
                           >
                             <Flex>
-                              <div style={{ width: '4px', minHeight: '100%', backgroundColor: nodeColor, flexShrink: 0 }} />
-                              <Box style={{ padding: '10px 12px', flex: 1 }}>
+                              <div style={{ width: '3px', minHeight: '100%', backgroundColor: nodeColor, flexShrink: 0 }} />
+                              <Box style={{ padding: '8px 10px', flex: 1 }}>
                                 <Flex justify="between" align="start" style={{ marginBottom: '4px' }}>
                                   <Flex align="center" gap="1">
                                     {node.type === 'depot' ? (
-                                      <House size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                      <House size={12} style={{ color: nodeColor, flexShrink: 0 }} />
                                     ) : node.type === 'station' ? (
-                                      <Zap size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                      <Zap size={12} style={{ color: nodeColor, flexShrink: 0 }} />
                                     ) : node.type === 'hazard' ? (
-                                      <AlertTriangle size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                      <AlertTriangle size={12} style={{ color: nodeColor, flexShrink: 0 }} />
                                     ) : (
-                                      <MapPin size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                      <MapPin size={12} style={{ color: nodeColor, flexShrink: 0 }} />
                                     )}
-                                    <Box>
-                                      <Text size="2" weight="bold">Site ID: {node.siteId || '?'}</Text>
-                                      <Text size="1" style={{ color: nodeColor, fontWeight: 500, display: 'block', marginTop: '-1px' }}>
-                                        {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {typeNum}
-                                      </Text>
-                                    </Box>
+                                    <Text size="1" weight="bold" style={{ whiteSpace: 'nowrap' }}>Site ID: {node.siteId || '?'}</Text>
+                                    <Text size="1" color="gray">-</Text>
+                                    <Text size="1" weight="medium" style={{ color: nodeColor, whiteSpace: 'nowrap' }}>
+                                      {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {typeNum}
+                                    </Text>
                                   </Flex>
                                   <Flex align="center" gap="1">
                                     {node.type === 'hazard' && node.severity && (
@@ -2242,7 +2286,7 @@ export function BottomPanel() {
                                     </IconButton>
                                   </Flex>
                                 </Flex>
-                                <Text size="1" color="gray" style={{ display: 'block', marginBottom: '6px' }}>
+                                <Text size="1" color="gray" style={{ display: 'block', marginBottom: '4px' }}>
                                   {displayMode === 'coords'
                                     ? `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
                                     : isLoading ? 'Loading address...' : node.address || `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
@@ -2365,23 +2409,25 @@ export function BottomPanel() {
           {/* Header */}
           <Flex align="center" className="p-4 border-b" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px', paddingTop: '24px' }}>
             {/* Mode label + Mission name + status badges — fixed width so right side stays put */}
-            <Flex align="center" gap="2" style={{ width: '350px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+            <Flex align="center" gap="2" style={{ width: '300px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
               <Text size="1" weight="medium" style={{ position: 'absolute', top: '-16px', left: 0, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Mission Control</Text>
-              <FileText size={16} style={{ flexShrink: 0 }} />
-              <Text size="2" weight="bold" style={{ whiteSpace: 'nowrap' }}>
+              <TowerControl size={16} style={{ flexShrink: 0 }} />
+              <Text size="2" weight="bold" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
                 {missionConfig.missionName || 'Untitled Mission'}
               </Text>
-              <Badge size="1" color={getStatusColor(missionStatus)}>{missionStatus}</Badge>
-              {!missionLaunched && (
-                <>
-                  <Badge size="1" color={missionConfig.nodes.length > 0 ? 'green' : 'gray'} variant={missionConfig.nodes.length > 0 ? 'soft' : 'outline'}>
-                    {missionConfig.nodes.length > 0 ? 'Plan Loaded' : 'No Plan'}
-                  </Badge>
-                  <Badge size="1" color={hasRoute ? 'green' : missionConfig.nodes.length > 0 ? 'orange' : 'gray'} variant={hasRoute ? 'soft' : 'outline'}>
-                    {hasRoute ? 'Route Ready' : missionConfig.nodes.length > 0 ? 'Route Required' : 'No Route'}
-                  </Badge>
-                </>
-              )}
+              <div className="badge-scroll" style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', overflowY: 'hidden', minWidth: 0, flexShrink: 1 }}>
+                <Badge size="1" style={{ fontSize: '10px', flexShrink: 0 }} color={getStatusColor(missionStatus)}>{missionStatus}</Badge>
+                {!missionLaunched && (
+                  <>
+                    <Badge size="1" style={{ fontSize: '10px', flexShrink: 0 }} color={missionConfig.nodes.length > 0 ? 'green' : 'gray'} variant={missionConfig.nodes.length > 0 ? 'soft' : 'outline'}>
+                      {missionConfig.nodes.length > 0 ? 'Plan Loaded' : 'No Plan'}
+                    </Badge>
+                    <Badge size="1" style={{ fontSize: '10px', flexShrink: 0 }} color={hasRoute ? 'green' : missionConfig.nodes.length > 0 ? 'orange' : 'gray'} variant={hasRoute ? 'soft' : 'outline'}>
+                      {hasRoute ? 'Route Ready' : missionConfig.nodes.length > 0 ? 'Route Required' : 'No Route'}
+                    </Badge>
+                  </>
+                )}
+              </div>
             </Flex>
 
             <Box className="w-px h-6 bg-gray-300" style={{ flexShrink: 0 }} />
@@ -2565,25 +2611,25 @@ export function BottomPanel() {
                         onClick={() => setSelectedNodeId(selectedNodeId === order.id ? null : order.id)}
                       >
                         <Flex>
-                          <div style={{ width: '4px', minHeight: '100%', backgroundColor: accentColor, flexShrink: 0 }} />
-                          <Box style={{ padding: '10px 12px', flex: 1 }}>
-                            <Flex justify="between" align="center" style={{ marginBottom: '6px' }}>
+                          <div style={{ width: '3px', minHeight: '100%', backgroundColor: accentColor, flexShrink: 0 }} />
+                          <Box style={{ padding: '8px 10px', flex: 1 }}>
+                            <Flex justify="between" align="center" style={{ marginBottom: '4px' }}>
                               <Flex align="center" gap="2">
-                                <MapPin size={14} style={{ color: accentColor === '#d1d5db' ? '#9ca3af' : accentColor }} />
-                                <Text size="2" weight="bold">Order ID: {order.orderId || '?'}</Text>
+                                <MapPin size={12} style={{ color: accentColor === '#d1d5db' ? '#9ca3af' : accentColor, flexShrink: 0 }} />
+                                <Text size="1" weight="bold">Order {order.orderId || '?'}</Text>
                               </Flex>
                               <IconButton size="1" variant="ghost" color={displayMode === 'address' ? 'blue' : 'gray'} onClick={() => toggleCardDisplayMode(order.id, order)} title={displayMode === 'coords' ? 'Show address' : 'Show coordinates'} style={{ minWidth: '18px', minHeight: '18px', padding: '1px' }}>
                                 {displayMode === 'coords' ? <MapPinned size={10} /> : <Hash size={10} />}
                               </IconButton>
                             </Flex>
-                            <Text size="1" color="gray" style={{ display: 'block', marginBottom: '6px' }}>
+                            <Text size="1" color="gray" style={{ display: 'block', marginBottom: '4px' }}>
                               {displayMode === 'coords'
                                 ? `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
                                 : isLoading ? 'Loading address...' : order.address || `${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`
                               }
                             </Text>
                             {etaInfo && (
-                              <Flex gap="3" style={{ marginBottom: '6px' }}>
+                              <Flex gap="3" style={{ marginBottom: '4px' }}>
                                 <Flex align="center" gap="1">
                                   <Clock size={10} style={{ color: '#6b7280' }} />
                                   <Text size="1" color="gray">ETA: <span style={{ fontWeight: 500, color: '#374151' }}>{formatDurationTimeline(etaInfo.eta)}</span></Text>
@@ -2676,25 +2722,24 @@ export function BottomPanel() {
                         onClick={() => setSelectedNodeId(selectedNodeId === node.id ? null : node.id)}
                       >
                         <Flex>
-                          <div style={{ width: '4px', minHeight: '100%', backgroundColor: nodeColor, flexShrink: 0 }} />
-                          <Box style={{ padding: '10px 12px', flex: 1 }}>
+                          <div style={{ width: '3px', minHeight: '100%', backgroundColor: nodeColor, flexShrink: 0 }} />
+                          <Box style={{ padding: '8px 10px', flex: 1 }}>
                             <Flex justify="between" align="start" style={{ marginBottom: '4px' }}>
                               <Flex align="center" gap="1">
                                 {node.type === 'depot' ? (
-                                  <House size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                  <House size={12} style={{ color: nodeColor, flexShrink: 0 }} />
                                 ) : node.type === 'station' ? (
-                                  <Zap size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                  <Zap size={12} style={{ color: nodeColor, flexShrink: 0 }} />
                                 ) : node.type === 'hazard' ? (
-                                  <AlertTriangle size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                  <AlertTriangle size={12} style={{ color: nodeColor, flexShrink: 0 }} />
                                 ) : (
-                                  <MapPin size={14} style={{ color: nodeColor, flexShrink: 0 }} />
+                                  <MapPin size={12} style={{ color: nodeColor, flexShrink: 0 }} />
                                 )}
-                                <Box>
-                                  <Text size="2" weight="bold">Site ID: {node.siteId || '?'}</Text>
-                                  <Text size="1" style={{ color: nodeColor, fontWeight: 500, display: 'block', marginTop: '-1px' }}>
-                                    {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {typeNum}
-                                  </Text>
-                                </Box>
+                                <Text size="1" weight="bold" style={{ whiteSpace: 'nowrap' }}>Site ID: {node.siteId || '?'}</Text>
+                                <Text size="1" color="gray">-</Text>
+                                <Text size="1" weight="medium" style={{ color: nodeColor, whiteSpace: 'nowrap' }}>
+                                  {node.type.charAt(0).toUpperCase() + node.type.slice(1)} {typeNum}
+                                </Text>
                               </Flex>
                               <Flex align="center" gap="1">
                                 {node.type === 'hazard' && node.severity && (
@@ -2707,7 +2752,7 @@ export function BottomPanel() {
                                 </IconButton>
                               </Flex>
                             </Flex>
-                            <Text size="1" color="gray" style={{ display: 'block', marginBottom: '6px' }}>
+                            <Text size="1" color="gray" style={{ display: 'block', marginBottom: '4px' }}>
                               {displayMode === 'coords'
                                 ? `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
                                 : isLoading ? 'Loading address...' : node.address || `${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}`
