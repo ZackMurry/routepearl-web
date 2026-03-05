@@ -90,7 +90,7 @@ const defaultMissionConfig: MissionConfig = {
   missionName: 'Untitled Mission',
   missionGoal: '',
   nodes: [],
-  algorithm: 'alns',
+  algorithm: 'negar',
   hazardZones: [],
   routes: undefined,
 }
@@ -167,7 +167,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
   // Update mission config
   const updateMissionConfig = (updates: Partial<MissionConfig>) => {
-    setMissionConfig((prev) => ({ ...prev, ...updates }))
+    setMissionConfig(prev => ({ ...prev, ...updates }))
   }
 
   // Helper function to get the next available Order ID for orders
@@ -244,7 +244,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
   // Node management
   const addNode = (node: MissionSite) => {
-    setMissionConfig((prev) => {
+    setMissionConfig(prev => {
       // If it's an order node, auto-assign the next available Order ID
       if (node.type === 'order' && node.orderId === undefined) {
         const orderId = getNextAvailableAddressId(prev.nodes)
@@ -277,38 +277,38 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   }
 
   const updateNode = (id: string, updates: Partial<MissionSite>) => {
-    setMissionConfig((prev) => ({
+    setMissionConfig(prev => ({
       ...prev,
-      nodes: prev.nodes.map((node) => (node.id === id ? { ...node, ...updates } : node)),
+      nodes: prev.nodes.map(node => (node.id === id ? { ...node, ...updates } : node)),
     }))
   }
 
   const removeNode = (id: string) => {
-    setMissionConfig((prev) => ({
+    setMissionConfig(prev => ({
       ...prev,
-      nodes: prev.nodes.filter((node) => node.id !== id),
+      nodes: prev.nodes.filter(node => node.id !== id),
     }))
   }
 
   // Hazard zone management
   const addHazardZone = (zone: HazardZone) => {
-    setMissionConfig((prev) => ({
+    setMissionConfig(prev => ({
       ...prev,
       hazardZones: [...prev.hazardZones, zone],
     }))
   }
 
   const updateHazardZone = (id: string, updates: Partial<HazardZone>) => {
-    setMissionConfig((prev) => ({
+    setMissionConfig(prev => ({
       ...prev,
-      hazardZones: prev.hazardZones.map((zone) => (zone.id === id ? { ...zone, ...updates } : zone)),
+      hazardZones: prev.hazardZones.map(zone => (zone.id === id ? { ...zone, ...updates } : zone)),
     }))
   }
 
   const removeHazardZone = (id: string) => {
-    setMissionConfig((prev) => ({
+    setMissionConfig(prev => ({
       ...prev,
-      hazardZones: prev.hazardZones.filter((zone) => zone.id !== id),
+      hazardZones: prev.hazardZones.filter(zone => zone.id !== id),
     }))
   }
 
@@ -364,7 +364,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
       console.log('Route data saved:', {
         truckRoutePoints: missionConfig.routes?.truckRoute?.length || 0,
         droneRoutePaths: missionConfig.routes?.droneRoutes?.length || 0,
-        hasRoute: (missionConfig.routes?.truckRoute?.length || 0) > 0 || (missionConfig.routes?.droneRoutes?.length || 0) > 0,
+        hasRoute:
+          (missionConfig.routes?.truckRoute?.length || 0) > 0 || (missionConfig.routes?.droneRoutes?.length || 0) > 0,
       })
     } catch (error) {
       console.error('Failed to save mission:', error)
@@ -390,7 +391,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     console.log('Route data loaded:', {
       truckRoutePoints: mission.config.routes?.truckRoute?.length || 0,
       droneRoutePaths: mission.config.routes?.droneRoutes?.length || 0,
-      hasRoute: (mission.config.routes?.truckRoute?.length || 0) > 0 || (mission.config.routes?.droneRoutes?.length || 0) > 0,
+      hasRoute:
+        (mission.config.routes?.truckRoute?.length || 0) > 0 || (mission.config.routes?.droneRoutes?.length || 0) > 0,
     })
   }
 
@@ -503,7 +505,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   }
 
   // Generate route using backend API
-  const hasUnassignedWaypoints = missionConfig.nodes.some((n) => n.type === 'waypoint')
+  const hasUnassignedWaypoints = missionConfig.nodes.some(n => n.type === 'waypoint')
 
   // Check if any routable nodes aren't covered by the current routes
   const hasUnroutedNodes = React.useMemo(() => {
@@ -511,19 +513,15 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     if (!hasRoute) return false // No route yet — not "unrouted", just not generated
 
     // All route points (truck + drone delivery points)
-    const routableNodes = missionConfig.nodes.filter(
-      (n) => n.type === 'order' || n.type === 'depot' || n.type === 'station'
-    )
+    const routableNodes = missionConfig.nodes.filter(n => n.type === 'order' || n.type === 'depot' || n.type === 'station')
 
-    return routableNodes.some((node) => {
+    return routableNodes.some(node => {
       // Check truck route
-      const inTruck = truckRoute.some((pt) => pointMatchesNode(pt, node))
+      const inTruck = truckRoute.some(pt => pointMatchesNode(pt, node))
       if (inTruck) return false
 
       // Check drone routes (delivery point is index 1 in each sortie)
-      const inDrone = droneRoutes.some((sortie) =>
-        sortie.some((pt) => pointMatchesNode(pt, node))
-      )
+      const inDrone = droneRoutes.some(sortie => sortie.some(pt => pointMatchesNode(pt, node)))
       if (inDrone) return false
 
       return true // This node is unrouted
@@ -537,16 +535,14 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     }
 
     // Separate nodes by type
-    const depots = missionConfig.nodes.filter((n) => n.type === 'depot')
-    const orders = missionConfig.nodes.filter((n) => n.type === 'order')
-    const stations = missionConfig.nodes.filter((n) => n.type === 'station')
+    const depots = missionConfig.nodes.filter(n => n.type === 'depot')
+    const orders = missionConfig.nodes.filter(n => n.type === 'order')
+    const stations = missionConfig.nodes.filter(n => n.type === 'station')
 
     // If no explicit depots, use first waypoint
     const finalDepots = depots.length > 0 ? depots : [missionConfig.nodes[0]]
     const finalOrders =
-      orders.length > 0
-        ? orders
-        : missionConfig.nodes.filter((n) => !finalDepots.includes(n) && n.type !== 'hazard')
+      orders.length > 0 ? orders : missionConfig.nodes.filter(n => !finalDepots.includes(n) && n.type !== 'hazard')
 
     setIsGeneratingRoute(true)
     try {
@@ -554,11 +550,12 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          depots: finalDepots.map((n) => ({ id: n.id, lat: n.lat, lon: n.lng })),
-          customers: finalOrders.map((n) => ({ id: n.id, lat: n.lat, lon: n.lng })),
-          stations: stations.map((n) => ({ id: n.id, lat: n.lat, lon: n.lng })),
-          algorithm: 'negar',
-          provider: 'OSRM-Online'
+          depots: finalDepots.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
+          customers: finalOrders.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
+          stations: stations.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
+          algorithm: missionConfig.algorithm,
+          D: droneCount,
+          provider: 'OSRM-Online',
           // TODO: Uncomment when backend is ready to handle hazards
           // hazards: hazards.map((n, index) => ({
           //   id: index + 1,
