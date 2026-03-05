@@ -17,7 +17,7 @@ export interface MissionSite extends Point {
   address?: string // Cached reverse-geocoded street address
 }
 
-export type RoutingAlgorithm = 'alns' | 'custom'
+export type RoutingAlgorithm = 'negar' | 'custom' | 'least_time' | 'least_risk' | 'fstsp'
 
 export interface HazardZone {
   id: string
@@ -127,10 +127,12 @@ export interface MissionConfig {
 
   // Generated routes (from optimization algorithm)
   // Uses EnhancedRouteData for full timing support, or legacy format for backwards compatibility
-  routes?: EnhancedRouteData | {
-    truckRoute: Point[]
-    droneRoutes: Point[][]
-  }
+  routes?:
+    | EnhancedRouteData
+    | {
+        truckRoute: Point[]
+        droneRoutes: Point[][]
+      }
 }
 
 export type MissionStatus = 'idle' | 'planning' | 'ready' | 'active' | 'paused' | 'completed' | 'failed'
