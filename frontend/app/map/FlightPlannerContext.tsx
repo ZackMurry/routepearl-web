@@ -556,13 +556,15 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
           algorithm: missionConfig.algorithm,
           D: droneCount,
           provider: 'OSRM-Online',
-          // TODO: Uncomment when backend is ready to handle hazards
-          // hazards: hazards.map((n, index) => ({
-          //   id: index + 1,
-          //   center: [n.lat, n.lng],
-          //   radius: n.radius || 100,
-          //   severity: n.severity || 'medium',
-          // })),
+          hazards: missionConfig.nodes
+            .filter(it => it.type === 'hazard')
+            .map((it, index) => ({
+              id: `${index + 1}`,
+              lat: it.lat,
+              lon: it.lng,
+              radius: (it.radius || 100) / 1000,
+              // severity: it.severity || 'medium',
+            })),
         }),
       })
 
