@@ -87,7 +87,7 @@ interface FlightPlannerContextType {
 const FlightPlannerContext = createContext<FlightPlannerContextType | undefined>(undefined)
 
 const defaultMissionConfig: MissionConfig = {
-  missionName: 'Untitled Mission',
+  missionName: '',
   missionGoal: '',
   nodes: [],
   algorithm: 'negar',

@@ -19,6 +19,7 @@ interface Props {
 const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDuration, axisMode, onStopClick, onStopDoubleClick }) => {
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [isClamped, setIsClamped] = useState(false) // true when tooltip was shifted to fit viewport
   const iconRef = useRef<HTMLDivElement>(null)
 
   // Position based on axis mode, with optional pixel nudge for overlapping stops
@@ -39,7 +40,26 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDura
         y: rect.top,
       })
     }
+    setIsClamped(false)
     setShowTooltip(true)
+  }, [])
+
+  // Callback ref: clamp tooltip within viewport, hide arrow if displaced
+  const tooltipRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const pad = 8
+    let shift = 0
+    if (rect.right > window.innerWidth - pad) {
+      shift = -(rect.right - (window.innerWidth - pad))
+    }
+    if (rect.left < pad) {
+      shift = pad - rect.left
+    }
+    if (shift !== 0) {
+      el.style.left = `${parseFloat(el.style.left) + shift}px`
+      setIsClamped(true)
+    }
   }, [])
 
   // Get icon based on stop type
@@ -151,6 +171,7 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDura
       {/* Tooltip rendered via portal to escape overflow clipping */}
       {showTooltip && typeof document !== 'undefined' && createPortal(
         <div
+          ref={tooltipRef}
           style={{
             position: 'fixed',
             left: `${tooltipPos.x}px`,
@@ -221,20 +242,22 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDura
               {stop.description}
             </div>
           )}
-          {/* Arrow pointing down */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '-6px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 0,
-              height: 0,
-              borderLeft: '6px solid transparent',
-              borderRight: '6px solid transparent',
-              borderTop: '6px solid #1f2937',
-            }}
-          />
+          {/* Arrow pointing down — hidden when tooltip is displaced */}
+          {!isClamped && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '-6px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 0,
+                height: 0,
+                borderLeft: '6px solid transparent',
+                borderRight: '6px solid transparent',
+                borderTop: '6px solid #1f2937',
+              }}
+            />
+          )}
         </div>,
         document.body
       )}
