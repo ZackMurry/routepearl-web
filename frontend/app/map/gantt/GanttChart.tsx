@@ -2,14 +2,161 @@
 
 import React, { FC, useRef, useState, useEffect } from 'react'
 import { Box, Flex, Text, Button } from '@radix-ui/themes'
-import { Plus, FolderOpen, ZoomIn, ZoomOut, Drone, Truck, Clock, Route, BarChart3, List, User } from 'lucide-react'
-import { GanttData, GanttChartState, GanttAxisMode, GanttStop, GanttVehicle, formatGanttTime, formatGanttDistance } from './gantt.types'
+import { Plus, FolderOpen, ZoomIn, ZoomOut, Drone, Truck, Clock, Route, BarChart3, List, User, Filter, ChevronDown, Check } from 'lucide-react'
+import { GanttData, GanttChartState, GanttAxisMode, GanttStop, GanttStopType, GanttVehicle, getStopColor, formatGanttTime, formatGanttDistance } from './gantt.types'
 import GanttTimeAxis from './GanttTimeAxis'
 import GanttRow from './GanttRow'
 import GanttCurrentTimeMarker from './GanttCurrentTimeMarker'
 import GanttListView from './GanttListView'
 
 type VehicleFilter = 'all' | 'drones' | 'trucks' | 'driver'
+
+/* ── Event-type stop icons (shared with GanttListView) ──────────────── */
+import { House, Package, ArrowUp, ArrowDown, Zap } from 'lucide-react'
+
+const ALL_STOP_TYPES: { type: GanttStopType; label: string; icon: React.ReactNode }[] = [
+  { type: 'depot', label: 'Depot', icon: <House size={10} /> },
+  { type: 'delivery', label: 'Delivery', icon: <Package size={10} /> },
+  { type: 'launch', label: 'Launch', icon: <ArrowUp size={10} /> },
+  { type: 'return', label: 'Return', icon: <ArrowDown size={10} /> },
+  { type: 'charging', label: 'Charging', icon: <Zap size={10} /> },
+  { type: 'travel', label: 'Travel', icon: <Truck size={10} /> },
+]
+
+/* ── Event Type Filter Dropdown ──────────────────────────────────────── */
+
+const EventTypeFilter: FC<{
+  activeTypes: Set<GanttStopType>
+  onToggle: (type: GanttStopType) => void
+  onSelectAll: () => void
+  onClearAll: () => void
+}> = ({ activeTypes, onToggle, onSelectAll, onClearAll }) => {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const allSelected = activeTypes.size === ALL_STOP_TYPES.length
+  const filterLabel = allSelected ? 'All Events' : `${activeTypes.size} of ${ALL_STOP_TYPES.length}`
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-flex' }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '5px',
+          padding: '3px 10px',
+          fontSize: '11px',
+          fontWeight: 500,
+          color: allSelected ? '#6b7280' : '#3b82f6',
+          backgroundColor: allSelected ? 'transparent' : '#eff6ff',
+          border: `1px solid ${allSelected ? '#d1d5db' : '#bfdbfe'}`,
+          borderRadius: '6px',
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+          lineHeight: '18px',
+        }}
+      >
+        <Filter size={11} />
+        {filterLabel}
+        <ChevronDown size={10} style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 150ms' }} />
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            zIndex: 50,
+            minWidth: '180px',
+            backgroundColor: 'white',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+            padding: '4px 0',
+          }}
+        >
+          {/* Quick actions */}
+          <div style={{ display: 'flex', gap: '4px', padding: '4px 8px 6px', borderBottom: '1px solid #f3f4f6' }}>
+            <button onClick={onSelectAll} style={{ flex: 1, fontSize: '10px', fontWeight: 500, padding: '3px 0', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer' }}>
+              Select All
+            </button>
+            <button onClick={onClearAll} style={{ flex: 1, fontSize: '10px', fontWeight: 500, padding: '3px 0', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>
+              Clear All
+            </button>
+          </div>
+
+          {/* Type options */}
+          {ALL_STOP_TYPES.map(({ type, label, icon }) => {
+            const checked = activeTypes.has(type)
+            return (
+              <button
+                key={type}
+                onClick={() => onToggle(type)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  width: '100%',
+                  padding: '6px 10px',
+                  fontSize: '12px',
+                  color: checked ? '#1e293b' : '#94a3b8',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+              >
+                {/* Checkbox */}
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '3px',
+                  border: `1.5px solid ${checked ? getStopColor(type) : '#d1d5db'}`,
+                  backgroundColor: checked ? getStopColor(type) : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  {checked && <Check size={10} color="white" strokeWidth={3} />}
+                </div>
+
+                {/* Icon */}
+                <div style={{
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '4px',
+                  backgroundColor: getStopColor(type),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  flexShrink: 0,
+                }}>
+                  {icon}
+                </div>
+
+                <span style={{ fontWeight: checked ? 500 : 400 }}>{label}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface Props {
   data: GanttData
@@ -23,7 +170,7 @@ interface Props {
   onStopDoubleClick?: (stop: GanttStop) => void
   onVehicleClick?: (vehicle: GanttVehicle) => void
   onVehicleDoubleClick?: (vehicle: GanttVehicle) => void
-}
+}2
 
 // Pick a "nice" grid interval in pixels for distance mode
 function niceDistanceGridInterval(totalMeters: number, zoomLevel: number): number {
@@ -58,7 +205,22 @@ const GanttChart: FC<Props> = ({
   const [showAllRow, setShowAllRow] = useState(true)
   const [showTrucksInDriver, setShowTrucksInDriver] = useState(true)
   const [showDronesInDriver, setShowDronesInDriver] = useState(true)
+  const [activeStopTypes, setActiveStopTypes] = useState<Set<GanttStopType>>(() => new Set(ALL_STOP_TYPES.map((t) => t.type)))
   const zoomInputRef = useRef<HTMLInputElement>(null)
+
+  const handleStopTypeToggle = (type: GanttStopType) => {
+    setActiveStopTypes((prev) => {
+      const next = new Set(prev)
+      if (next.has(type)) {
+        if (next.size > 1) next.delete(type)
+      } else {
+        next.add(type)
+      }
+      return next
+    })
+  }
+  const handleStopTypeSelectAll = () => setActiveStopTypes(new Set(ALL_STOP_TYPES.map((t) => t.type)))
+  const handleStopTypeClearAll = () => setActiveStopTypes(new Set<GanttStopType>(['delivery']))
 
   const ZOOM_MIN = 0.5
   const ZOOM_MAX = 3
@@ -164,10 +326,19 @@ const GanttChart: FC<Props> = ({
       })
     : filteredVehicles
 
+  // Apply stop-type filter to vehicle stops
+  const allStopTypesActive = activeStopTypes.size === ALL_STOP_TYPES.length
+  const stopFilteredVehicles = allStopTypesActive
+    ? sortedVehicles
+    : sortedVehicles.map((v) => ({
+        ...v,
+        stops: v.stops.filter((s) => activeStopTypes.has(s.type)),
+      }))
+
   // Row height for calculating current time marker height
   const rowHeight = 42
   const headerHeight = 28
-  const totalContentHeight = headerHeight + sortedVehicles.length * rowHeight
+  const totalContentHeight = headerHeight + stopFilteredVehicles.length * rowHeight
 
   // No plan state
   if (state === 'no-plan') {
@@ -347,28 +518,34 @@ const GanttChart: FC<Props> = ({
           </Flex>
         </Flex>
 
-        {/* Axis mode toggle */}
-        <Flex
-          align="center"
-          gap="0"
-          style={{
-            backgroundColor: '#e5e7eb',
-            borderRadius: '6px',
-            padding: '2px',
-          }}
-        >
-          <button style={segBtn(axisMode === 'duration')} onClick={() => setAxisMode('duration')}>
-            <span style={{ color: axisMode === 'duration' ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
-              <Clock size={12} />
-            </span>
-            Duration
-          </button>
-          <button style={segBtn(axisMode === 'distance')} onClick={() => setAxisMode('distance')}>
-            <span style={{ color: axisMode === 'distance' ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
-              <Route size={12} />
-            </span>
-            Distance
-          </button>
+        {/* Event type filter + Axis mode toggle */}
+        <Flex align="center" gap="2">
+          <EventTypeFilter activeTypes={activeStopTypes} onToggle={handleStopTypeToggle} onSelectAll={handleStopTypeSelectAll} onClearAll={handleStopTypeClearAll} />
+
+          <div style={{ width: '1px', height: '20px', backgroundColor: '#d1d5db' }} />
+
+          <Flex
+            align="center"
+            gap="0"
+            style={{
+              backgroundColor: '#e5e7eb',
+              borderRadius: '6px',
+              padding: '2px',
+            }}
+          >
+            <button style={segBtn(axisMode === 'duration')} onClick={() => setAxisMode('duration')}>
+              <span style={{ color: axisMode === 'duration' ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
+                <Clock size={12} />
+              </span>
+              Duration
+            </button>
+            <button style={segBtn(axisMode === 'distance')} onClick={() => setAxisMode('distance')}>
+              <span style={{ color: axisMode === 'distance' ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
+                <Route size={12} />
+              </span>
+              Distance
+            </button>
+          </Flex>
         </Flex>
 
         {/* Vehicle filter toggle */}
@@ -508,7 +685,7 @@ const GanttChart: FC<Props> = ({
 
             {/* Vehicle rows */}
             <Box style={{ position: 'relative' }}>
-              {sortedVehicles.map((vehicle, index) => {
+              {stopFilteredVehicles.map((vehicle, index) => {
                 // Detect group start: first truck in a new group (not the first row overall)
                 const isGroupStart = vehicleFilter === 'driver' && vehicle.type === 'truck' && vehicle.groupId != null && index > 0
 
@@ -538,7 +715,7 @@ const GanttChart: FC<Props> = ({
                   <GanttCurrentTimeMarker
                     currentTime={currentTime}
                     pixelsPerSecond={isDistanceMode ? 0 : pixelsPerUnit}
-                    height={sortedVehicles.length * rowHeight}
+                    height={stopFilteredVehicles.length * rowHeight}
                     axisMode={axisMode}
                   />
                 </Box>
@@ -549,7 +726,7 @@ const GanttChart: FC<Props> = ({
       ) : (
         <Box style={{ flex: 1, overflow: 'hidden' }}>
           <GanttListView
-            vehicles={sortedVehicles}
+            vehicles={stopFilteredVehicles}
             axisMode={axisMode}
             onStopClick={onStopClick}
             onStopDoubleClick={onStopDoubleClick}

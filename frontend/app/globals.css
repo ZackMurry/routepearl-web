@@ -71,3 +71,13 @@ body {
 .leaflet-grabbing.leaflet-cursor-crosshair {
   cursor: crosshair !important;
 }
+
+/* Exit button highlight pulse when route is generated */
+@keyframes exit-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+}
+
+.exit-highlight-pulse {
+  animation: exit-pulse 2s ease-in-out 3;
+}

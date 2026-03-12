@@ -801,7 +801,7 @@ export function BottomPanel() {
         >
         <Card className="rounded-none shadow-xl" style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
           <Flex direction="column">
-            <Flex align="center" className="p-4 panel-header" style={{ gap: 'var(--panel-header-gap)', paddingTop: '24px', flexWrap: 'wrap', rowGap: '6px' }}>
+            <Flex align="center" className="p-4 panel-header" style={{ gap: 'var(--panel-header-gap)', paddingTop: '24px', flexWrap: 'wrap', rowGap: '6px', position: 'relative', paddingRight: '48px' }}>
               {/* Mode label + Mission name + status badges — fixed width so right side stays put */}
               {isFlightPlannerMode ? (
                 <Flex align="center" gap="2" style={{ width: 'var(--panel-header-name-width)', minWidth: '140px', flexShrink: 1, overflow: 'hidden', position: 'relative' }}>
@@ -896,7 +896,7 @@ export function BottomPanel() {
               {/* Right zone: action buttons next to collapse */}
               {isFlightPlannerMode ? (
                 <Flex gap="2" align="center" style={{ flexShrink: 1, width: 'var(--panel-header-actions-width)', minWidth: '120px' }}>
-                  <Button size="2" variant="soft" color="gray" style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }} onClick={handleExitFlightPlanner}>
+                  <Button size="2" variant={hasRoute ? 'solid' : 'soft'} color={hasRoute ? 'blue' : 'gray'} className={hasRoute ? 'exit-highlight-pulse' : ''} style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }} onClick={handleExitFlightPlanner}>
                     <LogOut size={14} /> Exit
                   </Button>
                   <Button size="2" variant="soft" style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }} onClick={handleExport} disabled={!canSave} title={!canSave ? 'Add at least 1 node or order to save' : 'Save mission'}>
@@ -914,7 +914,7 @@ export function BottomPanel() {
                 </Flex>
               )}
 
-              <IconButton size="3" variant="ghost" onClick={() => setBottomPanelExpanded(true)} style={{ cursor: 'pointer' }}>
+              <IconButton size="3" variant="ghost" onClick={() => setBottomPanelExpanded(true)} style={{ cursor: 'pointer', position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)' }}>
                 <ChevronUp size={24} />
               </IconButton>
             </Flex>
@@ -971,7 +971,7 @@ export function BottomPanel() {
         <Card className="h-full rounded-none shadow-xl" style={{ height: '100%' }}>
           <Flex direction="column" className="h-full">
             {/* Header */}
-            <Flex align="center" className="p-4 border-b panel-header" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: 'var(--panel-header-gap)', paddingTop: '24px', flexWrap: 'wrap', rowGap: '6px' }}>
+            <Flex align="center" className="p-4 border-b panel-header" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: 'var(--panel-header-gap)', paddingTop: '24px', flexWrap: 'wrap', rowGap: '6px', position: 'relative', paddingRight: '48px' }}>
               {/* Mode label + Mission name + route status badge — fixed width so right side stays put */}
               <Flex align="center" gap="2" style={{ width: 'var(--panel-header-name-width)', minWidth: '140px', flexShrink: 1, overflow: 'hidden', position: 'relative' }}>
                 <Text size="1" weight="medium" style={{ position: 'absolute', top: '-16px', left: 0, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Route Planner</Text>
@@ -1026,7 +1026,7 @@ export function BottomPanel() {
 
               {/* Right: Exit/Save buttons next to collapse */}
               <Flex gap="2" align="center" style={{ flexShrink: 1, width: 'var(--panel-header-actions-width)', minWidth: '120px' }}>
-                <Button size="2" variant="soft" color="gray" style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }} onClick={handleExitFlightPlanner}>
+                <Button size="2" variant={hasRoute ? 'solid' : 'soft'} color={hasRoute ? 'blue' : 'gray'} className={hasRoute ? 'exit-highlight-pulse' : ''} style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }} onClick={handleExitFlightPlanner}>
                   <LogOut size={14} /> Exit
                 </Button>
                 <Button size="2" variant="soft" style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }} onClick={handleExport} disabled={!canSave} title={!canSave ? 'Add at least 1 node or order to save' : 'Save mission'}>
@@ -1034,7 +1034,7 @@ export function BottomPanel() {
                 </Button>
               </Flex>
 
-              <IconButton size="3" variant="ghost" onClick={() => setBottomPanelExpanded(false)} style={{ cursor: 'pointer' }}>
+              <IconButton size="3" variant="ghost" onClick={() => setBottomPanelExpanded(false)} style={{ cursor: 'pointer', position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)' }}>
                 <ChevronDown size={24} />
               </IconButton>
             </Flex>
@@ -2002,7 +2002,7 @@ export function BottomPanel() {
           <Card className="h-full rounded-none shadow-xl" style={{ height: '100%' }}>
             <Flex direction="column" className="h-full">
               {/* Header */}
-              <Flex align="center" className="p-4 border-b panel-header" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: 'var(--panel-header-gap)', paddingTop: '24px', flexWrap: 'wrap', rowGap: '6px' }}>
+              <Flex align="center" className="p-4 border-b panel-header" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: 'var(--panel-header-gap)', paddingTop: '24px', flexWrap: 'wrap', rowGap: '6px', position: 'relative', paddingRight: '48px' }}>
                 {/* Mode label + Mission name + status badges — fixed width so right side stays put */}
                 <Flex align="center" gap="2" style={{ width: 'var(--panel-header-name-width)', minWidth: '140px', flexShrink: 1, overflow: 'hidden', position: 'relative' }}>
                   <Text size="1" weight="medium" style={{ position: 'absolute', top: '-16px', left: 0, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Mission Control</Text>
@@ -2065,7 +2065,7 @@ export function BottomPanel() {
                   </Button>
                 </Flex>
 
-                <IconButton size="3" variant="ghost" onClick={() => setBottomPanelExpanded(false)} style={{ cursor: 'pointer' }}>
+                <IconButton size="3" variant="ghost" onClick={() => setBottomPanelExpanded(false)} style={{ cursor: 'pointer', position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)' }}>
                   <ChevronDown size={24} />
                 </IconButton>
               </Flex>
@@ -2460,7 +2460,7 @@ export function BottomPanel() {
       <Card className="h-full rounded-none shadow-xl" style={{ height: '100%' }}>
         <Flex direction="column" className="h-full">
           {/* Header */}
-          <Flex align="center" className="p-4 border-b panel-header" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: 'var(--panel-header-gap)', paddingTop: '24px', flexWrap: 'wrap', rowGap: '6px' }}>
+          <Flex align="center" className="p-4 border-b panel-header" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: 'var(--panel-header-gap)', paddingTop: '24px', flexWrap: 'wrap', rowGap: '6px', position: 'relative', paddingRight: '48px' }}>
             {/* Mode label + Mission name + status badges — fixed width so right side stays put */}
             <Flex align="center" gap="2" style={{ width: 'var(--panel-header-name-width)', minWidth: '140px', flexShrink: 1, overflow: 'hidden', position: 'relative' }}>
               <Text size="1" weight="medium" style={{ position: 'absolute', top: '-16px', left: 0, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px' }}>Mission Control</Text>
@@ -2531,7 +2531,7 @@ export function BottomPanel() {
               </Button>
             </Flex>
 
-            <IconButton size="3" variant="ghost" onClick={() => setBottomPanelExpanded(false)} style={{ cursor: 'pointer' }}>
+            <IconButton size="3" variant="ghost" onClick={() => setBottomPanelExpanded(false)} style={{ cursor: 'pointer', position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)' }}>
               <ChevronDown size={24} />
             </IconButton>
           </Flex>
@@ -2936,6 +2936,10 @@ function MissionStatsBar({
       className="px-4 py-2 border-t"
       style={{ backgroundColor: 'rgba(249, 250, 251, 0.8)', flexWrap: 'wrap', rowGap: '4px', gap: 'var(--panel-stats-gap)' }}
     >
+      <Text size="1" weight="bold" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#3b82f6' }}>
+        {isFlightPlannerMode ? 'Planner Mode' : 'Control Mode'}
+      </Text>
+      <Box className="w-px h-4 bg-gray-300" />
       <Flex gap="1" align="center" title="Total Mission Sites">
         <MapPin size={14} className="text-gray-600" />
         <Text size="1" weight="medium">{totalNodes}</Text>
