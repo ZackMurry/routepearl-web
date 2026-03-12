@@ -112,8 +112,11 @@ export function useGanttData(
         groupId: 1,
       })
 
-      // Build Driver instruction row from the same truck events
-      const driverStops: GanttStop[] = truckEvents.map((event) => {
+      // Build Driver instruction row — only actionable stops (no travel segments)
+      const driverEvents = truckEvents.filter(
+        (e) => e.type !== 'truck_travel'
+      )
+      const driverStops: GanttStop[] = driverEvents.map((event) => {
         let label: string
         let description: string | undefined
         const droneNum = event.sortieNumber
@@ -124,14 +127,6 @@ export function useGanttData(
           case 'truck_depart':
             label = 'Depart from depot'
             description = 'Begin mission — pull out of depot and head to first stop'
-            break
-          case 'truck_travel':
-            label = event.distance
-              ? `Drive ${(event.distance / 1000).toFixed(1)} km to next stop`
-              : 'Drive to next stop'
-            description = event.estimatedDuration
-              ? `Estimated drive time: ${Math.ceil(event.estimatedDuration / 60)} min`
-              : undefined
             break
           case 'truck_delivery':
             label = `Deliver package${event.orderName ? ` to ${event.orderName}` : ''}`
