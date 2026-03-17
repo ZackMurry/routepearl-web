@@ -48,6 +48,7 @@ import {
   Drone,
   House,
   Zap,
+  Fuel,
   AlertTriangle,
   Settings,
   Lock,
@@ -130,6 +131,8 @@ export function BottomPanel() {
     setDroneCount,
     truckCount,
     setTruckCount,
+    truckPowerType,
+    setTruckPowerType,
     missionLaunched,
     missionPaused,
     launchMission,
@@ -153,6 +156,18 @@ export function BottomPanel() {
   const [nodeTab, setNodeTab] = useState<'overview' | 'orders' | 'missionSites'>('overview')
 
   const [csvImporting, setCsvImporting] = useState(false)
+
+  // --- Clamp panel height on window resize so it never exceeds 80% of viewport ---
+  useEffect(() => {
+    const handleResize = () => {
+      const maxHeight = window.innerHeight * 0.8
+      if (bottomPanelHeight > maxHeight) {
+        setBottomPanelHeight(maxHeight)
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [bottomPanelHeight, setBottomPanelHeight])
 
   // --- Focus node effect: switch tab and scroll to node entry on map marker double-click ---
   useEffect(() => {
@@ -336,9 +351,11 @@ export function BottomPanel() {
 
     const handleMouseMove = (e: MouseEvent) => {
       const deltaY = dragStartY - e.clientY
-      const minHeightPercent = isFlightPlannerMode ? 0.32 : 0.24 // 30% for flight planner, 24% for mission management
-      const minHeight = window.innerHeight * minHeightPercent
-      const maxHeight = window.innerHeight * 0.8 // 80% of viewport height
+      const vh = window.innerHeight
+      // On very small viewports (<600px), allow panel to shrink more
+      const minHeightPercent = vh < 600 ? (isFlightPlannerMode ? 0.25 : 0.2) : isFlightPlannerMode ? 0.32 : 0.24
+      const minHeight = Math.max(120, vh * minHeightPercent)
+      const maxHeight = vh * 0.8
       const newHeight = Math.max(minHeight, Math.min(maxHeight, dragStartHeight + deltaY))
       setBottomPanelHeight(newHeight)
     }
@@ -880,13 +897,30 @@ export function BottomPanel() {
         >
           <Card className='rounded-none shadow-xl' style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
             <Flex direction='column'>
-              <Flex align='center' className='p-4' style={{ gap: '12px', paddingTop: '24px' }}>
+              <Flex
+                align='center'
+                className='p-4 panel-header'
+                style={{
+                  gap: 'var(--panel-header-gap)',
+                  paddingTop: '24px',
+                  flexWrap: 'wrap',
+                  rowGap: '6px',
+                  position: 'relative',
+                  paddingRight: '48px',
+                }}
+              >
                 {/* Mode label + Mission name + status badges — fixed width so right side stays put */}
                 {isFlightPlannerMode ? (
                   <Flex
                     align='center'
                     gap='2'
-                    style={{ width: '300px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}
+                    style={{
+                      width: 'var(--panel-header-name-width)',
+                      minWidth: '140px',
+                      flexShrink: 1,
+                      overflow: 'hidden',
+                      position: 'relative',
+                    }}
                   >
                     <Text
                       size='1'
@@ -957,7 +991,13 @@ export function BottomPanel() {
                   <Flex
                     align='center'
                     gap='2'
-                    style={{ width: '300px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}
+                    style={{
+                      width: 'var(--panel-header-name-width)',
+                      minWidth: '140px',
+                      flexShrink: 1,
+                      overflow: 'hidden',
+                      position: 'relative',
+                    }}
                   >
                     <Text
                       size='1'
@@ -1022,7 +1062,12 @@ export function BottomPanel() {
                 <DateTimeDisplay />
 
                 {/* Stats */}
-                <Flex gap='5' align='center' className='text-gray-600' style={{ flexShrink: 0 }}>
+                <Flex
+                  gap='3'
+                  align='center'
+                  className='text-gray-600'
+                  style={{ flexShrink: 1, flexWrap: 'wrap', minWidth: 0 }}
+                >
                   <Flex gap='1' align='center' title='Time Elapsed / Estimated'>
                     <Clock size={16} />
                     <Text size='2'>00:00/{estimatedTime}</Text>
@@ -1093,14 +1138,25 @@ export function BottomPanel() {
 
                 {/* Right zone: action buttons next to collapse */}
                 {isFlightPlannerMode ? (
-                  <Flex gap='2' align='center' style={{ flexShrink: 0, width: '250px' }}>
-                    <Button size='2' variant='soft' color='gray' style={{ flex: 1 }} onClick={handleExitFlightPlanner}>
+                  <Flex
+                    gap='2'
+                    align='center'
+                    style={{ flexShrink: 1, width: 'var(--panel-header-actions-width)', minWidth: '120px' }}
+                  >
+                    <Button
+                      size='2'
+                      variant={hasRoute ? 'solid' : 'soft'}
+                      color={hasRoute ? 'blue' : 'gray'}
+                      className={hasRoute ? 'exit-highlight-pulse' : ''}
+                      style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }}
+                      onClick={handleExitFlightPlanner}
+                    >
                       <LogOut size={14} /> Exit
                     </Button>
                     <Button
                       size='2'
                       variant='soft'
-                      style={{ flex: 1 }}
+                      style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }}
                       onClick={handleExport}
                       disabled={!canSave}
                       title={!canSave ? 'Add at least 1 node or order to save' : 'Save mission'}
@@ -1109,10 +1165,14 @@ export function BottomPanel() {
                     </Button>
                   </Flex>
                 ) : (
-                  <Flex gap='2' align='center' style={{ flexShrink: 0, width: '250px' }}>
+                  <Flex
+                    gap='2'
+                    align='center'
+                    style={{ flexShrink: 1, width: 'var(--panel-header-actions-width)', minWidth: '120px' }}
+                  >
                     <Button
                       size='2'
-                      style={{ flex: 1 }}
+                      style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }}
                       onClick={() => setIsFlightPlannerMode(true)}
                       disabled={missionLaunched}
                     >
@@ -1126,7 +1186,13 @@ export function BottomPanel() {
                         </>
                       )}
                     </Button>
-                    <Button size='2' variant='soft' style={{ flex: 1 }} onClick={handleImport} disabled={missionLaunched}>
+                    <Button
+                      size='2'
+                      variant='soft'
+                      style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }}
+                      onClick={handleImport}
+                      disabled={missionLaunched}
+                    >
                       <FolderOpen size={14} /> Load Plan
                     </Button>
                   </Flex>
@@ -1136,7 +1202,13 @@ export function BottomPanel() {
                   size='3'
                   variant='ghost'
                   onClick={() => setBottomPanelExpanded(true)}
-                  style={{ cursor: 'pointer' }}
+                  style={{
+                    cursor: 'pointer',
+                    position: 'absolute',
+                    right: '16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                  }}
                 >
                   <ChevronUp size={24} />
                 </IconButton>
@@ -1209,14 +1281,28 @@ export function BottomPanel() {
               {/* Header */}
               <Flex
                 align='center'
-                className='p-4 border-b'
-                style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px', paddingTop: '24px' }}
+                className='p-4 border-b panel-header'
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.5)',
+                  gap: 'var(--panel-header-gap)',
+                  paddingTop: '24px',
+                  flexWrap: 'wrap',
+                  rowGap: '6px',
+                  position: 'relative',
+                  paddingRight: '48px',
+                }}
               >
                 {/* Mode label + Mission name + route status badge — fixed width so right side stays put */}
                 <Flex
                   align='center'
                   gap='2'
-                  style={{ width: '300px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}
+                  style={{
+                    width: 'var(--panel-header-name-width)',
+                    minWidth: '140px',
+                    flexShrink: 1,
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }}
                 >
                   <Text
                     size='1'
@@ -1287,7 +1373,12 @@ export function BottomPanel() {
                 <DateTimeDisplay />
 
                 {/* Stats */}
-                <Flex gap='5' align='center' className='text-gray-600' style={{ flexShrink: 0 }}>
+                <Flex
+                  gap='3'
+                  align='center'
+                  className='text-gray-600'
+                  style={{ flexShrink: 1, flexWrap: 'wrap', minWidth: 0 }}
+                >
                   <Flex gap='1' align='center' title='Time Elapsed / Estimated'>
                     <Clock size={16} />
                     <Text size='2'>00:00/{estimatedTime}</Text>
@@ -1330,14 +1421,25 @@ export function BottomPanel() {
                 <Box className='w-px h-6 bg-gray-300' style={{ flexShrink: 0 }} />
 
                 {/* Right: Exit/Save buttons next to collapse */}
-                <Flex gap='2' align='center' style={{ flexShrink: 0, width: '250px' }}>
-                  <Button size='2' variant='soft' color='gray' style={{ flex: 1 }} onClick={handleExitFlightPlanner}>
+                <Flex
+                  gap='2'
+                  align='center'
+                  style={{ flexShrink: 1, width: 'var(--panel-header-actions-width)', minWidth: '120px' }}
+                >
+                  <Button
+                    size='2'
+                    variant={hasRoute ? 'solid' : 'soft'}
+                    color={hasRoute ? 'blue' : 'gray'}
+                    className={hasRoute ? 'exit-highlight-pulse' : ''}
+                    style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }}
+                    onClick={handleExitFlightPlanner}
+                  >
                     <LogOut size={14} /> Exit
                   </Button>
                   <Button
                     size='2'
                     variant='soft'
-                    style={{ flex: 1 }}
+                    style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }}
                     onClick={handleExport}
                     disabled={!canSave}
                     title={!canSave ? 'Add at least 1 node or order to save' : 'Save mission'}
@@ -1350,7 +1452,13 @@ export function BottomPanel() {
                   size='3'
                   variant='ghost'
                   onClick={() => setBottomPanelExpanded(false)}
-                  style={{ cursor: 'pointer' }}
+                  style={{
+                    cursor: 'pointer',
+                    position: 'absolute',
+                    right: '16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                  }}
                 >
                   <ChevronDown size={24} />
                 </IconButton>
@@ -2511,6 +2619,58 @@ export function BottomPanel() {
                           </IconButton>
                         </Flex>
                       </Flex>
+                      {/* Truck Power Type Toggle */}
+                      <Flex align='center' justify='between' style={{ paddingLeft: '24px' }}>
+                        <Flex align='center' gap='2'>
+                          <Text size='1' color='gray'>
+                            Power
+                          </Text>
+                        </Flex>
+                        <Flex
+                          align='center'
+                          gap='1'
+                          style={{ backgroundColor: '#f3f4f6', borderRadius: '6px', padding: '2px' }}
+                        >
+                          <button
+                            onClick={() => setTruckPowerType('gas')}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              border: 'none',
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              cursor: 'pointer',
+                              backgroundColor: truckPowerType === 'gas' ? 'white' : 'transparent',
+                              color: truckPowerType === 'gas' ? '#374151' : '#9ca3af',
+                              boxShadow: truckPowerType === 'gas' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                            }}
+                          >
+                            <Fuel size={12} /> Gas
+                          </button>
+                          <button
+                            onClick={() => setTruckPowerType('electric')}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              border: 'none',
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              cursor: 'pointer',
+                              backgroundColor: truckPowerType === 'electric' ? 'white' : 'transparent',
+                              color: truckPowerType === 'electric' ? '#374151' : '#9ca3af',
+                              boxShadow: truckPowerType === 'electric' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                            }}
+                          >
+                            <Zap size={12} /> Electric
+                          </button>
+                        </Flex>
+                      </Flex>
                       {/* Drones */}
                       <Flex align='center' justify='between'>
                         <Flex align='center' gap='2'>
@@ -2613,14 +2773,28 @@ export function BottomPanel() {
               {/* Header */}
               <Flex
                 align='center'
-                className='p-4 border-b'
-                style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px', paddingTop: '24px' }}
+                className='p-4 border-b panel-header'
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.5)',
+                  gap: 'var(--panel-header-gap)',
+                  paddingTop: '24px',
+                  flexWrap: 'wrap',
+                  rowGap: '6px',
+                  position: 'relative',
+                  paddingRight: '48px',
+                }}
               >
                 {/* Mode label + Mission name + status badges — fixed width so right side stays put */}
                 <Flex
                   align='center'
                   gap='2'
-                  style={{ width: '300px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}
+                  style={{
+                    width: 'var(--panel-header-name-width)',
+                    minWidth: '140px',
+                    flexShrink: 1,
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }}
                 >
                   <Text
                     size='1'
@@ -2669,7 +2843,12 @@ export function BottomPanel() {
                 <DateTimeDisplay />
 
                 {/* Stats */}
-                <Flex gap='5' align='center' className='text-gray-600' style={{ flexShrink: 0 }}>
+                <Flex
+                  gap='3'
+                  align='center'
+                  className='text-gray-600'
+                  style={{ flexShrink: 1, flexWrap: 'wrap', minWidth: 0 }}
+                >
                   <Flex gap='1' align='center' title='Time Elapsed / Estimated'>
                     <Clock size={16} />
                     <Text size='2'>00:00/{estimatedTime}</Text>
@@ -2707,11 +2886,24 @@ export function BottomPanel() {
                 <Box className='w-px h-6 bg-gray-300' style={{ flexShrink: 0 }} />
 
                 {/* Right: Make/Edit + Load (disabled during mission) next to collapse */}
-                <Flex gap='2' align='center' style={{ flexShrink: 0, width: '250px' }}>
-                  <Button size='2' style={{ flex: 1 }} disabled>
+                <Flex
+                  gap='2'
+                  align='center'
+                  style={{ flexShrink: 1, width: 'var(--panel-header-actions-width)', minWidth: '120px' }}
+                >
+                  <Button
+                    size='2'
+                    style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }}
+                    disabled
+                  >
                     <Settings size={14} /> Edit Plan
                   </Button>
-                  <Button size='2' variant='soft' style={{ flex: 1 }} disabled>
+                  <Button
+                    size='2'
+                    variant='soft'
+                    style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }}
+                    disabled
+                  >
                     <FolderOpen size={14} /> Load Plan
                   </Button>
                 </Flex>
@@ -2720,7 +2912,13 @@ export function BottomPanel() {
                   size='3'
                   variant='ghost'
                   onClick={() => setBottomPanelExpanded(false)}
-                  style={{ cursor: 'pointer' }}
+                  style={{
+                    cursor: 'pointer',
+                    position: 'absolute',
+                    right: '16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                  }}
                 >
                   <ChevronDown size={24} />
                 </IconButton>
@@ -3204,14 +3402,28 @@ export function BottomPanel() {
             {/* Header */}
             <Flex
               align='center'
-              className='p-4 border-b'
-              style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)', gap: '12px', paddingTop: '24px' }}
+              className='p-4 border-b panel-header'
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.5)',
+                gap: 'var(--panel-header-gap)',
+                paddingTop: '24px',
+                flexWrap: 'wrap',
+                rowGap: '6px',
+                position: 'relative',
+                paddingRight: '48px',
+              }}
             >
               {/* Mode label + Mission name + status badges — fixed width so right side stays put */}
               <Flex
                 align='center'
                 gap='2'
-                style={{ width: '300px', flexShrink: 0, overflow: 'hidden', position: 'relative' }}
+                style={{
+                  width: 'var(--panel-header-name-width)',
+                  minWidth: '140px',
+                  flexShrink: 1,
+                  overflow: 'hidden',
+                  position: 'relative',
+                }}
               >
                 <Text
                   size='1'
@@ -3275,7 +3487,12 @@ export function BottomPanel() {
               <DateTimeDisplay />
 
               {/* Stats */}
-              <Flex gap='5' align='center' className='text-gray-600' style={{ flexShrink: 0 }}>
+              <Flex
+                gap='3'
+                align='center'
+                className='text-gray-600'
+                style={{ flexShrink: 1, flexWrap: 'wrap', minWidth: 0 }}
+              >
                 <Flex gap='1' align='center' title='Time Elapsed / Estimated'>
                   <Clock size={16} />
                   <Text size='2'>00:00/{estimatedTime}</Text>
@@ -3324,8 +3541,17 @@ export function BottomPanel() {
               <Box className='w-px h-6 bg-gray-300' style={{ flexShrink: 0 }} />
 
               {/* Right: Make/Edit + Load buttons next to collapse */}
-              <Flex gap='2' align='center' style={{ flexShrink: 0, width: '250px' }}>
-                <Button size='2' style={{ flex: 1 }} onClick={() => setIsFlightPlannerMode(true)} disabled={missionLaunched}>
+              <Flex
+                gap='2'
+                align='center'
+                style={{ flexShrink: 1, width: 'var(--panel-header-actions-width)', minWidth: '120px' }}
+              >
+                <Button
+                  size='2'
+                  style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }}
+                  onClick={() => setIsFlightPlannerMode(true)}
+                  disabled={missionLaunched}
+                >
                   {missionConfig.nodes.length > 0 ? (
                     <>
                       <Settings size={14} /> Edit Plan
@@ -3336,7 +3562,13 @@ export function BottomPanel() {
                     </>
                   )}
                 </Button>
-                <Button size='2' variant='soft' style={{ flex: 1 }} onClick={handleImport} disabled={missionLaunched}>
+                <Button
+                  size='2'
+                  variant='soft'
+                  style={{ flex: 1, fontSize: 'clamp(10px, 1.2vw, 14px)', whiteSpace: 'nowrap', overflow: 'hidden' }}
+                  onClick={handleImport}
+                  disabled={missionLaunched}
+                >
                   <FolderOpen size={14} /> Load Plan
                 </Button>
               </Flex>
@@ -3345,7 +3577,7 @@ export function BottomPanel() {
                 size='3'
                 variant='ghost'
                 onClick={() => setBottomPanelExpanded(false)}
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer', position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)' }}
               >
                 <ChevronDown size={24} />
               </IconButton>
@@ -3826,11 +4058,19 @@ function MissionStatsBar({
 
   return (
     <Flex
-      gap='5'
+      gap='3'
       align='center'
       className='px-4 py-2 border-t'
-      style={{ backgroundColor: 'rgba(249, 250, 251, 0.8)', flexWrap: 'wrap', rowGap: '4px' }}
+      style={{ backgroundColor: 'rgba(249, 250, 251, 0.8)', flexWrap: 'wrap', rowGap: '4px', gap: 'var(--panel-stats-gap)' }}
     >
+      <Text
+        size='1'
+        weight='bold'
+        style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#3b82f6' }}
+      >
+        {isFlightPlannerMode ? 'Planner Mode' : 'Control Mode'}
+      </Text>
+      <Box className='w-px h-4 bg-gray-300' />
       <Flex gap='1' align='center' title='Total Mission Sites'>
         <MapPin size={14} className='text-gray-600' />
         <Text size='1' weight='medium'>

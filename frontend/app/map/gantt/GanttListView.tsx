@@ -207,7 +207,7 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, onStopClick, onStopDoubl
                     borderBottom: '1px solid #d1d5db',
                   }}
                 >
-                  No events
+                  No matching events
                 </div>
               )}
             </div>

@@ -146,6 +146,7 @@ function LocationJump() {
         display: 'flex',
         flexDirection: 'column',
         gap: 4,
+        maxWidth: 'min(320px, calc(100vw - 24px))',
       }}
     >
       <div
@@ -182,6 +183,8 @@ function LocationJump() {
               onKeyDown={handleKeyDown}
               style={{
                 width: 100,
+                minWidth: 60,
+                flex: 1,
                 height: 32,
                 border: 'none',
                 borderRight: '1px solid #e5e7eb',
@@ -200,6 +203,8 @@ function LocationJump() {
               onKeyDown={handleKeyDown}
               style={{
                 width: 100,
+                minWidth: 60,
+                flex: 1,
                 height: 32,
                 border: 'none',
                 textAlign: 'center',
@@ -220,6 +225,8 @@ function LocationJump() {
             onKeyDown={handleKeyDown}
             style={{
               width: 200,
+              minWidth: 100,
+              flex: 1,
               height: 32,
               border: 'none',
               fontSize: 12,
@@ -404,7 +411,7 @@ function MapContent() {
   // Prevent SSR/hydration issues with Leaflet
   if (!isMounted) {
     return (
-      <div style={{ height: '100vh', width: '100%', position: 'relative', backgroundColor: '#f0f0f0' }}>
+      <div style={{ height: '100dvh', width: '100%', position: 'relative', backgroundColor: '#f0f0f0' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
           Loading map...
         </div>
@@ -414,7 +421,7 @@ function MapContent() {
 
   return (
     <>
-      <div style={{ height: '100vh', width: '100%', position: 'relative' }}>
+      <div style={{ height: '100dvh', width: '100%', position: 'relative', overflow: 'hidden' }}>
         <MapContainer
           style={{ height: '100%', width: '100%' }}
           className={plotModeNodes ? 'leaflet-cursor-crosshair' : undefined}

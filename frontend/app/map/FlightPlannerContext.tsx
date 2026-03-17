@@ -64,6 +64,8 @@ interface FlightPlannerContextType {
   setDroneCount: (count: number) => void
   truckCount: number
   setTruckCount: (count: number) => void
+  truckPowerType: 'gas' | 'electric'
+  setTruckPowerType: (type: 'gas' | 'electric') => void
 
   // Map state
   mapCenter: Point
@@ -108,7 +110,12 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [activePanelTab, setActivePanelTab] = useState<'overview' | 'nodes' | 'advanced'>('overview')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [bottomPanelExpanded, setBottomPanelExpanded] = useState(true)
-  const [bottomPanelHeight, setBottomPanelHeight] = useState(400) // Default height increased for better visibility
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return Math.min(400, Math.round(window.innerHeight * 0.4))
+    }
+    return 400
+  })
   const [isFlightPlannerMode, setIsFlightPlannerModeInternal] = useState(false) // Default to mission management mode
   const [isGeneratingRoute, setIsGeneratingRoute] = useState(false)
   const [plotModeOrder, setPlotModeOrderInternal] = useState(false)
@@ -125,6 +132,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   }
   const [droneCount, setDroneCount] = useState<number>(2)
   const [truckCount, setTruckCount] = useState<number>(1)
+  const [truckPowerType, setTruckPowerType] = useState<'gas' | 'electric'>('gas')
   // Derive fleetMode from counts — trucks always >= 1, drones optional
   const fleetMode: 'truck-drone' | 'truck-only' | 'drones-only' = droneCount > 0 ? 'truck-drone' : 'truck-only'
   const setFleetMode = (_mode: 'truck-drone' | 'truck-only' | 'drones-only') => {} // no-op, derived from counts
@@ -555,6 +563,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
           stations: stations.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
           algorithm: missionConfig.algorithm,
           D: droneCount,
+          truck_power_type: truckPowerType,
           provider: 'OSRM-Online',
           hazards: missionConfig.nodes
             .filter(it => it.type === 'hazard')
@@ -650,6 +659,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setDroneCount,
     truckCount,
     setTruckCount,
+    truckPowerType,
+    setTruckPowerType,
     createNewMission,
     saveMission,
     loadMission,
