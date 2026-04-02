@@ -2,7 +2,7 @@
 
 import React, { FC, useState, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { GanttStop, GanttStopType, GanttAxisMode, formatGanttTime, formatGanttDistance } from './gantt.types'
+import { GanttStop, GanttStopType, GanttAxisMode, GanttLocationMode, formatGanttTime, formatGanttDistance, getStopLocation } from './gantt.types'
 import { formatDistance } from '../timeline/timeline.types'
 import { House, Package, ArrowUp, ArrowDown, Zap, Truck } from 'lucide-react'
 
@@ -12,11 +12,12 @@ interface Props {
   pixelsPerUnit: number
   totalDuration: number
   axisMode: GanttAxisMode
+  locationMode?: GanttLocationMode
   onStopClick?: (stop: GanttStop) => void
   onStopDoubleClick?: (stop: GanttStop) => void
 }
 
-const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDuration, axisMode, onStopClick, onStopDoubleClick }) => {
+const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDuration, axisMode, locationMode = 'street', onStopClick, onStopDoubleClick }) => {
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const [isClamped, setIsClamped] = useState(false) // true when tooltip was shifted to fit viewport
@@ -188,12 +189,20 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDura
             pointerEvents: 'none',
           }}
         >
-          <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{stop.label}</div>
-          {stop.address && (
-            <div style={{ color: '#fbbf24', marginBottom: '2px', fontSize: '11px', maxWidth: '280px', whiteSpace: 'normal' }}>
-              {stop.address}
+          {stop.stopGroupLabel && (
+            <div style={{ color: '#60a5fa', fontSize: '10px', fontWeight: 600, marginBottom: '2px' }}>
+              {stop.stopGroupLabel}
             </div>
           )}
+          <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{stop.label}</div>
+          {(() => {
+            const loc = getStopLocation(stop, locationMode)
+            return loc ? (
+              <div style={{ color: '#fbbf24', marginBottom: '2px', fontSize: '11px', maxWidth: '280px', whiteSpace: 'normal' }}>
+                {loc}
+              </div>
+            ) : null
+          })()}
           {/* Always show time */}
           <div style={{ color: '#9ca3af' }}>
             Time: {formatGanttTime(stop.time)}

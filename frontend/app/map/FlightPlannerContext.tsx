@@ -26,6 +26,7 @@ interface FlightPlannerContextType {
   // Route state (derived from missionConfig.routes)
   truckRoute: Point[]
   droneRoutes: Point[][]
+  truckStops: Point[]
 
   // UI state
   activePanelTab: 'overview' | 'nodes' | 'advanced'
@@ -105,6 +106,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   // Route state (computed from missionConfig.routes)
   const truckRoute = missionConfig.routes?.truckRoute || []
   const droneRoutes = missionConfig.routes?.droneRoutes || []
+  const truckStops = missionConfig.routes?.truckStops || []
 
   // UI state
   const [activePanelTab, setActivePanelTab] = useState<'overview' | 'nodes' | 'advanced'>('overview')
@@ -520,12 +522,15 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     const hasRoute = truckRoute.length > 0 || droneRoutes.length > 0
     if (!hasRoute) return false // No route yet — not "unrouted", just not generated
 
+    // Use truckStops (original coordinates) when available for reliable matching
+    const truckMatchPoints = truckStops.length > 0 ? truckStops : truckRoute
+
     // All route points (truck + drone delivery points)
     const routableNodes = missionConfig.nodes.filter(n => n.type === 'order' || n.type === 'depot' || n.type === 'station')
 
     return routableNodes.some(node => {
       // Check truck route
-      const inTruck = truckRoute.some(pt => pointMatchesNode(pt, node))
+      const inTruck = truckMatchPoints.some(pt => pointMatchesNode(pt, node))
       if (inTruck) return false
 
       // Check drone routes (delivery point is index 1 in each sortie)
@@ -534,7 +539,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
       return true // This node is unrouted
     })
-  }, [missionConfig.nodes, truckRoute, droneRoutes])
+  }, [missionConfig.nodes, truckStops, truckRoute, droneRoutes])
 
   const generateRoute = async () => {
     if (missionConfig.nodes.length < 2 || hasUnassignedWaypoints) {
@@ -587,6 +592,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
       // Prepare route data
       let truckPoints: Point[] = []
       let dronePaths: Point[][] = []
+      let truckStopPoints: Point[] = []
 
       // --- Truck route ---
       if (data.routes.truck_route) {
@@ -594,6 +600,12 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
           segment.map(([lat, lon]) => ({ lat, lng: lon })),
         )
         console.log('Truck route:', truckPoints)
+      }
+
+      // --- Truck stops (original un-snapped coordinates) ---
+      if (data.routes.truck_stops) {
+        truckStopPoints = data.routes.truck_stops.map(([lat, lon]: number[]) => ({ lat, lng: lon }))
+        console.log('Truck stops:', truckStopPoints)
       }
 
       // --- Drone route ---
@@ -610,6 +622,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
         routes: {
           truckRoute: truckPoints,
           droneRoutes: dronePaths,
+          truckStops: truckStopPoints,
         },
       })
     } catch (err) {
@@ -632,6 +645,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     removeHazardZone,
     truckRoute,
     droneRoutes,
+    truckStops,
     activePanelTab,
     setActivePanelTab,
     sidebarCollapsed,

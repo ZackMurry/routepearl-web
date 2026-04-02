@@ -378,6 +378,65 @@ export function useTimelineGenerator(
       }
     }
 
+    // Ensure all drone launches/recoveries are included as significant points.
+    // The point-by-point scan above may miss them because drone sortie
+    // coordinates are original (un-snapped) while truck route points are
+    // OSRM-snapped. For each unmatched launch/recovery, find the closest
+    // truck route point and inject it.
+    droneRoutes.forEach((sortie, sortieIdx) => {
+      if (sortie.length !== 3) return
+
+      // Check if launch was matched
+      if (!matchedLaunches.has(sortieIdx)) {
+        const launchPoint = sortie[0]
+        let closestIdx = -1
+        let closestDist = Infinity
+        for (let i = 1; i < truckRoute.length; i++) {
+          const d = calculateDistance(truckRoute[i], launchPoint)
+          if (d < closestDist) {
+            closestDist = d
+            closestIdx = i
+          }
+        }
+        if (closestIdx >= 0) {
+          matchedLaunches.add(sortieIdx)
+          const orderAtDelivery = findOrderAtLocation(sortie[1], nodes)
+          significantPoints.push({
+            index: closestIdx,
+            point: truckRoute[closestIdx],
+            type: 'drone_launch',
+            sortieNumber: sortieIdx + 1,
+            orderNode: orderAtDelivery,
+          })
+        }
+      }
+
+      // Check if recovery was matched
+      if (!matchedRecovers.has(sortieIdx)) {
+        const recoverPoint = sortie[2]
+        let closestIdx = -1
+        let closestDist = Infinity
+        for (let i = 1; i < truckRoute.length; i++) {
+          const d = calculateDistance(truckRoute[i], recoverPoint)
+          if (d < closestDist) {
+            closestDist = d
+            closestIdx = i
+          }
+        }
+        if (closestIdx >= 0) {
+          matchedRecovers.add(sortieIdx)
+          const orderAtDelivery = findOrderAtLocation(sortie[1], nodes)
+          significantPoints.push({
+            index: closestIdx,
+            point: truckRoute[closestIdx],
+            type: 'drone_recover',
+            sortieNumber: sortieIdx + 1,
+            orderNode: orderAtDelivery,
+          })
+        }
+      }
+    })
+
     // Ensure all truck-delivered orders are included as significant points.
     // The point-by-point scan above may miss orders whose coordinates don't
     // exactly match a truck route point (e.g. road-snapped routes). For each

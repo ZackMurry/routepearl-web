@@ -24,11 +24,13 @@ export function useGanttData(
   return useMemo(() => {
     const { events, summary } = timelineResult
 
-    // Build nodeId → address lookup map
+    // Build nodeId → address and nodeId → coordinates lookup maps
     const addressMap = new Map<string, string>()
+    const coordMap = new Map<string, { lat: number; lng: number }>()
     if (nodes) {
       for (const node of nodes) {
         if (node.address) addressMap.set(node.id, node.address)
+        coordMap.set(node.id, { lat: node.lat, lng: node.lng })
       }
     }
 
@@ -67,7 +69,35 @@ export function useGanttData(
         (e) => e.vehicle === 'truck' || e.type === 'drone_return'
       )
 
-      const truckStops: GanttStop[] = truckEvents.map((event, index) => {
+      // Compute stop group indices first — used by both truck and driver rows.
+      // Walk all truck events and increment a group counter each time a travel
+      // segment is crossed. truck_return always gets its own "Return to Depot" group.
+      const stopGroupMap = new Map<string, { group: number; label: string }>()
+      let currentStopGroup = 0
+      let stopCounter = 0
+      let lastWasTravel = false
+      for (const event of truckEvents) {
+        if (event.type === 'truck_travel') {
+          lastWasTravel = true
+          continue
+        }
+        if (event.type === 'truck_return') {
+          currentStopGroup++
+          stopGroupMap.set(event.id, { group: currentStopGroup, label: 'Return to Depot' })
+          lastWasTravel = false
+          continue
+        }
+        if (lastWasTravel) {
+          currentStopGroup++
+          stopCounter++
+          stopGroupMap.set(event.id, { group: currentStopGroup, label: `Stop ${stopCounter}` })
+          lastWasTravel = false
+        } else {
+          stopGroupMap.set(event.id, { group: currentStopGroup, label: currentStopGroup === 0 ? 'Start' : `Stop ${stopCounter}` })
+        }
+      }
+
+      const truckStops: GanttStop[] = truckEvents.map((event) => {
         // For drone launch/return events on the truck row, label which drone
         let label = event.label
         if (event.sortieNumber) {
@@ -80,6 +110,8 @@ export function useGanttData(
             label = `Recover Drone ${droneNum}` + (event.orderName ? ` ← ${event.orderName}` : '')
           }
         }
+        const coords = event.nodeId ? coordMap.get(event.nodeId) : undefined
+        const groupInfo = stopGroupMap.get(event.id)
         return {
           id: event.id,
           type: mapEventTypeToStopType(event.type),
@@ -93,6 +125,10 @@ export function useGanttData(
           distance: event.distance,
           nodeId: event.nodeId,
           address: event.nodeId ? addressMap.get(event.nodeId) : undefined,
+          lat: coords?.lat ?? event.location?.lat,
+          lng: coords?.lng ?? event.location?.lng,
+          stopGroup: groupInfo?.group,
+          stopGroupLabel: groupInfo?.label,
         }
       })
 
@@ -112,7 +148,6 @@ export function useGanttData(
         groupId: 1,
       })
 
-      // Build Driver instruction row — only actionable stops (no travel segments)
       const driverEvents = truckEvents.filter(
         (e) => e.type !== 'truck_travel'
       )
@@ -159,6 +194,8 @@ export function useGanttData(
             description = event.description
         }
 
+        const driverCoords = event.nodeId ? coordMap.get(event.nodeId) : undefined
+        const groupInfo = stopGroupMap.get(event.id)
         return {
           id: `driver-${event.id}`,
           type: mapEventTypeToStopType(event.type),
@@ -172,6 +209,10 @@ export function useGanttData(
           distance: event.distance,
           nodeId: event.nodeId,
           address: event.nodeId ? addressMap.get(event.nodeId) : undefined,
+          lat: driverCoords?.lat ?? event.location?.lat,
+          lng: driverCoords?.lng ?? event.location?.lng,
+          stopGroup: groupInfo?.group,
+          stopGroupLabel: groupInfo?.label,
         }
       })
 
@@ -234,9 +275,43 @@ export function useGanttData(
 
         const droneStops: GanttStop[] = []
 
+        // Build a flat ordered list of all events for this drone to determine
+        // first/last launch and which return is the final one
+        const allDroneEvents: TimelineEvent[] = []
         assignedSorties.forEach((sortieNum) => {
           const sortieEvents = sortieMap.get(sortieNum) || []
-          sortieEvents.forEach((event) => {
+          sortieEvents.forEach((e) => allDroneEvents.push(e))
+        })
+        allDroneEvents.sort((a, b) => a.cumulativeTime - b.cumulativeTime)
+
+        const firstEventId = allDroneEvents[0]?.id
+        const lastEventId = allDroneEvents[allDroneEvents.length - 1]?.id
+
+        assignedSorties.forEach((sortieNum) => {
+          const sortieEvents = sortieMap.get(sortieNum) || []
+          sortieEvents.forEach((event, evtIdx) => {
+            const droneCoords = event.nodeId ? coordMap.get(event.nodeId) : undefined
+            const isFirst = event.id === firstEventId
+            const isLast = event.id === lastEventId
+
+            // Assign a sequential stop group — each drone event is a distinct physical location
+            const stopGroup = allDroneEvents.findIndex((e) => e.id === event.id)
+
+            let stopGroupLabel: string
+            if (event.type === 'drone_launch') {
+              stopGroupLabel = isFirst ? 'Start' : 'Re-Launch'
+            } else if (event.type === 'drone_delivery') {
+              stopGroupLabel = event.orderName
+                ? `Order: ${event.orderName}`
+                : event.orderId != null
+                  ? `Order ${event.orderId}`
+                  : 'Delivery'
+            } else if (event.type === 'drone_return') {
+              stopGroupLabel = isLast ? 'Return to Depot' : 'Rendezvous'
+            } else {
+              stopGroupLabel = event.label
+            }
+
             droneStops.push({
               id: event.id,
               type: mapEventTypeToStopType(event.type),
@@ -249,6 +324,11 @@ export function useGanttData(
               sortieNumber: event.sortieNumber,
               distance: event.distance,
               nodeId: event.nodeId,
+              address: event.nodeId ? addressMap.get(event.nodeId) : undefined,
+              lat: droneCoords?.lat ?? event.location?.lat,
+              lng: droneCoords?.lng ?? event.location?.lng,
+              stopGroup,
+              stopGroupLabel,
             })
           })
         })

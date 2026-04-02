@@ -9,6 +9,9 @@ export type GanttVehicleType = 'all' | 'truck' | 'drone' | 'driver'
 // Axis mode for toggling between duration and distance
 export type GanttAxisMode = 'duration' | 'distance'
 
+// Location display mode
+export type GanttLocationMode = 'street' | 'coordinates'
+
 // Individual stop on the Gantt chart
 export interface GanttStop {
   id: string
@@ -23,10 +26,14 @@ export interface GanttStop {
   distance?: number // Distance of this segment in meters
   cumulativeDistance?: number // Cumulative distance from mission start in meters
   address?: string // Street address of the stop location
+  lat?: number // Latitude of the stop
+  lng?: number // Longitude of the stop
   nodeId?: string // Original MissionSite node ID for map selection
   pixelOffset?: number // Horizontal pixel nudge for overlapping stops in the "All" row
   vehicleName?: string // Source vehicle name (set on "All" row stops)
   vehicleColor?: string // Source vehicle color (set on "All" row stops)
+  stopGroup?: number // Physical stop group index (0 = Start, 1 = Stop 1, etc.)
+  stopGroupLabel?: string // Display label for the stop group (e.g. "Start", "Stop 1")
 }
 
 // Vehicle row data
@@ -96,6 +103,23 @@ export function formatGanttTime(seconds: number): string {
     return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
   return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+// Format coordinates as a compact string
+export function formatCoordinates(lat: number, lng: number): string {
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+}
+
+// Get display location based on mode: street address or coordinates (with fallback)
+export function getStopLocation(stop: GanttStop, mode: GanttLocationMode): string | undefined {
+  if (mode === 'coordinates') {
+    if (stop.lat != null && stop.lng != null) return formatCoordinates(stop.lat, stop.lng)
+    return stop.address || undefined
+  }
+  // street mode: prefer address, fall back to coordinates with note
+  if (stop.address) return stop.address
+  if (stop.lat != null && stop.lng != null) return `${formatCoordinates(stop.lat, stop.lng)} — Street address not available`
+  return undefined
 }
 
 // Format distance in meters to human readable (e.g. "500 m", "1.2 km")

@@ -103,6 +103,9 @@ export interface EnhancedRouteData {
   truckRoute: Point[]
   droneRoutes: Point[][]
 
+  // Original (un-snapped) truck stop coordinates for reliable delivery matching
+  truckStops?: Point[]
+
   // Backend-computed timing data (optional - may be absent for legacy data)
   timing?: RouteTiming
 
@@ -132,6 +135,7 @@ export interface MissionConfig {
     | {
         truckRoute: Point[]
         droneRoutes: Point[][]
+        truckStops?: Point[]
       }
 }
 

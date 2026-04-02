@@ -108,6 +108,7 @@ export function BottomPanel() {
     createNewMission,
     truckRoute,
     droneRoutes,
+    truckStops,
     isFlightPlannerMode,
     setIsFlightPlannerMode,
     addNode,
@@ -663,20 +664,23 @@ export function BottomPanel() {
   }, [selectedNodeId])
 
   // Compute delivery vehicle for each order: 'drone' | 'truck' | 'unrouted'
+  // Use truckStops (original un-snapped coordinates) when available for reliable matching,
+  // falling back to truckRoute (OSRM road geometry) for legacy data
   const orderDeliveryMap = useMemo(() => {
+    const truckMatchPoints = truckStops.length > 0 ? truckStops : truckRoute
     const map = new Map<string, 'drone' | 'truck' | 'unrouted'>()
     orderNodes.forEach(order => {
       const isDrone = droneRoutes.some(sortie => sortie.length >= 2 && pointMatchesNode(sortie[1], order))
       if (isDrone) {
         map.set(order.id, 'drone')
-      } else if (hasRoute && truckRoute.some(pt => pointMatchesNode(pt, order))) {
+      } else if (hasRoute && truckMatchPoints.some(pt => pointMatchesNode(pt, order))) {
         map.set(order.id, 'truck')
       } else {
         map.set(order.id, 'unrouted')
       }
     })
     return map
-  }, [orderNodes, droneRoutes, truckRoute, hasRoute])
+  }, [orderNodes, droneRoutes, truckStops, truckRoute, hasRoute])
 
   // Delivery counts from route matching (more reliable than timeline for truck deliveries)
   const droneDeliveryCount = useMemo(
@@ -1530,6 +1534,32 @@ export function BottomPanel() {
                             >
                               <Download size={14} /> Export Addresses (CSV)
                             </Button>
+                            <AlertDialog.Root>
+                              <AlertDialog.Trigger>
+                                <Button size='1' variant='soft' color='orange' disabled={!hasRoute}>
+                                  <Route size={14} /> Reset Routing
+                                </Button>
+                              </AlertDialog.Trigger>
+                              <AlertDialog.Content maxWidth='400px'>
+                                <AlertDialog.Title>Reset Routing</AlertDialog.Title>
+                                <AlertDialog.Description size='2'>
+                                  This will remove the generated route but keep all nodes and orders. You can regenerate the
+                                  route afterwards.
+                                </AlertDialog.Description>
+                                <Flex gap='3' mt='4' justify='end'>
+                                  <AlertDialog.Cancel>
+                                    <Button variant='soft' color='gray'>
+                                      Cancel
+                                    </Button>
+                                  </AlertDialog.Cancel>
+                                  <AlertDialog.Action>
+                                    <Button variant='solid' color='orange' onClick={() => updateMissionConfig({ routes: undefined })}>
+                                      Reset Routing
+                                    </Button>
+                                  </AlertDialog.Action>
+                                </Flex>
+                              </AlertDialog.Content>
+                            </AlertDialog.Root>
                             <AlertDialog.Root>
                               <AlertDialog.Trigger>
                                 <Button size='1' variant='soft' color='red' disabled={missionConfig.nodes.length === 0}>

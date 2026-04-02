@@ -24,7 +24,7 @@ const MissionSiteMarker: FC<Props> = ({ node }) => {
   // Nodes are draggable only when both plot modes are OFF
 
   // Helper function: Get ALL sortie info for a node (a node can have multiple roles)
-  const { updateNode, removeNode, truckRoute, droneRoutes, plotModeOrder, plotModeNodes, selectedNodeId, setSelectedNodeId, isFlightPlannerMode, requestFocusNode } = useFlightPlanner()
+  const { updateNode, removeNode, truckRoute, droneRoutes, truckStops, plotModeOrder, plotModeNodes, selectedNodeId, setSelectedNodeId, isFlightPlannerMode, requestFocusNode } = useFlightPlanner()
 
   const isDroneDelivery = useMemo(
     () =>
@@ -39,8 +39,8 @@ const MissionSiteMarker: FC<Props> = ({ node }) => {
 
   const isTruckDelivery = useMemo(
     () =>
-      !isDroneDelivery && truckRoute.some(pt => pointMatchesNode(pt, node)),
-    [isDroneDelivery, truckRoute, node],
+      !isDroneDelivery && (truckStops.length > 0 ? truckStops : truckRoute).some(pt => pointMatchesNode(pt, node)),
+    [isDroneDelivery, truckStops, truckRoute, node],
   )
 
   // Order circle color: yellow=drone, blue=truck, white=unrouted

@@ -2,8 +2,8 @@
 
 import React, { FC, useRef, useState, useEffect } from 'react'
 import { Box, Flex, Text, Button } from '@radix-ui/themes'
-import { Plus, FolderOpen, ZoomIn, ZoomOut, Drone, Truck, Clock, Route, BarChart3, List, User, Filter, ChevronDown, Check } from 'lucide-react'
-import { GanttData, GanttChartState, GanttAxisMode, GanttStop, GanttStopType, GanttVehicle, getStopColor, formatGanttTime, formatGanttDistance } from './gantt.types'
+import { Plus, FolderOpen, ZoomIn, ZoomOut, Drone, Truck, Clock, Route, BarChart3, List, User, Filter, ChevronDown, Check, LayoutList, MapPin, Hash } from 'lucide-react'
+import { GanttData, GanttChartState, GanttAxisMode, GanttLocationMode, GanttStop, GanttStopType, GanttVehicle, getStopColor, formatGanttTime, formatGanttDistance } from './gantt.types'
 import GanttTimeAxis from './GanttTimeAxis'
 import GanttRow from './GanttRow'
 import GanttCurrentTimeMarker from './GanttCurrentTimeMarker'
@@ -170,7 +170,7 @@ interface Props {
   onStopDoubleClick?: (stop: GanttStop) => void
   onVehicleClick?: (vehicle: GanttVehicle) => void
   onVehicleDoubleClick?: (vehicle: GanttVehicle) => void
-}2
+}
 
 // Pick a "nice" grid interval in pixels for distance mode
 function niceDistanceGridInterval(totalMeters: number, zoomLevel: number): number {
@@ -202,6 +202,7 @@ const GanttChart: FC<Props> = ({
   const [zoomInputValue, setZoomInputValue] = useState('')
   const [axisMode, setAxisMode] = useState<GanttAxisMode>('duration')
   const [viewMode, setViewMode] = useState<'chart' | 'list'>('chart')
+  const [locationMode, setLocationMode] = useState<GanttLocationMode>('street')
   const [showAllRow, setShowAllRow] = useState(true)
   const [showTrucksInDriver, setShowTrucksInDriver] = useState(true)
   const [showDronesInDriver, setShowDronesInDriver] = useState(true)
@@ -328,12 +329,36 @@ const GanttChart: FC<Props> = ({
 
   // Apply stop-type filter to vehicle stops
   const allStopTypesActive = activeStopTypes.size === ALL_STOP_TYPES.length
-  const stopFilteredVehicles = allStopTypesActive
+  const typeFilteredVehicles = allStopTypesActive
     ? sortedVehicles
     : sortedVehicles.map((v) => ({
         ...v,
         stops: v.stops.filter((s) => activeStopTypes.has(s.type)),
       }))
+
+  // Spread overlapping stops apart so they're easier to click.
+  // Icon width = 24px; we want at least 4px gap between icon edges → 28px center-to-center.
+  const ICON_W = 24
+  const GAP = 4
+  const STRIDE = ICON_W + GAP
+  const stopFilteredVehicles = typeFilteredVehicles.map((v) => {
+    const stops = v.stops.map((s) => ({ ...s })) // shallow clone so we can mutate pixelOffset
+    for (let i = 0; i < stops.length; i++) {
+      const a = stops[i]
+      const aUnit = isDistanceMode ? (a.cumulativeDistance || 0) : a.time
+      const aPx = aUnit * pixelsPerUnit + (a.pixelOffset || 0)
+
+      for (let j = i + 1; j < stops.length; j++) {
+        const b = stops[j]
+        const bUnit = isDistanceMode ? (b.cumulativeDistance || 0) : b.time
+        const bPx = bUnit * pixelsPerUnit + (b.pixelOffset || 0)
+        if (bPx - aPx >= STRIDE) break // sorted — no more overlaps possible
+        // Nudge b to the right so its center is STRIDE px from a's center
+        b.pixelOffset = (b.pixelOffset || 0) + (STRIDE - (bPx - aPx))
+      }
+    }
+    return { ...v, stops }
+  })
 
   // Row height for calculating current time marker height
   const rowHeight = 42
@@ -516,6 +541,28 @@ const GanttChart: FC<Props> = ({
               <List size={12} />
             </button>
           </Flex>
+
+          {/* Location display mode toggle */}
+          <Flex
+            align="center"
+            gap="0"
+            style={{
+              backgroundColor: '#e5e7eb',
+              borderRadius: '6px',
+              padding: '2px',
+            }}
+          >
+            <button style={segBtn(locationMode === 'street')} onClick={() => setLocationMode('street')} title="Show street addresses">
+              <span style={{ color: locationMode === 'street' ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
+                <MapPin size={12} />
+              </span>
+            </button>
+            <button style={segBtn(locationMode === 'coordinates')} onClick={() => setLocationMode('coordinates')} title="Show coordinates">
+              <span style={{ color: locationMode === 'coordinates' ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
+                <Hash size={12} />
+              </span>
+            </button>
+          </Flex>
         </Flex>
 
         {/* Event type filter + Axis mode toggle */}
@@ -564,12 +611,19 @@ const GanttChart: FC<Props> = ({
                 { key: 'all' as VehicleFilter, label: 'All', icon: null },
                 { key: 'drones' as VehicleFilter, label: 'Drones', icon: <Drone size={12} /> },
                 { key: 'trucks' as VehicleFilter, label: 'Trucks', icon: <Truck size={12} /> },
+                { key: 'driver' as VehicleFilter, label: 'Drivers', icon: <User size={12} /> },
               ]).map((option) => {
                 const isActive = vehicleFilter === option.key
                 const isAllHighlight = option.key === 'all' && isActive && showAllRow
+                const isDriverHighlight = option.key === 'driver' && isActive
                 const btnStyle = isAllHighlight
                   ? { ...segBtn(true), color: '#2563eb', backgroundColor: '#eff6ff' }
-                  : segBtn(isActive)
+                  : isDriverHighlight
+                    ? { ...segBtn(true), backgroundColor: '#fb923c', color: 'white' }
+                    : segBtn(isActive)
+                const iconColor = isDriverHighlight
+                  ? 'white'
+                  : isActive ? '#3b82f6' : '#9ca3af'
                 return (
                   <button
                     key={option.key}
@@ -583,7 +637,7 @@ const GanttChart: FC<Props> = ({
                     style={btnStyle}
                   >
                     {option.icon && (
-                      <span style={{ color: isActive ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
+                      <span style={{ color: iconColor, display: 'flex' }}>
                         {option.icon}
                       </span>
                     )}
@@ -591,33 +645,6 @@ const GanttChart: FC<Props> = ({
                   </button>
                 )
               })}
-            </Flex>
-
-            {/* Divider */}
-            <div style={{ width: '1px', height: '20px', backgroundColor: '#d1d5db' }} />
-
-            {/* Driver toggle */}
-            <Flex
-              align="center"
-              gap="0"
-              style={{
-                backgroundColor: '#e5e7eb',
-                borderRadius: '6px',
-                padding: '2px',
-              }}
-            >
-              <button
-                onClick={() => onVehicleFilterChange('driver')}
-                style={{
-                  ...segBtn(vehicleFilter === 'driver'),
-                  ...(vehicleFilter === 'driver' ? { backgroundColor: '#fb923c', color: 'white' } : {}),
-                }}
-              >
-                <span style={{ color: vehicleFilter === 'driver' ? 'white' : '#9ca3af', display: 'flex' }}>
-                  <User size={12} />
-                </span>
-                Drivers
-              </button>
             </Flex>
 
             {/* Truck/Drone sub-toggles — always visible, greyed out when not in driver mode */}
@@ -634,7 +661,8 @@ const GanttChart: FC<Props> = ({
             >
               <button
                 onClick={() => setShowTrucksInDriver((prev) => !prev)}
-                style={segBtn(vehicleFilter === 'driver' && showTrucksInDriver)}
+                disabled={vehicleFilter !== 'driver'}
+                style={{ ...segBtn(vehicleFilter === 'driver' && showTrucksInDriver), cursor: vehicleFilter === 'driver' ? 'pointer' : 'default' }}
                 title={showTrucksInDriver ? 'Hide truck rows' : 'Show truck rows'}
               >
                 <span style={{ color: vehicleFilter === 'driver' && showTrucksInDriver ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
@@ -644,11 +672,23 @@ const GanttChart: FC<Props> = ({
               <div style={{ width: '1px', height: '16px', backgroundColor: '#d1d5db' }} />
               <button
                 onClick={() => setShowDronesInDriver((prev) => !prev)}
-                style={segBtn(vehicleFilter === 'driver' && showDronesInDriver)}
+                disabled={vehicleFilter !== 'driver'}
+                style={{ ...segBtn(vehicleFilter === 'driver' && showDronesInDriver), cursor: vehicleFilter === 'driver' ? 'pointer' : 'default' }}
                 title={showDronesInDriver ? 'Hide drone rows' : 'Show drone rows'}
               >
                 <span style={{ color: vehicleFilter === 'driver' && showDronesInDriver ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
                   <Drone size={12} />
+                </span>
+              </button>
+              <div style={{ width: '1px', height: '16px', backgroundColor: '#d1d5db' }} />
+              <button
+                onClick={() => setShowAllRow((prev) => !prev)}
+                disabled={vehicleFilter !== 'driver'}
+                style={{ ...segBtn(vehicleFilter === 'driver' && showAllRow), cursor: vehicleFilter === 'driver' ? 'pointer' : 'default' }}
+                title={showAllRow ? 'Hide All summary row' : 'Show All summary row'}
+              >
+                <span style={{ color: vehicleFilter === 'driver' && showAllRow ? '#3b82f6' : '#9ca3af', display: 'flex' }}>
+                  <LayoutList size={12} />
                 </span>
               </button>
             </Flex>
@@ -701,6 +741,7 @@ const GanttChart: FC<Props> = ({
                     isGreyed={state === 'empty-fleet'}
                     gridIntervalPx={gridIntervalPx}
                     isGroupStart={isGroupStart}
+                    locationMode={locationMode}
                     onStopClick={onStopClick}
                     onStopDoubleClick={onStopDoubleClick}
                     onVehicleClick={onVehicleClick}
@@ -728,6 +769,7 @@ const GanttChart: FC<Props> = ({
           <GanttListView
             vehicles={stopFilteredVehicles}
             axisMode={axisMode}
+            locationMode={locationMode}
             onStopClick={onStopClick}
             onStopDoubleClick={onStopDoubleClick}
             onVehicleClick={onVehicleClick}
