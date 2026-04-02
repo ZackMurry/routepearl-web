@@ -275,11 +275,10 @@ const GanttChart: FC<Props> = ({
   }, [])
 
   // Calculate timeline width based on zoom
-  // The scale width drives marker positioning; the track adds right padding
-  // so the last marker (16px base offset + 12px icon half) doesn't hang on white.
-  const TRACK_PAD_RIGHT = 32
+  const TRACK_PAD_RIGHT = 48
   const scaleWidth = containerWidth * zoomLevel
-  const timelineWidth = scaleWidth + TRACK_PAD_RIGHT
+  // timelineWidth is computed after spread offsets below — placeholder used for pixelsPerUnit
+  const baseTimelineWidth = scaleWidth + TRACK_PAD_RIGHT
 
   // Compute pixels per unit based on axis mode (uses scaleWidth, not padded width)
   const isDistanceMode = axisMode === 'distance'
@@ -359,6 +358,19 @@ const GanttChart: FC<Props> = ({
     }
     return { ...v, stops }
   })
+
+  // Compute the actual rightmost icon position after spreading so the track is always
+  // wide enough to contain all icons without them overflowing off the right edge.
+  const ICON_HALF = 12 // half of 24px icon
+  let maxIconRight = baseTimelineWidth
+  stopFilteredVehicles.forEach((v) => {
+    v.stops.forEach((s) => {
+      const unitValue = isDistanceMode ? (s.cumulativeDistance || 0) : s.time
+      const iconRight = unitValue * pixelsPerUnit + 16 + (s.pixelOffset || 0) + ICON_HALF
+      if (iconRight > maxIconRight) maxIconRight = iconRight
+    })
+  })
+  const timelineWidth = maxIconRight + TRACK_PAD_RIGHT
 
   // Row height for calculating current time marker height
   const rowHeight = 42

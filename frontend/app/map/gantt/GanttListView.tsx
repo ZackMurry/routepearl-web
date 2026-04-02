@@ -3,7 +3,7 @@
 import React, { FC } from 'react'
 import { ScrollArea } from '@radix-ui/themes'
 import { GanttVehicle, GanttStop, GanttStopType, GanttAxisMode, GanttLocationMode, getStopColor, formatGanttTime, formatGanttDistance, getStopLocation } from './gantt.types'
-import { House, Package, ArrowUp, ArrowDown, Zap, Truck, Drone, LayoutList, MapPin } from 'lucide-react'
+import { House, Package, ArrowUp, ArrowDown, Zap, Truck, Drone, LayoutList, MapPin, Download } from 'lucide-react'
 
 interface Props {
   vehicles: GanttVehicle[]
@@ -31,6 +31,8 @@ function getStopIcon(type: GanttStopType, hasOrder: boolean) {
       return hasOrder
         ? <span style={{ display: 'flex', alignItems: 'center', gap: '1px' }}><ArrowDown size={ICON_SIZE * 0.7} /><Package size={ICON_SIZE * 0.7} /></span>
         : <ArrowDown size={ICON_SIZE} />
+    case 'recover':
+      return <Download size={ICON_SIZE} />
     case 'charging':
       return <Zap size={ICON_SIZE} />
     case 'travel':
@@ -42,7 +44,7 @@ function getStopIcon(type: GanttStopType, hasOrder: boolean) {
 
 function getStopBgColor(type: GanttStopType, vehicleColor: string): string {
   if (type === 'delivery') return vehicleColor
-  return getStopColor(type)
+  return getStopColor(type) // getStopColor now handles 'recover' → cyan
 }
 
 // Derive accent color for a group label
@@ -51,6 +53,7 @@ function getGroupAccent(label: string): string {
   if (label === 'Return to Depot') return '#ef4444'
   if (label === 'Rendezvous') return '#a855f7'
   if (label === 'Re-Launch') return '#f97316'
+  if (label === 'On Truck') return '#1e3a8a'
   if (label.startsWith('Order')) return '#3b82f6'
   return '#6b7280'
 }
@@ -61,6 +64,7 @@ function getGroupBadge(label: string, sequentialNum?: number): string {
   if (label === 'Return to Depot') return 'R'
   if (label === 'Rendezvous') return '⇲'
   if (label === 'Re-Launch') return '↑'
+  if (label === 'On Truck') return '🚛'
   if (label.startsWith('Order')) return '📦'
   if (sequentialNum != null) return String(sequentialNum)
   return label.replace('Stop ', '')
@@ -187,7 +191,7 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                   let intervalCounter = 0
                   return groups.map((group, gIdx) => {
                     const accent = getGroupAccent(group.label)
-                    const isNumbered = !['Start', 'Return to Depot', 'Rendezvous', 'Re-Launch'].includes(group.label) && !group.label.startsWith('Order')
+                    const isNumbered = !['Start', 'Return to Depot', 'Rendezvous', 'Re-Launch', 'On Truck'].includes(group.label) && !group.label.startsWith('Order')
                     if (isNumbered) intervalCounter++
                     const badge = getGroupBadge(group.label, isNumbered ? intervalCounter : undefined)
                     const groupLocation = group.stops.find((s) => s.address || (s.lat != null && s.lng != null))
@@ -299,9 +303,31 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                                     {getStopLocation(stop, locationMode) || '--'}
                                   </td>
                                   <td>
-                                    {stop.orderName ? (
+                                    {(stop.orderName || stop.locationBadge) ? (
                                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        {stop.orderId != null && (
+                                        {/* Location badge (blue) for launch/return: physical launch/landing node */}
+                                        {(stop.type === 'launch' || stop.type === 'return' || stop.type === 'recover') && stop.locationBadge && (
+                                          <span
+                                            style={{
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              minWidth: '16px',
+                                              height: '16px',
+                                              borderRadius: '8px',
+                                              backgroundColor: '#0369a1',
+                                              color: 'white',
+                                              fontSize: '9px',
+                                              fontWeight: 700,
+                                              padding: '0 4px',
+                                              lineHeight: 1,
+                                            }}
+                                          >
+                                            {stop.locationBadge}
+                                          </span>
+                                        )}
+                                        {/* Order ID badge (dark) for all other stop types */}
+                                        {stop.orderId != null && stop.type !== 'launch' && stop.type !== 'return' && stop.type !== 'recover' && (
                                           <span
                                             style={{
                                               display: 'inline-flex',
@@ -397,9 +423,29 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                             {getStopLocation(stop, locationMode) || '--'}
                           </td>
                           <td>
-                            {stop.orderName ? (
+                            {(stop.orderName || stop.locationBadge) ? (
                               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                {stop.orderId != null && (
+                                {(stop.type === 'launch' || stop.type === 'return' || stop.type === 'recover') && stop.locationBadge && (
+                                  <span
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      minWidth: '16px',
+                                      height: '16px',
+                                      borderRadius: '8px',
+                                      backgroundColor: '#0369a1',
+                                      color: 'white',
+                                      fontSize: '9px',
+                                      fontWeight: 700,
+                                      padding: '0 4px',
+                                      lineHeight: 1,
+                                    }}
+                                  >
+                                    {stop.locationBadge}
+                                  </span>
+                                )}
+                                {stop.orderId != null && stop.type !== 'launch' && stop.type !== 'return' && stop.type !== 'recover' && (
                                   <span
                                     style={{
                                       display: 'inline-flex',

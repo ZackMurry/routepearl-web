@@ -1,7 +1,7 @@
 // Gantt Chart Type Definitions
 
 // Stop type enum
-export type GanttStopType = 'depot' | 'delivery' | 'launch' | 'return' | 'charging' | 'travel'
+export type GanttStopType = 'depot' | 'delivery' | 'launch' | 'return' | 'recover' | 'charging' | 'travel'
 
 // Vehicle type
 export type GanttVehicleType = 'all' | 'truck' | 'drone' | 'driver'
@@ -34,6 +34,7 @@ export interface GanttStop {
   vehicleColor?: string // Source vehicle color (set on "All" row stops)
   stopGroup?: number // Physical stop group index (0 = Start, 1 = Stop 1, etc.)
   stopGroupLabel?: string // Display label for the stop group (e.g. "Start", "Stop 1")
+  locationBadge?: string // Short badge for launch/return stops indicating the physical truck stop (e.g. "S", "1", "2", "R")
 }
 
 // Vehicle row data
@@ -77,7 +78,8 @@ export const GANTT_COLORS = {
   depot: '#374151', // gray-700
   delivery: '#3b82f6', // blue
   launch: '#f97316', // orange
-  return: '#10b981', // green
+  return: '#10b981', // green  — drone landing at truck
+  recover: '#0891b2', // cyan-600 — truck catching/recovering the drone
   charging: '#eab308', // yellow
   travel: '#9ca3af', // gray-400
 } as const

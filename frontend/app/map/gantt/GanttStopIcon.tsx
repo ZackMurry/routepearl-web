@@ -4,7 +4,7 @@ import React, { FC, useState, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { GanttStop, GanttStopType, GanttAxisMode, GanttLocationMode, formatGanttTime, formatGanttDistance, getStopLocation } from './gantt.types'
 import { formatDistance } from '../timeline/timeline.types'
-import { House, Package, ArrowUp, ArrowDown, Zap, Truck } from 'lucide-react'
+import { House, Package, ArrowUp, ArrowDown, Zap, Truck, Download } from 'lucide-react'
 
 interface Props {
   stop: GanttStop
@@ -78,6 +78,9 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDura
         return hasOrder
           ? <span style={{ display: 'flex', alignItems: 'center', gap: '1px' }}><ArrowDown size={iconSize * 0.65} /><Package size={iconSize * 0.65} /></span>
           : <ArrowDown size={iconSize} />
+      case 'recover':
+        // Truck catching the drone — distinct from the drone's own return flight
+        return <Download size={iconSize} />
       case 'charging':
         return <Zap size={iconSize} />
       case 'travel':
@@ -97,7 +100,9 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDura
       case 'launch':
         return '#f97316' // orange
       case 'return':
-        return '#10b981' // green
+        return '#10b981' // green — drone landing
+      case 'recover':
+        return '#0891b2' // cyan — truck catching drone
       case 'charging':
         return '#eab308' // yellow
       case 'travel':
@@ -142,8 +147,34 @@ const GanttStopIcon: FC<Props> = ({ stop, vehicleColor, pixelsPerUnit, totalDura
         >
           {getIcon(stop.type)}
         </div>
-        {/* Order ID badge */}
-        {stop.orderId != null && (
+        {/* Location badge (blue) — for launch/return/recover: shows the order point or depot
+            the drone physically departs from or arrives at (e.g. "6", "D"). */}
+        {(stop.type === 'launch' || stop.type === 'return' || stop.type === 'recover') && stop.locationBadge && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '-6px',
+              right: '-6px',
+              minWidth: '14px',
+              height: '14px',
+              borderRadius: '7px',
+              backgroundColor: '#0369a1',
+              color: 'white',
+              fontSize: '9px',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0 3px',
+              lineHeight: 1,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+            }}
+          >
+            {stop.locationBadge}
+          </div>
+        )}
+        {/* Order ID badge (dark) — for delivery/depot/charging stops: shows the associated order number. */}
+        {stop.orderId != null && stop.type !== 'launch' && stop.type !== 'return' && stop.type !== 'recover' && (
           <div
             style={{
               position: 'absolute',
