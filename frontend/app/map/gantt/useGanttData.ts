@@ -123,7 +123,9 @@ export function useGanttData(
       // (truck_drone_recover). Only include drone_return events that occur while the truck is
       // still on its active route (before it finishes returning to depot).
       const truckEvents = events.filter(
-        (e) => e.vehicle === 'truck' || (e.type === 'drone_return' && e.cumulativeTime <= truckRouteEndTime)
+        (e) =>
+          (e.vehicle === 'truck' && e.type !== 'truck_drone_recover') ||
+          (e.type === 'drone_return' && e.cumulativeTime <= truckRouteEndTime)
       )
 
       // Compute stop group indices first — used by both truck and driver rows.
@@ -528,7 +530,7 @@ export function useGanttData(
           //             again in All duplicates it (same sortie, same time, same icon)
           // Keep: depot, delivery, charging, travel — these are truck-only events.
           return v.stops
-            .filter((s) => s.type !== 'launch' && s.type !== 'return')
+            .filter((s) => s.type !== 'launch' && s.type !== 'return' && s.type !== 'recover')
             .map((s) => ({ ...s, vehicleName: v.name, vehicleColor: v.color }))
         }
         if (v.type === 'drone') {
