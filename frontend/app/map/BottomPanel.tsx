@@ -127,13 +127,12 @@ export function BottomPanel() {
     selectedRouteId,
     setSelectedRouteId,
     fleetMode,
-    setFleetMode,
+    trucks,
+    addTruck,
+    removeTruck,
+    updateTruck,
     droneCount,
-    setDroneCount,
     truckCount,
-    setTruckCount,
-    truckPowerType,
-    setTruckPowerType,
     missionLaunched,
     missionPaused,
     launchMission,
@@ -2613,127 +2612,166 @@ export function BottomPanel() {
                     )}
                     <Flex
                       direction='column'
-                      gap='3'
+                      gap='2'
                       style={{ opacity: isConfigLocked ? 0.5 : 1, pointerEvents: isConfigLocked ? 'none' : 'auto' }}
                     >
-                      {/* Trucks */}
-                      <Flex align='center' justify='between'>
-                        <Flex align='center' gap='2'>
-                          <Truck size={16} style={{ color: '#6b7280' }} />
-                          <Text size='2' weight='medium'>
-                            Trucks
-                          </Text>
-                        </Flex>
-                        <Flex align='center' gap='1'>
-                          <IconButton
-                            size='1'
-                            variant='soft'
-                            color='gray'
-                            onClick={() => setTruckCount(Math.max(1, truckCount - 1))}
-                            disabled={truckCount <= 1}
-                            style={{ cursor: truckCount <= 1 ? 'not-allowed' : 'pointer' }}
-                          >
-                            <Minus size={12} />
-                          </IconButton>
-                          <TextField.Root
-                            type='number'
-                            value={truckCount}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                              setTruckCount(Math.max(1, parseInt(e.target.value) || 1))
-                            }
-                            size='1'
-                            style={{ width: '48px', textAlign: 'center' }}
-                          />
-                          <IconButton size='1' variant='soft' color='gray' onClick={() => setTruckCount(truckCount + 1)}>
-                            <Plus size={12} />
-                          </IconButton>
+                      {/* Fleet totals summary */}
+                      <Flex
+                        align='center'
+                        justify='between'
+                        style={{
+                          padding: '6px 10px',
+                          backgroundColor: '#f9fafb',
+                          borderRadius: '6px',
+                          border: '1px dashed #e5e7eb',
+                        }}
+                      >
+                        <Text size='1' color='gray'>
+                          Total fleet
+                        </Text>
+                        <Flex align='center' gap='3'>
+                          <Flex align='center' gap='1'>
+                            <Truck size={12} style={{ color: '#374151' }} />
+                            <Text size='1' weight='medium'>
+                              {truckCount}
+                            </Text>
+                          </Flex>
+                          <Flex align='center' gap='1'>
+                            <Drone size={12} style={{ color: '#3b82f6' }} />
+                            <Text size='1' weight='medium'>
+                              {droneCount}
+                            </Text>
+                          </Flex>
                         </Flex>
                       </Flex>
-                      {/* Truck Power Type Toggle */}
-                      <Flex align='center' justify='between' style={{ paddingLeft: '24px' }}>
-                        <Flex align='center' gap='2'>
-                          <Text size='1' color='gray'>
-                            Power
-                          </Text>
-                        </Flex>
-                        <Flex
-                          align='center'
-                          gap='1'
-                          style={{ backgroundColor: '#f3f4f6', borderRadius: '6px', padding: '2px' }}
+                      <Button
+                        size='1'
+                        variant='soft'
+                        color='blue'
+                        onClick={addTruck}
+                        style={{ width: '100%', cursor: 'pointer' }}
+                      >
+                        <Plus size={12} /> Add Truck
+                      </Button>
+                      {trucks.map((truck, index) => (
+                        <Box
+                          key={truck.id}
+                          style={{
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            padding: '10px 12px',
+                            backgroundColor: '#ffffff',
+                          }}
                         >
-                          <button
-                            onClick={() => setTruckPowerType('gas')}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '3px 8px',
-                              borderRadius: '4px',
-                              border: 'none',
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              cursor: 'pointer',
-                              backgroundColor: truckPowerType === 'gas' ? 'white' : 'transparent',
-                              color: truckPowerType === 'gas' ? '#374151' : '#9ca3af',
-                              boxShadow: truckPowerType === 'gas' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                            }}
-                          >
-                            <Fuel size={12} /> Gas
-                          </button>
-                          <button
-                            onClick={() => setTruckPowerType('electric')}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '3px 8px',
-                              borderRadius: '4px',
-                              border: 'none',
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              cursor: 'pointer',
-                              backgroundColor: truckPowerType === 'electric' ? 'white' : 'transparent',
-                              color: truckPowerType === 'electric' ? '#374151' : '#9ca3af',
-                              boxShadow: truckPowerType === 'electric' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                            }}
-                          >
-                            <Zap size={12} /> Electric
-                          </button>
-                        </Flex>
-                      </Flex>
-                      {/* Drones */}
-                      <Flex align='center' justify='between'>
-                        <Flex align='center' gap='2'>
-                          <Drone size={16} style={{ color: '#6b7280' }} />
-                          <Text size='2' weight='medium'>
-                            Drones
-                          </Text>
-                        </Flex>
-                        <Flex align='center' gap='1'>
-                          <IconButton
-                            size='1'
-                            variant='soft'
-                            color='gray'
-                            onClick={() => setDroneCount(Math.max(0, droneCount - 1))}
-                            disabled={droneCount <= 0}
-                            style={{ cursor: droneCount <= 0 ? 'not-allowed' : 'pointer' }}
-                          >
-                            <Minus size={12} />
-                          </IconButton>
-                          <TextField.Root
-                            type='number'
-                            value={droneCount}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                              setDroneCount(Math.max(0, parseInt(e.target.value) || 0))
-                            }
-                            size='1'
-                            style={{ width: '48px', textAlign: 'center' }}
-                          />
-                          <IconButton size='1' variant='soft' color='gray' onClick={() => setDroneCount(droneCount + 1)}>
-                            <Plus size={12} />
-                          </IconButton>
-                        </Flex>
-                      </Flex>
+                          <Flex align='center' justify='between' className='mb-2'>
+                            <Flex align='center' gap='2'>
+                              <Truck size={14} style={{ color: '#374151' }} />
+                              <Text size='2' weight='medium'>
+                                Truck {index + 1}
+                              </Text>
+                            </Flex>
+                            <IconButton
+                              size='1'
+                              variant='ghost'
+                              color='gray'
+                              onClick={() => removeTruck(truck.id)}
+                              disabled={trucks.length <= 1}
+                              style={{ cursor: trucks.length <= 1 ? 'not-allowed' : 'pointer' }}
+                              title={trucks.length <= 1 ? 'At least one truck is required' : 'Remove truck'}
+                            >
+                              <Trash2 size={12} />
+                            </IconButton>
+                          </Flex>
+                          {/* Power type toggle */}
+                          <Flex align='center' justify='between' className='mb-2'>
+                            <Text size='1' color='gray'>
+                              Power
+                            </Text>
+                            <Flex
+                              align='center'
+                              gap='1'
+                              style={{ backgroundColor: '#f3f4f6', borderRadius: '6px', padding: '2px' }}
+                            >
+                              <button
+                                onClick={() => updateTruck(truck.id, { powerType: 'gas' })}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '3px 8px',
+                                  borderRadius: '4px',
+                                  border: 'none',
+                                  fontSize: '11px',
+                                  fontWeight: 500,
+                                  cursor: 'pointer',
+                                  backgroundColor: truck.powerType === 'gas' ? 'white' : 'transparent',
+                                  color: truck.powerType === 'gas' ? '#374151' : '#9ca3af',
+                                  boxShadow: truck.powerType === 'gas' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                }}
+                              >
+                                <Fuel size={12} /> Gas
+                              </button>
+                              <button
+                                onClick={() => updateTruck(truck.id, { powerType: 'electric' })}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '3px 8px',
+                                  borderRadius: '4px',
+                                  border: 'none',
+                                  fontSize: '11px',
+                                  fontWeight: 500,
+                                  cursor: 'pointer',
+                                  backgroundColor: truck.powerType === 'electric' ? 'white' : 'transparent',
+                                  color: truck.powerType === 'electric' ? '#374151' : '#9ca3af',
+                                  boxShadow: truck.powerType === 'electric' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                }}
+                              >
+                                <Zap size={12} /> Electric
+                              </button>
+                            </Flex>
+                          </Flex>
+                          {/* Drones allocated to this truck */}
+                          <Flex align='center' justify='between'>
+                            <Flex align='center' gap='2'>
+                              <Drone size={14} style={{ color: '#6b7280' }} />
+                              <Text size='1' color='gray'>
+                                Drones
+                              </Text>
+                            </Flex>
+                            <Flex align='center' gap='1'>
+                              <IconButton
+                                size='1'
+                                variant='soft'
+                                color='gray'
+                                onClick={() => updateTruck(truck.id, { drones: Math.max(0, truck.drones - 1) })}
+                                disabled={truck.drones <= 0}
+                                style={{ cursor: truck.drones <= 0 ? 'not-allowed' : 'pointer' }}
+                              >
+                                <Minus size={12} />
+                              </IconButton>
+                              <TextField.Root
+                                type='number'
+                                value={truck.drones}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                  updateTruck(truck.id, { drones: Math.max(0, parseInt(e.target.value) || 0) })
+                                }
+                                size='1'
+                                style={{ width: '48px', textAlign: 'center' }}
+                              />
+                              <IconButton
+                                size='1'
+                                variant='soft'
+                                color='gray'
+                                onClick={() => updateTruck(truck.id, { drones: truck.drones + 1 })}
+                              >
+                                <Plus size={12} />
+                              </IconButton>
+                            </Flex>
+                          </Flex>
+                        </Box>
+                      ))}
                     </Flex>
                   </Box>
                 </Box>

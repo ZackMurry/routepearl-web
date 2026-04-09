@@ -4,6 +4,18 @@ import React, { createContext, useContext, useState, ReactNode } from 'react'
 import { Mission, MissionConfig, MissionStatus, MissionSite, HazardZone, Point } from '@/lib/types'
 import { pointMatchesNode } from '@/lib/util'
 
+export interface Truck {
+  id: string
+  powerType: 'gas' | 'electric'
+  drones: number
+}
+
+const createTruck = (powerType: 'gas' | 'electric' = 'gas', drones: number = 2): Truck => ({
+  id: `truck-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  powerType,
+  drones,
+})
+
 interface FlightPlannerContextType {
   // Mission state
   currentMission: Mission | null
@@ -60,13 +72,13 @@ interface FlightPlannerContextType {
 
   // Fleet configuration
   fleetMode: 'truck-drone' | 'truck-only' | 'drones-only'
-  setFleetMode: (mode: 'truck-drone' | 'truck-only' | 'drones-only') => void
-  droneCount: number
-  setDroneCount: (count: number) => void
+  trucks: Truck[]
+  addTruck: () => void
+  removeTruck: (id: string) => void
+  updateTruck: (id: string, updates: Partial<Omit<Truck, 'id'>>) => void
+  // Derived aggregates
   truckCount: number
-  setTruckCount: (count: number) => void
-  truckPowerType: 'gas' | 'electric'
-  setTruckPowerType: (type: 'gas' | 'electric') => void
+  droneCount: number
 
   // Map state
   mapCenter: Point
@@ -132,12 +144,27 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setFocusNodeId(id)
     setFocusNodeCounter(c => c + 1)
   }
-  const [droneCount, setDroneCount] = useState<number>(2)
-  const [truckCount, setTruckCount] = useState<number>(1)
-  const [truckPowerType, setTruckPowerType] = useState<'gas' | 'electric'>('gas')
-  // Derive fleetMode from counts — trucks always >= 1, drones optional
+  // Per-truck fleet configuration. Each card represents a dispatched truck
+  // with its own power type and allocated drone count.
+  const [trucks, setTrucks] = useState<Truck[]>(() => [createTruck('gas', 2)])
+
+  const truckCount = trucks.length
+  const droneCount = trucks.reduce((sum, t) => sum + t.drones, 0)
+
+  const addTruck = () => {
+    setTrucks(prev => [...prev, createTruck('gas', 0)])
+  }
+
+  const removeTruck = (id: string) => {
+    setTrucks(prev => (prev.length <= 1 ? prev : prev.filter(t => t.id !== id)))
+  }
+
+  const updateTruck = (id: string, updates: Partial<Omit<Truck, 'id'>>) => {
+    setTrucks(prev => prev.map(t => (t.id === id ? { ...t, ...updates } : t)))
+  }
+
+  // Derive fleetMode from aggregate drone count — trucks always >= 1, drones optional
   const fleetMode: 'truck-drone' | 'truck-only' | 'drones-only' = droneCount > 0 ? 'truck-drone' : 'truck-only'
-  const setFleetMode = (_mode: 'truck-drone' | 'truck-only' | 'drones-only') => {} // no-op, derived from counts
   const [missionLaunched, setMissionLaunched] = useState(false)
   const [missionPaused, setMissionPaused] = useState(false)
   const [mapCenter, setMapCenter] = useState<Point>({ lat: 38.9404, lng: -92.3277 })
@@ -568,7 +595,12 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
           stations: stations.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
           algorithm: missionConfig.algorithm,
           D: droneCount,
-          truck_power_type: truckPowerType,
+          truck_power_type: trucks[0]?.powerType ?? 'gas',
+          trucks: trucks.map(t => ({
+            id: t.id,
+            power_type: t.powerType,
+            drones: t.drones,
+          })),
           provider: 'OSRM-Online',
           hazards: missionConfig.nodes
             .filter(it => it.type === 'hazard')
@@ -668,13 +700,12 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     selectedRouteId,
     setSelectedRouteId,
     fleetMode,
-    setFleetMode,
-    droneCount,
-    setDroneCount,
+    trucks,
+    addTruck,
+    removeTruck,
+    updateTruck,
     truckCount,
-    setTruckCount,
-    truckPowerType,
-    setTruckPowerType,
+    droneCount,
     createNewMission,
     saveMission,
     loadMission,
