@@ -259,7 +259,7 @@ export function useGanttData(
             description = 'Begin mission — pull out of depot and head to first stop'
             break
           case 'truck_delivery':
-            label = `Deliver package${event.orderName ? ` to ${event.orderName}` : ''}`
+            label = `Deliver package${event.orderId != null ? ` at Order Point ${event.orderId}` : ''}${event.orderName ? ` (${event.orderName})` : ''}`
             description = `Park and complete delivery${event.estimatedDuration ? ` — approx ${Math.ceil(event.estimatedDuration / 60)} min` : ''}`
             break
           case 'truck_drone_launch':

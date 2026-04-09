@@ -21,6 +21,8 @@ import {
 import {
   ChevronUp,
   ChevronDown,
+  Maximize2,
+  Minimize2,
   Play,
   Pause,
   Square,
@@ -344,6 +346,24 @@ export function BottomPanel() {
     setDragStartY(e.clientY)
     setDragStartHeight(bottomPanelHeight)
     e.preventDefault()
+  }
+
+  // Quick expand: remember the current height and snap to ~80% of viewport,
+  // or restore the saved height if already expanded. One-click toggle so the
+  // user doesn't have to drag the lip by hand.
+  const QUICK_EXPAND_RATIO = 0.8
+  const [savedPanelHeight, setSavedPanelHeight] = useState<number | null>(null)
+  const isQuickExpanded = savedPanelHeight != null
+  const toggleQuickExpand = () => {
+    if (typeof window === 'undefined') return
+    if (isQuickExpanded) {
+      // Restore to the previously saved height
+      setBottomPanelHeight(savedPanelHeight!)
+      setSavedPanelHeight(null)
+    } else {
+      setSavedPanelHeight(bottomPanelHeight)
+      setBottomPanelHeight(Math.round(window.innerHeight * QUICK_EXPAND_RATIO))
+    }
   }
 
   useEffect(() => {
@@ -1292,7 +1312,7 @@ export function BottomPanel() {
                   flexWrap: 'wrap',
                   rowGap: '6px',
                   position: 'relative',
-                  paddingRight: '48px',
+                  paddingRight: '104px',
                 }}
               >
                 {/* Mode label + Mission name + route status badge — fixed width so right side stays put */}
@@ -1451,6 +1471,21 @@ export function BottomPanel() {
                   </Button>
                 </Flex>
 
+                <IconButton
+                  size='2'
+                  variant='ghost'
+                  onClick={toggleQuickExpand}
+                  title={isQuickExpanded ? 'Restore previous panel size' : 'Expand panel'}
+                  style={{
+                    cursor: 'pointer',
+                    position: 'absolute',
+                    right: '64px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                  }}
+                >
+                  {isQuickExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                </IconButton>
                 <IconButton
                   size='3'
                   variant='ghost'
@@ -2849,7 +2884,7 @@ export function BottomPanel() {
                   flexWrap: 'wrap',
                   rowGap: '6px',
                   position: 'relative',
-                  paddingRight: '48px',
+                  paddingRight: '104px',
                 }}
               >
                 {/* Mode label + Mission name + status badges — fixed width so right side stays put */}
@@ -2976,6 +3011,21 @@ export function BottomPanel() {
                   </Button>
                 </Flex>
 
+                <IconButton
+                  size='2'
+                  variant='ghost'
+                  onClick={toggleQuickExpand}
+                  title={isQuickExpanded ? 'Restore previous panel size' : 'Expand panel'}
+                  style={{
+                    cursor: 'pointer',
+                    position: 'absolute',
+                    right: '64px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                  }}
+                >
+                  {isQuickExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                </IconButton>
                 <IconButton
                   size='3'
                   variant='ghost'
@@ -3478,7 +3528,7 @@ export function BottomPanel() {
                 flexWrap: 'wrap',
                 rowGap: '6px',
                 position: 'relative',
-                paddingRight: '48px',
+                paddingRight: '104px',
               }}
             >
               {/* Mode label + Mission name + status badges — fixed width so right side stays put */}
@@ -3641,6 +3691,15 @@ export function BottomPanel() {
                 </Button>
               </Flex>
 
+              <IconButton
+                size='2'
+                variant='ghost'
+                onClick={toggleQuickExpand}
+                title={isQuickExpanded ? 'Restore previous panel size' : 'Expand panel'}
+                style={{ cursor: 'pointer', position: 'absolute', right: '64px', top: '50%', transform: 'translateY(-50%)' }}
+              >
+                {isQuickExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+              </IconButton>
               <IconButton
                 size='3'
                 variant='ghost'

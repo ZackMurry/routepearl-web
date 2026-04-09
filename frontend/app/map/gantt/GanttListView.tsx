@@ -17,6 +17,141 @@ interface Props {
 
 const ICON_SIZE = 12
 
+// ──────────────────────────────────────────────────────────────────────
+// Inline layout constants for the list view.
+//
+// The shared `.data-table` CSS rules from flight-planner.css don't end up
+// in the bundle at runtime, so every width, padding and alignment that
+// this view depends on is declared inline right here. Being self-contained
+// also guarantees the exact same cell widths across every vehicle table
+// and every group tbody (the root of the earlier alignment bug).
+//
+// Total of explicit column widths is 544 px; the two flex columns split
+// the remainder of the `minWidth` (720 px) at 88 px each, which is enough
+// headroom for real content while still fitting tight side panels.
+// ──────────────────────────────────────────────────────────────────────
+const GANTT_TABLE_STYLE: React.CSSProperties = {
+  width: '100%',
+  minWidth: '720px',
+  tableLayout: 'fixed',
+  borderCollapse: 'collapse',
+  fontSize: '12px',
+  lineHeight: 1.4,
+}
+
+const COL_WIDTHS = {
+  num: 48,
+  type: 56,
+  // event & location are flex (no explicit width)
+  order: 96,
+  time: 96,
+  duration: 100,
+  distance: 100,
+} as const
+
+// Note: build the <col> list as an array so there is zero whitespace
+// between children — indented JSX siblings inside <colgroup> produce
+// text nodes which React flags as a hydration error.
+const GANTT_COL_DEFS: React.CSSProperties[] = [
+  { width: `${COL_WIDTHS.num}px` },
+  { width: `${COL_WIDTHS.type}px` },
+  {},
+  {},
+  { width: `${COL_WIDTHS.order}px` },
+  { width: `${COL_WIDTHS.time}px` },
+  { width: `${COL_WIDTHS.duration}px` },
+  { width: `${COL_WIDTHS.distance}px` },
+]
+const GanttColgroup = () => (
+  <colgroup>{GANTT_COL_DEFS.map((s, i) => <col key={i} style={s} />)}</colgroup>
+)
+
+// Shared th/td padding — matches what the original .data-table CSS used
+// so visual density is preserved even without the external stylesheet.
+const CELL_PAD: React.CSSProperties = { padding: '6px 10px' }
+const TH_STYLE: React.CSSProperties = {
+  ...CELL_PAD,
+  textAlign: 'left',
+  fontWeight: 600,
+  fontSize: '11px',
+  color: '#64748b',
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  whiteSpace: 'nowrap',
+  borderBottom: '1px solid #e2e8f0',
+  backgroundColor: '#f8fafc',
+  position: 'sticky',
+  top: 0,
+  zIndex: 1,
+}
+const TD_STYLE: React.CSSProperties = {
+  ...CELL_PAD,
+  borderBottom: '1px solid #f1f5f9',
+  verticalAlign: 'middle',
+  color: '#334155',
+  overflow: 'hidden',
+}
+
+// Order cell — shared between grouped and non-grouped renderers.
+// The outer gate must include stop.orderId so that truck/drone deliveries
+// whose underlying order has no `label` still display the order badge.
+function renderOrderCell(stop: GanttStop) {
+  const hasContent = stop.orderName || stop.locationBadge || stop.orderId != null
+  if (!hasContent) {
+    return <span style={{ color: '#d1d5db' }}>--</span>
+  }
+  const showLocationBadge =
+    (stop.type === 'launch' || stop.type === 'return' || stop.type === 'recover') && stop.locationBadge
+  // Order badge shows on delivery (and any non launch/return/recover stop) whenever orderId is present
+  const showOrderBadge =
+    stop.orderId != null && stop.type !== 'launch' && stop.type !== 'return' && stop.type !== 'recover'
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+      {showLocationBadge && (
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: '16px',
+            height: '16px',
+            borderRadius: '8px',
+            backgroundColor: '#0369a1',
+            color: 'white',
+            fontSize: '9px',
+            fontWeight: 700,
+            padding: '0 4px',
+            lineHeight: 1,
+          }}
+        >
+          {stop.locationBadge}
+        </span>
+      )}
+      {showOrderBadge && (
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: '16px',
+            height: '16px',
+            borderRadius: '8px',
+            backgroundColor: '#1f2937',
+            color: 'white',
+            fontSize: '9px',
+            fontWeight: 700,
+            padding: '0 4px',
+            lineHeight: 1,
+          }}
+        >
+          {stop.orderId}
+        </span>
+      )}
+      {stop.orderName && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{stop.orderName}</span>}
+    </span>
+  )
+}
+
 function getStopIcon(type: GanttStopType, hasOrder: boolean) {
   switch (type) {
     case 'depot':
@@ -189,77 +324,90 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                   const groups = buildGroups(vehicle, vehicles)
                   let globalIdx = 0
                   let intervalCounter = 0
-                  return groups.map((group, gIdx) => {
-                    const accent = getGroupAccent(group.label)
-                    const isNumbered = !['Start', 'Return to Depot', 'Rendezvous', 'Re-Launch', 'On Truck'].includes(group.label) && !group.label.startsWith('Order')
-                    if (isNumbered) intervalCounter++
-                    const badge = getGroupBadge(group.label, isNumbered ? intervalCounter : undefined)
-                    const groupLocation = group.stops.find((s) => s.address || (s.lat != null && s.lng != null))
-                    const locationStr = groupLocation ? getStopLocation(groupLocation, locationMode) : undefined
+                  return (
+                    <table className="data-table" style={GANTT_TABLE_STYLE}>
+                      <GanttColgroup />
+                      <thead>
+                        <tr>
+                          <th style={{ ...TH_STYLE, textAlign: 'center' }}>#</th>
+                          <th style={TH_STYLE}>Type</th>
+                          <th style={TH_STYLE}>Event</th>
+                          <th style={TH_STYLE}>Location</th>
+                          <th style={TH_STYLE}>Order</th>
+                          <th style={{ ...TH_STYLE, ...(isDuration ? emphStyle : dimStyle) }}>Time</th>
+                          <th style={{ ...TH_STYLE, ...(isDuration ? emphStyle : dimStyle) }}>Duration</th>
+                          <th style={{ ...TH_STYLE, ...(!isDuration ? emphStyle : dimStyle) }}>Distance</th>
+                        </tr>
+                      </thead>
+                      {groups.map((group, gIdx) => {
+                        const accent = getGroupAccent(group.label)
+                        const isNumbered = !['Start', 'Return to Depot', 'Rendezvous', 'Re-Launch', 'On Truck'].includes(group.label) && !group.label.startsWith('Order')
+                        if (isNumbered) intervalCounter++
+                        const badge = getGroupBadge(group.label, isNumbered ? intervalCounter : undefined)
+                        const groupLocation = group.stops.find((s) => s.address || (s.lat != null && s.lng != null))
+                        const locationStr = groupLocation ? getStopLocation(groupLocation, locationMode) : undefined
 
-                    return (
-                      <div key={`group-${gIdx}`}>
-                        {/* Interval header — intentionally thin */}
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '2px 10px',
-                            backgroundColor: `${accent}10`,
-                            borderBottom: '1px solid #e5e7eb',
-                            borderLeft: `3px solid ${accent}`,
-                          }}
-                        >
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              minWidth: '16px',
-                              height: '16px',
-                              borderRadius: '8px',
-                              backgroundColor: accent,
-                              color: 'white',
-                              fontSize: '9px',
-                              fontWeight: 700,
-                              padding: '0 4px',
-                              flexShrink: 0,
-                            }}
-                          >
-                            {badge}
-                          </span>
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#374151' }}>
-                            {group.label}
-                          </span>
-                          {locationStr && (
-                            <span style={{ fontSize: '10px', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                              <MapPin size={9} />
-                              {locationStr}
-                            </span>
-                          )}
-                          <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#9ca3af' }}>
-                            {group.stops.length}
-                          </span>
-                        </div>
-
-                        {/* Events within this stop group */}
-                        <table className="data-table">
-                          {gIdx === 0 && (
-                            <thead>
-                              <tr>
-                                <th className="col-stat-sm">#</th>
-                                <th style={{ width: '52px', minWidth: '52px' }}>Type</th>
-                                <th className="col-flex">Event</th>
-                                <th className="col-flex">Location</th>
-                                <th className="col-stat">Order</th>
-                                <th className="col-stat" style={isDuration ? emphStyle : dimStyle}>Time</th>
-                                <th className="col-stat" style={isDuration ? emphStyle : dimStyle}>Duration</th>
-                                <th className="col-stat" style={!isDuration ? emphStyle : dimStyle}>Distance</th>
-                              </tr>
-                            </thead>
-                          )}
-                          <tbody>
+                        return (
+                          <tbody key={`group-${gIdx}`}>
+                            {/* Interval header — spans all columns so widths stay aligned */}
+                            <tr className="group-header-row">
+                              <td
+                                colSpan={8}
+                                style={{
+                                  padding: '3px 10px',
+                                  backgroundColor: `${accent}14`,
+                                  borderBottom: '1px solid #e5e7eb',
+                                  borderLeft: `3px solid ${accent}`,
+                                  cursor: 'default',
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      minWidth: '16px',
+                                      height: '16px',
+                                      borderRadius: '8px',
+                                      backgroundColor: accent,
+                                      color: 'white',
+                                      fontSize: '9px',
+                                      fontWeight: 700,
+                                      padding: '0 4px',
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {badge}
+                                  </span>
+                                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#374151' }}>
+                                    {group.label}
+                                  </span>
+                                  {locationStr && (
+                                    <span
+                                      style={{
+                                        fontSize: '10px',
+                                        color: '#9ca3af',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '2px',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        minWidth: 0,
+                                      }}
+                                    >
+                                      <MapPin size={9} />
+                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{locationStr}</span>
+                                    </span>
+                                  )}
+                                  <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#9ca3af' }}>
+                                    {group.stops.length}
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
                             {group.stops.map((stop, idx) => {
                               globalIdx++
                               return (
@@ -269,8 +417,8 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                                   onDoubleClick={() => onStopDoubleClick?.(stop)}
                                   style={{ cursor: onStopClick ? 'pointer' : 'default' }}
                                 >
-                                  <td className="col-stat-sm">{globalIdx}</td>
-                                  <td>
+                                  <td style={{ ...TD_STYLE, textAlign: 'center' }}>{globalIdx}</td>
+                                  <td style={TD_STYLE}>
                                     <div
                                       style={{
                                         width: '22px',
@@ -286,80 +434,25 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                                       {getStopIcon(stop.type, !!stop.orderName)}
                                     </div>
                                   </td>
-                                  <td>
+                                  <td style={{ ...TD_STYLE, textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                     <span>{stop.label}</span>
-                                    {stop.sortieNumber != null && (
-                                      <span style={{ marginLeft: '6px', fontSize: '11px', color: '#8b5cf6' }}>
-                                        #{stop.sortieNumber}
-                                      </span>
-                                    )}
                                     {stop.vehicleName && (
                                       <span style={{ marginLeft: '6px', fontSize: '10px', color: stop.vehicleColor || '#6b7280' }}>
                                         {stop.vehicleName}
                                       </span>
                                     )}
                                   </td>
-                                  <td className="cell-truncate" style={{ color: '#6b7280', fontSize: '11px' }}>
+                                  <td style={{ ...TD_STYLE, color: '#6b7280', fontSize: '11px', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                     {getStopLocation(stop, locationMode) || '--'}
                                   </td>
-                                  <td>
-                                    {(stop.orderName || stop.locationBadge) ? (
-                                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        {/* Location badge (blue) for launch/return: physical launch/landing node */}
-                                        {(stop.type === 'launch' || stop.type === 'return' || stop.type === 'recover') && stop.locationBadge && (
-                                          <span
-                                            style={{
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              minWidth: '16px',
-                                              height: '16px',
-                                              borderRadius: '8px',
-                                              backgroundColor: '#0369a1',
-                                              color: 'white',
-                                              fontSize: '9px',
-                                              fontWeight: 700,
-                                              padding: '0 4px',
-                                              lineHeight: 1,
-                                            }}
-                                          >
-                                            {stop.locationBadge}
-                                          </span>
-                                        )}
-                                        {/* Order ID badge (dark) for all other stop types */}
-                                        {stop.orderId != null && stop.type !== 'launch' && stop.type !== 'return' && stop.type !== 'recover' && (
-                                          <span
-                                            style={{
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              minWidth: '16px',
-                                              height: '16px',
-                                              borderRadius: '8px',
-                                              backgroundColor: '#1f2937',
-                                              color: 'white',
-                                              fontSize: '9px',
-                                              fontWeight: 700,
-                                              padding: '0 4px',
-                                              lineHeight: 1,
-                                            }}
-                                          >
-                                            {stop.orderId}
-                                          </span>
-                                        )}
-                                        {stop.orderName}
-                                      </span>
-                                    ) : (
-                                      <span style={{ color: '#d1d5db' }}>--</span>
-                                    )}
-                                  </td>
-                                  <td style={isDuration ? emphStyle : dimStyle}>
+                                  <td style={TD_STYLE}>{renderOrderCell(stop)}</td>
+                                  <td style={{ ...TD_STYLE, ...(isDuration ? emphStyle : dimStyle) }}>
                                     {formatGanttTime(stop.time)}
                                   </td>
-                                  <td style={isDuration ? emphStyle : dimStyle}>
+                                  <td style={{ ...TD_STYLE, ...(isDuration ? emphStyle : dimStyle) }}>
                                     {stop.duration > 0 ? formatGanttTime(stop.duration) : '--'}
                                   </td>
-                                  <td style={!isDuration ? emphStyle : dimStyle}>
+                                  <td style={{ ...TD_STYLE, ...(!isDuration ? emphStyle : dimStyle) }}>
                                     {stop.distance && stop.distance > 0
                                       ? formatGanttDistance(stop.distance)
                                       : '--'}
@@ -368,22 +461,23 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                               )
                             })}
                           </tbody>
-                        </table>
-                      </div>
-                    )
-                  })
+                        )
+                      })}
+                    </table>
+                  )
                 })() : (
-                  <table className="data-table">
+                  <table className="data-table" style={GANTT_TABLE_STYLE}>
+                    <GanttColgroup />
                     <thead>
                       <tr>
-                        <th className="col-stat-sm">#</th>
-                        <th style={{ width: '52px', minWidth: '52px' }}>Type</th>
-                        <th className="col-flex">Event</th>
-                        <th className="col-flex">Location</th>
-                        <th className="col-stat">Order</th>
-                        <th className="col-stat" style={isDuration ? emphStyle : dimStyle}>Time</th>
-                        <th className="col-stat" style={isDuration ? emphStyle : dimStyle}>Duration</th>
-                        <th className="col-stat" style={!isDuration ? emphStyle : dimStyle}>Distance</th>
+                        <th style={{ ...TH_STYLE, textAlign: 'center' }}>#</th>
+                        <th style={TH_STYLE}>Type</th>
+                        <th style={TH_STYLE}>Event</th>
+                        <th style={TH_STYLE}>Location</th>
+                        <th style={TH_STYLE}>Order</th>
+                        <th style={{ ...TH_STYLE, ...(isDuration ? emphStyle : dimStyle) }}>Time</th>
+                        <th style={{ ...TH_STYLE, ...(isDuration ? emphStyle : dimStyle) }}>Duration</th>
+                        <th style={{ ...TH_STYLE, ...(!isDuration ? emphStyle : dimStyle) }}>Distance</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -394,8 +488,8 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                           onDoubleClick={() => onStopDoubleClick?.(stop)}
                           style={{ cursor: onStopClick ? 'pointer' : 'default' }}
                         >
-                          <td className="col-stat-sm">{idx + 1}</td>
-                          <td>
+                          <td style={{ ...TD_STYLE, textAlign: 'center' }}>{idx + 1}</td>
+                          <td style={TD_STYLE}>
                             <div
                               style={{
                                 width: '22px',
@@ -411,73 +505,20 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                               {getStopIcon(stop.type, !!stop.orderName)}
                             </div>
                           </td>
-                          <td>
+                          <td style={{ ...TD_STYLE, textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <span>{stop.label}</span>
-                            {stop.sortieNumber != null && (
-                              <span style={{ marginLeft: '6px', fontSize: '11px', color: '#8b5cf6' }}>
-                                #{stop.sortieNumber}
-                              </span>
-                            )}
                           </td>
-                          <td className="cell-truncate" style={{ color: '#6b7280', fontSize: '11px' }}>
+                          <td style={{ ...TD_STYLE, color: '#6b7280', fontSize: '11px', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {getStopLocation(stop, locationMode) || '--'}
                           </td>
-                          <td>
-                            {(stop.orderName || stop.locationBadge) ? (
-                              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                {(stop.type === 'launch' || stop.type === 'return' || stop.type === 'recover') && stop.locationBadge && (
-                                  <span
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      minWidth: '16px',
-                                      height: '16px',
-                                      borderRadius: '8px',
-                                      backgroundColor: '#0369a1',
-                                      color: 'white',
-                                      fontSize: '9px',
-                                      fontWeight: 700,
-                                      padding: '0 4px',
-                                      lineHeight: 1,
-                                    }}
-                                  >
-                                    {stop.locationBadge}
-                                  </span>
-                                )}
-                                {stop.orderId != null && stop.type !== 'launch' && stop.type !== 'return' && stop.type !== 'recover' && (
-                                  <span
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      minWidth: '16px',
-                                      height: '16px',
-                                      borderRadius: '8px',
-                                      backgroundColor: '#1f2937',
-                                      color: 'white',
-                                      fontSize: '9px',
-                                      fontWeight: 700,
-                                      padding: '0 4px',
-                                      lineHeight: 1,
-                                    }}
-                                  >
-                                    {stop.orderId}
-                                  </span>
-                                )}
-                                {stop.orderName}
-                              </span>
-                            ) : (
-                              <span style={{ color: '#d1d5db' }}>--</span>
-                            )}
-                          </td>
-                          <td style={isDuration ? emphStyle : dimStyle}>
+                          <td style={TD_STYLE}>{renderOrderCell(stop)}</td>
+                          <td style={{ ...TD_STYLE, ...(isDuration ? emphStyle : dimStyle) }}>
                             {formatGanttTime(stop.time)}
                           </td>
-                          <td style={isDuration ? emphStyle : dimStyle}>
+                          <td style={{ ...TD_STYLE, ...(isDuration ? emphStyle : dimStyle) }}>
                             {stop.duration > 0 ? formatGanttTime(stop.duration) : '--'}
                           </td>
-                          <td style={!isDuration ? emphStyle : dimStyle}>
+                          <td style={{ ...TD_STYLE, ...(!isDuration ? emphStyle : dimStyle) }}>
                             {stop.distance && stop.distance > 0
                               ? formatGanttDistance(stop.distance)
                               : '--'}
