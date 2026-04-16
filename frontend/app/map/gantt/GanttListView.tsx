@@ -7,6 +7,10 @@ import { House, Package, ArrowUp, ArrowDown, ArrowRight, Zap, Truck, Drone, User
 
 interface Props {
   vehicles: GanttVehicle[]
+  // Optional unfiltered vehicle list, used only for cross-vehicle lookups
+  // (e.g. finding the drone delivery paired to a truck's launch/recover stop).
+  // Falls back to `vehicles` when not provided.
+  allVehicles?: GanttVehicle[]
   axisMode: GanttAxisMode
   locationMode?: GanttLocationMode
   onStopClick?: (stop: GanttStop) => void
@@ -347,7 +351,11 @@ function buildGroups(
   return groups
 }
 
-const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street', onStopClick, onStopDoubleClick, onVehicleClick, onVehicleDoubleClick }) => {
+const GanttListView: FC<Props> = ({ vehicles, allVehicles, axisMode, locationMode = 'street', onStopClick, onStopDoubleClick, onVehicleClick, onVehicleDoubleClick }) => {
+  // For looking up paired drone deliveries across rows, prefer the caller's
+  // unfiltered list so a stop-type filter or vehicle-row filter doesn't break
+  // the pair lookup. Falls back to the visible vehicles when not supplied.
+  const lookupVehicles = allVehicles ?? vehicles
   const isDuration = axisMode === 'duration'
   const emphStyle = { fontWeight: 600, color: '#1e293b' } as const
   const dimStyle = { color: '#94a3b8' } as const
@@ -629,7 +637,7 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                                     )}
                                   </td>
                                   <td style={{ ...TD_STYLE, color: '#6b7280', fontSize: '11px', overflow: 'hidden' }}>
-                                    {renderLocationCell(stop, vehicles, locationMode)}
+                                    {renderLocationCell(stop, lookupVehicles, locationMode)}
                                   </td>
                                   <td style={TD_STYLE}>{renderOrderCell(stop, vehicle.type === 'drone' || (vehicle.type === 'all' && !!stop.vehicleName?.startsWith('Drone')))}</td>
                                   <td style={{ ...TD_STYLE, ...(isDuration ? emphStyle : dimStyle) }}>
@@ -695,7 +703,7 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                             <span>{stop.label}</span>
                           </td>
                           <td style={{ ...TD_STYLE, color: '#6b7280', fontSize: '11px', overflow: 'hidden' }}>
-                            {renderLocationCell(stop, vehicles, locationMode)}
+                            {renderLocationCell(stop, lookupVehicles, locationMode)}
                           </td>
                           <td style={TD_STYLE}>{renderOrderCell(stop, vehicle.type === 'drone')}</td>
                           <td style={{ ...TD_STYLE, ...(isDuration ? emphStyle : dimStyle) }}>

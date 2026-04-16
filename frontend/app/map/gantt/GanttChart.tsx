@@ -780,6 +780,7 @@ const GanttChart: FC<Props> = ({
         <Box style={{ flex: 1, overflow: 'hidden' }}>
           <GanttListView
             vehicles={stopFilteredVehicles}
+            allVehicles={data.vehicles}
             axisMode={axisMode}
             locationMode={locationMode}
             onStopClick={onStopClick}
