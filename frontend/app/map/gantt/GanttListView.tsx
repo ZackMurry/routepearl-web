@@ -3,7 +3,7 @@
 import React, { FC } from 'react'
 import { ScrollArea } from '@radix-ui/themes'
 import { GanttVehicle, GanttStop, GanttStopType, GanttAxisMode, GanttLocationMode, getStopColor, formatGanttTime, formatGanttDistance, getStopLocation } from './gantt.types'
-import { House, Package, ArrowUp, ArrowDown, Zap, Truck, Drone, LayoutList, MapPin, Download } from 'lucide-react'
+import { House, Package, ArrowUp, ArrowDown, ArrowRight, Zap, Truck, Drone, LayoutList, MapPin, Download } from 'lucide-react'
 
 interface Props {
   vehicles: GanttVehicle[]
@@ -92,64 +92,131 @@ const TD_STYLE: React.CSSProperties = {
   overflow: 'hidden',
 }
 
+// Shared pill styles used across the order cell.
+const LOCATION_PILL: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minWidth: '16px',
+  height: '16px',
+  borderRadius: '8px',
+  backgroundColor: '#0369a1',
+  color: 'white',
+  fontSize: '9px',
+  fontWeight: 700,
+  padding: '0 4px',
+  lineHeight: 1,
+}
+const ORDER_PILL_BASE: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minWidth: '16px',
+  height: '16px',
+  borderRadius: '8px',
+  color: 'white',
+  fontSize: '9px',
+  fontWeight: 700,
+  padding: '0 4px',
+  lineHeight: 1,
+}
+
 // Order cell — shared between grouped and non-grouped renderers.
-// The outer gate must include stop.orderId so that truck/drone deliveries
-// whose underlying order has no `label` still display the order badge.
-function renderOrderCell(stop: GanttStop) {
+// Launch/return/recover stops now show both endpoints (truck-stop badge
+// and delivery orderId) separated by an arrow, so the reader can see
+// where the drone is going or coming from at a glance — e.g. "S → 3"
+// for a launch, "3 → 1" for a return.
+function renderOrderCell(stop: GanttStop, isDrone?: boolean) {
   const hasContent = stop.orderName || stop.locationBadge || stop.orderId != null
   if (!hasContent) {
     return <span style={{ color: '#d1d5db' }}>--</span>
   }
-  const showLocationBadge =
-    (stop.type === 'launch' || stop.type === 'return' || stop.type === 'recover') && stop.locationBadge
-  // Order badge shows on delivery (and any non launch/return/recover stop) whenever orderId is present
-  const showOrderBadge =
-    stop.orderId != null && stop.type !== 'launch' && stop.type !== 'return' && stop.type !== 'recover'
+  const orderPillBg = isDrone ? '#ca8a04' : '#1f2937'
+  const orderPill = stop.orderId != null
+    ? <span style={{ ...ORDER_PILL_BASE, backgroundColor: orderPillBg }}>{stop.orderId}</span>
+    : null
+  const locPill = stop.locationBadge
+    ? <span style={LOCATION_PILL}>{stop.locationBadge}</span>
+    : null
+  const arrow = <ArrowRight size={10} color="#6b7280" />
+
+  // Launch: truck-stop → order
+  if (stop.type === 'launch' && (locPill || orderPill)) {
+    return (
+      <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+        {locPill}
+        {locPill && orderPill && arrow}
+        {orderPill}
+      </span>
+    )
+  }
+  // Return: order → truck-stop
+  if (stop.type === 'return' && (locPill || orderPill)) {
+    return (
+      <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+        {orderPill}
+        {orderPill && locPill && arrow}
+        {locPill}
+      </span>
+    )
+  }
+  // Recover: truck-stop badge only (no paired order on these stops)
+  if (stop.type === 'recover' && locPill) {
+    return <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>{locPill}</span>
+  }
+  // Everything else (delivery, depot, travel, charging): order badge + name
   return (
     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-      {showLocationBadge && (
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minWidth: '16px',
-            height: '16px',
-            borderRadius: '8px',
-            backgroundColor: '#0369a1',
-            color: 'white',
-            fontSize: '9px',
-            fontWeight: 700,
-            padding: '0 4px',
-            lineHeight: 1,
-          }}
-        >
-          {stop.locationBadge}
-        </span>
-      )}
-      {showOrderBadge && (
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minWidth: '16px',
-            height: '16px',
-            borderRadius: '8px',
-            backgroundColor: '#1f2937',
-            color: 'white',
-            fontSize: '9px',
-            fontWeight: 700,
-            padding: '0 4px',
-            lineHeight: 1,
-          }}
-        >
-          {stop.orderId}
-        </span>
-      )}
+      {orderPill}
       {stop.orderName && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{stop.orderName}</span>}
     </span>
   )
+}
+
+// For a launch/return stop, find the paired delivery stop in the same sortie
+// so we can surface both locations (launch point → delivery point, etc.).
+function findPairedDelivery(stop: GanttStop, stops: GanttStop[]): GanttStop | undefined {
+  if (stop.type !== 'launch' && stop.type !== 'return') return undefined
+  if (stop.sortieNumber == null) return undefined
+  return stops.find((s) => s.type === 'delivery' && s.sortieNumber === stop.sortieNumber)
+}
+
+// Render the Location cell — shows both endpoints with an arrow for drone
+// launch/return so the reader sees the full hop (like a train timetable).
+function renderLocationCell(
+  stop: GanttStop,
+  vehicleStops: GanttStop[],
+  locationMode: GanttLocationMode
+) {
+  const self = getStopLocation(stop, locationMode)
+  if (stop.type === 'launch' || stop.type === 'return') {
+    const paired = findPairedDelivery(stop, vehicleStops)
+    const pairedLoc = paired ? getStopLocation(paired, locationMode) : undefined
+    if (self && pairedLoc) {
+      const [from, to] = stop.type === 'launch' ? [self, pairedLoc] : [pairedLoc, self]
+      return (
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            maxWidth: '100%',
+            overflow: 'hidden',
+          }}
+          title={`${from} → ${to}`}
+        >
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flexShrink: 1 }}>
+            {from}
+          </span>
+          <ArrowRight size={10} color="#6b7280" style={{ flexShrink: 0 }} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flexShrink: 1 }}>
+            {to}
+          </span>
+        </span>
+      )
+    }
+  }
+  return self || '--'
 }
 
 function getStopIcon(type: GanttStopType, hasOrder: boolean) {
@@ -344,68 +411,141 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                         const isNumbered = !['Start', 'Return to Depot', 'Rendezvous', 'Re-Launch', 'On Truck'].includes(group.label) && !group.label.startsWith('Order')
                         if (isNumbered) intervalCounter++
                         const badge = getGroupBadge(group.label, isNumbered ? intervalCounter : undefined)
-                        const groupLocation = group.stops.find((s) => s.address || (s.lat != null && s.lng != null))
+                        // Prefer the delivery stop's location; otherwise the first stop with an address.
+                        const deliveryStop = group.stops.find((s) => s.type === 'delivery' && (s.address || (s.lat != null && s.lng != null)))
+                        const groupLocation = deliveryStop || group.stops.find((s) => s.address || (s.lat != null && s.lng != null))
                         const locationStr = groupLocation ? getStopLocation(groupLocation, locationMode) : undefined
+                        // Surface the order info (ID + name) for any stop in the group that has it.
+                        const orderStop = group.stops.find((s) => s.orderId != null || s.orderName)
+                        const headerIsDrone =
+                          vehicle.type === 'drone' ||
+                          (vehicle.type === 'all' && !!orderStop?.vehicleName?.startsWith('Drone'))
+
+                        // Shared td style for header cells — background tint + bottom border applied per-cell
+                        // because colSpan no longer covers the whole row. The left accent stripe lives on the
+                        // first cell only. Tint bumped + top border added so the header stands apart from the
+                        // stop rows below.
+                        const headerCellBase: React.CSSProperties = {
+                          padding: '6px 10px',
+                          backgroundColor: `${accent}26`,
+                          borderTop: `1px solid ${accent}66`,
+                          borderBottom: `1px solid ${accent}66`,
+                          cursor: 'default',
+                          overflow: 'hidden',
+                          whiteSpace: 'nowrap',
+                          verticalAlign: 'middle',
+                        }
 
                         return (
                           <tbody key={`group-${gIdx}`}>
-                            {/* Interval header — spans all columns so widths stay aligned */}
+                            {/* Interval header — cells map 1:1 to the column layout below so the
+                                group badge, label, location, and order line up with their columns. */}
                             <tr className="group-header-row">
-                              <td
-                                colSpan={8}
-                                style={{
-                                  padding: '3px 10px',
-                                  backgroundColor: `${accent}14`,
-                                  borderBottom: '1px solid #e5e7eb',
-                                  borderLeft: `3px solid ${accent}`,
-                                  cursor: 'default',
-                                  overflow: 'hidden',
-                                }}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {/* # — group badge, aligned with row-number column */}
+                              <td style={{ ...headerCellBase, textAlign: 'center', borderLeft: `3px solid ${accent}` }}>
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    minWidth: '18px',
+                                    height: '18px',
+                                    borderRadius: '9px',
+                                    backgroundColor: accent,
+                                    color: 'white',
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    padding: '0 5px',
+                                  }}
+                                >
+                                  {badge}
+                                </span>
+                              </td>
+                              {/* Type — intentionally empty to mirror the icon slot */}
+                              <td style={headerCellBase} />
+                              {/* Event — group label */}
+                              <td style={{ ...headerCellBase, textOverflow: 'ellipsis' }}>
+                                <span
+                                  style={{
+                                    fontSize: '12.5px',
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    letterSpacing: '0.02em',
+                                  }}
+                                >
+                                  {group.label}
+                                </span>
+                              </td>
+                              {/* Location — aligned under the Location column */}
+                              <td style={{ ...headerCellBase, textOverflow: 'ellipsis' }} title={locationStr || undefined}>
+                                {locationStr ? (
                                   <span
                                     style={{
+                                      fontSize: '11.5px',
+                                      fontWeight: 700,
+                                      color: '#0f172a',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      justifyContent: 'center',
-                                      minWidth: '16px',
-                                      height: '16px',
-                                      borderRadius: '8px',
-                                      backgroundColor: accent,
-                                      color: 'white',
-                                      fontSize: '9px',
-                                      fontWeight: 700,
-                                      padding: '0 4px',
-                                      flexShrink: 0,
+                                      gap: '4px',
+                                      maxWidth: '100%',
+                                      overflow: 'hidden',
                                     }}
                                   >
-                                    {badge}
+                                    <MapPin size={11} style={{ flexShrink: 0 }} />
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{locationStr}</span>
                                   </span>
-                                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#374151' }}>
-                                    {group.label}
+                                ) : (
+                                  <span style={{ color: '#cbd5e1', fontSize: '11px' }}>--</span>
+                                )}
+                              </td>
+                              {/* Order — aligned under the Order column */}
+                              <td style={{ ...headerCellBase, textOverflow: 'ellipsis' }}>
+                                {orderStop && (orderStop.orderId != null || orderStop.orderName) ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', maxWidth: '100%' }}>
+                                    {orderStop.orderId != null && (
+                                      <span
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          minWidth: '16px',
+                                          height: '16px',
+                                          borderRadius: '8px',
+                                          backgroundColor: headerIsDrone ? '#ca8a04' : '#1f2937',
+                                          color: 'white',
+                                          fontSize: '9px',
+                                          fontWeight: 700,
+                                          padding: '0 4px',
+                                          lineHeight: 1,
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        {orderStop.orderId}
+                                      </span>
+                                    )}
+                                    {orderStop.orderName && (
+                                      <span
+                                        style={{
+                                          fontSize: '11.5px',
+                                          color: '#0f172a',
+                                          fontWeight: 700,
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                        }}
+                                      >
+                                        {orderStop.orderName}
+                                      </span>
+                                    )}
                                   </span>
-                                  {locationStr && (
-                                    <span
-                                      style={{
-                                        fontSize: '10px',
-                                        color: '#9ca3af',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '2px',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
-                                        minWidth: 0,
-                                      }}
-                                    >
-                                      <MapPin size={9} />
-                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{locationStr}</span>
-                                    </span>
-                                  )}
-                                  <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#9ca3af' }}>
-                                    {group.stops.length}
-                                  </span>
-                                </div>
+                                ) : (
+                                  <span style={{ color: '#cbd5e1', fontSize: '11px' }}>--</span>
+                                )}
+                              </td>
+                              {/* Time/Duration/Distance — event count, right aligned across the numeric columns */}
+                              <td colSpan={3} style={{ ...headerCellBase, textAlign: 'right' }}>
+                                <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#334155' }}>
+                                  {group.stops.length} {group.stops.length === 1 ? 'event' : 'events'}
+                                </span>
                               </td>
                             </tr>
                             {group.stops.map((stop, idx) => {
@@ -442,10 +582,10 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                                       </span>
                                     )}
                                   </td>
-                                  <td style={{ ...TD_STYLE, color: '#6b7280', fontSize: '11px', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {getStopLocation(stop, locationMode) || '--'}
+                                  <td style={{ ...TD_STYLE, color: '#6b7280', fontSize: '11px', overflow: 'hidden' }}>
+                                    {renderLocationCell(stop, vehicle.stops, locationMode)}
                                   </td>
-                                  <td style={TD_STYLE}>{renderOrderCell(stop)}</td>
+                                  <td style={TD_STYLE}>{renderOrderCell(stop, vehicle.type === 'drone' || (vehicle.type === 'all' && !!stop.vehicleName?.startsWith('Drone')))}</td>
                                   <td style={{ ...TD_STYLE, ...(isDuration ? emphStyle : dimStyle) }}>
                                     {formatGanttTime(stop.time)}
                                   </td>
@@ -508,10 +648,10 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                           <td style={{ ...TD_STYLE, textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <span>{stop.label}</span>
                           </td>
-                          <td style={{ ...TD_STYLE, color: '#6b7280', fontSize: '11px', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {getStopLocation(stop, locationMode) || '--'}
+                          <td style={{ ...TD_STYLE, color: '#6b7280', fontSize: '11px', overflow: 'hidden' }}>
+                            {renderLocationCell(stop, vehicle.stops, locationMode)}
                           </td>
-                          <td style={TD_STYLE}>{renderOrderCell(stop)}</td>
+                          <td style={TD_STYLE}>{renderOrderCell(stop, vehicle.type === 'drone')}</td>
                           <td style={{ ...TD_STYLE, ...(isDuration ? emphStyle : dimStyle) }}>
                             {formatGanttTime(stop.time)}
                           </td>
