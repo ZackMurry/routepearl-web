@@ -178,26 +178,43 @@ function renderOrderCell(stop: GanttStop, isDrone?: boolean) {
   )
 }
 
-// For a launch/return stop, find the paired delivery stop in the same sortie
-// so we can surface both locations (launch point → delivery point, etc.).
-function findPairedDelivery(stop: GanttStop, stops: GanttStop[]): GanttStop | undefined {
-  if (stop.type !== 'launch' && stop.type !== 'return') return undefined
-  if (stop.sortieNumber == null) return undefined
-  return stops.find((s) => s.type === 'delivery' && s.sortieNumber === stop.sortieNumber)
+// For a launch/return/recover stop, find the paired drone delivery.
+// The delivery stop lives on the drone row, so we search across every
+// vehicle's stops — not just the current row's — and match by sortieNumber.
+// Falls back to matching by orderId when sortieNumber isn't set.
+function findPairedDelivery(stop: GanttStop, allVehicles: GanttVehicle[]): GanttStop | undefined {
+  if (stop.type !== 'launch' && stop.type !== 'return' && stop.type !== 'recover') return undefined
+  for (const v of allVehicles) {
+    for (const s of v.stops) {
+      if (s.type !== 'delivery') continue
+      if (stop.sortieNumber != null && s.sortieNumber === stop.sortieNumber) return s
+    }
+  }
+  if (stop.orderId != null) {
+    for (const v of allVehicles) {
+      const match = v.stops.find((s) => s.type === 'delivery' && s.orderId === stop.orderId)
+      if (match) return match
+    }
+  }
+  return undefined
 }
 
 // Render the Location cell — shows both endpoints with an arrow for drone
-// launch/return so the reader sees the full hop (like a train timetable).
+// launch / landing events so the reader sees the full hop (like a train timetable).
+// Works on truck, driver, drone and "all" rows because we search all vehicles
+// when looking up the paired delivery.
 function renderLocationCell(
   stop: GanttStop,
-  vehicleStops: GanttStop[],
+  allVehicles: GanttVehicle[],
   locationMode: GanttLocationMode
 ) {
   const self = getStopLocation(stop, locationMode)
-  if (stop.type === 'launch' || stop.type === 'return') {
-    const paired = findPairedDelivery(stop, vehicleStops)
+  const isDroneHop = stop.type === 'launch' || stop.type === 'return' || stop.type === 'recover'
+  if (isDroneHop) {
+    const paired = findPairedDelivery(stop, allVehicles)
     const pairedLoc = paired ? getStopLocation(paired, locationMode) : undefined
     if (self && pairedLoc) {
+      // launch: truck/depot → delivery. return/recover: delivery → truck/depot.
       const [from, to] = stop.type === 'launch' ? [self, pairedLoc] : [pairedLoc, self]
       return (
         <span
@@ -612,7 +629,7 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                                     )}
                                   </td>
                                   <td style={{ ...TD_STYLE, color: '#6b7280', fontSize: '11px', overflow: 'hidden' }}>
-                                    {renderLocationCell(stop, vehicle.stops, locationMode)}
+                                    {renderLocationCell(stop, vehicles, locationMode)}
                                   </td>
                                   <td style={TD_STYLE}>{renderOrderCell(stop, vehicle.type === 'drone' || (vehicle.type === 'all' && !!stop.vehicleName?.startsWith('Drone')))}</td>
                                   <td style={{ ...TD_STYLE, ...(isDuration ? emphStyle : dimStyle) }}>
@@ -678,7 +695,7 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                             <span>{stop.label}</span>
                           </td>
                           <td style={{ ...TD_STYLE, color: '#6b7280', fontSize: '11px', overflow: 'hidden' }}>
-                            {renderLocationCell(stop, vehicle.stops, locationMode)}
+                            {renderLocationCell(stop, vehicles, locationMode)}
                           </td>
                           <td style={TD_STYLE}>{renderOrderCell(stop, vehicle.type === 'drone')}</td>
                           <td style={{ ...TD_STYLE, ...(isDuration ? emphStyle : dimStyle) }}>
