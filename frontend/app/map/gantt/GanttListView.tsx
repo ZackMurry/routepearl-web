@@ -3,7 +3,7 @@
 import React, { FC } from 'react'
 import { ScrollArea } from '@radix-ui/themes'
 import { GanttVehicle, GanttStop, GanttStopType, GanttAxisMode, GanttLocationMode, getStopColor, formatGanttTime, formatGanttDistance, getStopLocation } from './gantt.types'
-import { House, Package, ArrowUp, ArrowDown, ArrowRight, Zap, Truck, Drone, LayoutList, MapPin, Download } from 'lucide-react'
+import { House, Package, ArrowUp, ArrowDown, ArrowRight, Zap, Truck, Drone, User, LayoutList, MapPin, Download } from 'lucide-react'
 
 interface Props {
   vehicles: GanttVehicle[]
@@ -126,12 +126,17 @@ const ORDER_PILL_BASE: React.CSSProperties = {
 // and delivery orderId) separated by an arrow, so the reader can see
 // where the drone is going or coming from at a glance — e.g. "S → 3"
 // for a launch, "3 → 1" for a return.
+// The order-pill turns gold whenever the stop is a drone node — either
+// because it originated from a drone row, or because it's a drone-related
+// stop type (launch/return/recover) regardless of which row it's on.
 function renderOrderCell(stop: GanttStop, isDrone?: boolean) {
   const hasContent = stop.orderName || stop.locationBadge || stop.orderId != null
   if (!hasContent) {
     return <span style={{ color: '#d1d5db' }}>--</span>
   }
-  const orderPillBg = isDrone ? '#ca8a04' : '#1f2937'
+  const isDroneNode =
+    isDrone || stop.type === 'launch' || stop.type === 'return' || stop.type === 'recover'
+  const orderPillBg = isDroneNode ? '#ca8a04' : '#1f2937'
   const orderPill = stop.orderId != null
     ? <span style={{ ...ORDER_PILL_BASE, backgroundColor: orderPillBg }}>{stop.orderId}</span>
     : null
@@ -371,7 +376,13 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                     flexShrink: 0,
                   }}
                 >
-                  {vehicle.type === 'all' ? <LayoutList size={14} /> : vehicle.type === 'truck' ? <Truck size={14} /> : <Drone size={14} />}
+                  {vehicle.type === 'all'
+                    ? <LayoutList size={14} />
+                    : vehicle.type === 'truck'
+                      ? <Truck size={14} />
+                      : vehicle.type === 'driver'
+                        ? <User size={14} />
+                        : <Drone size={14} />}
                 </div>
                 <span style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>
                   {vehicle.name}
@@ -415,11 +426,29 @@ const GanttListView: FC<Props> = ({ vehicles, axisMode, locationMode = 'street',
                         const deliveryStop = group.stops.find((s) => s.type === 'delivery' && (s.address || (s.lat != null && s.lng != null)))
                         const groupLocation = deliveryStop || group.stops.find((s) => s.address || (s.lat != null && s.lng != null))
                         const locationStr = groupLocation ? getStopLocation(groupLocation, locationMode) : undefined
-                        // Surface the order info (ID + name) for any stop in the group that has it.
-                        const orderStop = group.stops.find((s) => s.orderId != null || s.orderName)
+                        // Prefer the group's own delivery stop as the representative order —
+                        // its orderId is the order actually being delivered at this stop.
+                        // On truck/driver rows this matters because launch/recover stops carry
+                        // the drone's orderId, not the truck's. If a truck/driver group has no
+                        // delivery of its own, we surface no order (rather than leaking the
+                        // drone's order point into the truck's header).
+                        const deliveryOrderStop = group.stops.find(
+                          (s) => s.type === 'delivery' && (s.orderId != null || s.orderName)
+                        )
+                        const orderStop =
+                          deliveryOrderStop ??
+                          (vehicle.type === 'drone' || vehicle.type === 'all'
+                            ? group.stops.find((s) => s.orderId != null || s.orderName)
+                            : undefined)
+                        // Treat the header order as a drone node when the vehicle row is a drone,
+                        // when the stop in the 'all' view came from a drone, or when the order-carrying
+                        // stop is itself a drone-interaction type (launch/return/recover).
                         const headerIsDrone =
                           vehicle.type === 'drone' ||
-                          (vehicle.type === 'all' && !!orderStop?.vehicleName?.startsWith('Drone'))
+                          (vehicle.type === 'all' && !!orderStop?.vehicleName?.startsWith('Drone')) ||
+                          orderStop?.type === 'launch' ||
+                          orderStop?.type === 'return' ||
+                          orderStop?.type === 'recover'
 
                         // Shared td style for header cells — background tint + bottom border applied per-cell
                         // because colSpan no longer covers the whole row. The left accent stripe lives on the

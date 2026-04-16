@@ -135,6 +135,8 @@ export function BottomPanel() {
     updateTruck,
     droneCount,
     truckCount,
+    gasTruckCount,
+    electricTruckCount,
     missionLaunched,
     missionPaused,
     launchMission,
@@ -1241,6 +1243,8 @@ export function BottomPanel() {
                 missionLaunched={missionLaunched}
                 fleetMode={fleetMode}
                 truckCount={truckCount}
+                gasTruckCount={gasTruckCount}
+                electricTruckCount={electricTruckCount}
                 droneCount={droneCount}
                 hasRoute={hasRoute}
                 timelineSummary={hasRoute ? timelineResult.summary : undefined}
@@ -1507,6 +1511,8 @@ export function BottomPanel() {
                 missionConfig={missionConfig}
                 fleetMode={fleetMode}
                 truckCount={truckCount}
+                gasTruckCount={gasTruckCount}
+                electricTruckCount={electricTruckCount}
                 droneCount={droneCount}
                 hasRoute={hasRoute}
                 timelineSummary={hasRoute ? timelineResult.summary : undefined}
@@ -2665,10 +2671,22 @@ export function BottomPanel() {
                           Total fleet
                         </Text>
                         <Flex align='center' gap='3'>
-                          <Flex align='center' gap='1'>
+                          <Flex align='center' gap='1' title='Trucks (all)'>
                             <Truck size={12} style={{ color: '#374151' }} />
                             <Text size='1' weight='medium'>
                               {truckCount}
+                            </Text>
+                          </Flex>
+                          <Flex align='center' gap='1' title={`${gasTruckCount} gas truck${gasTruckCount === 1 ? '' : 's'}`}>
+                            <Fuel size={12} style={{ color: '#b45309' }} />
+                            <Text size='1' weight='medium' style={{ color: '#b45309' }}>
+                              {gasTruckCount}
+                            </Text>
+                          </Flex>
+                          <Flex align='center' gap='1' title={`${electricTruckCount} electric truck${electricTruckCount === 1 ? '' : 's'}`}>
+                            <Zap size={12} style={{ color: '#059669' }} />
+                            <Text size='1' weight='medium' style={{ color: '#059669' }}>
+                              {electricTruckCount}
                             </Text>
                           </Flex>
                           <Flex align='center' gap='1'>
@@ -3048,6 +3066,8 @@ export function BottomPanel() {
                 missionLaunched={missionLaunched}
                 fleetMode={fleetMode}
                 truckCount={truckCount}
+                gasTruckCount={gasTruckCount}
+                electricTruckCount={electricTruckCount}
                 droneCount={droneCount}
                 hasRoute={hasRoute}
                 timelineSummary={hasRoute ? timelineResult.summary : undefined}
@@ -3716,6 +3736,8 @@ export function BottomPanel() {
               missionLaunched={missionLaunched}
               fleetMode={fleetMode}
               truckCount={truckCount}
+              gasTruckCount={gasTruckCount}
+              electricTruckCount={electricTruckCount}
               droneCount={droneCount}
               hasRoute={hasRoute}
               timelineSummary={hasRoute ? timelineResult.summary : undefined}
@@ -4147,6 +4169,8 @@ function MissionStatsBar({
   elapsedTime = '00:00',
   fleetMode = 'truck-drone',
   truckCount = 1,
+  gasTruckCount = 0,
+  electricTruckCount = 0,
   droneCount = 2,
   hasRoute = false,
   timelineSummary,
@@ -4165,6 +4189,8 @@ function MissionStatsBar({
   elapsedTime?: string
   fleetMode?: 'truck-drone' | 'truck-only' | 'drones-only'
   truckCount?: number
+  gasTruckCount?: number
+  electricTruckCount?: number
   droneCount?: number
   hasRoute?: boolean
   timelineSummary?: TimelineSummary
@@ -4240,6 +4266,41 @@ function MissionStatsBar({
         <Truck size={14} style={{ color: hasRoute && hasTruck ? '#374151' : '#9ca3af' }} />
         <Text size='1' weight='medium' style={{ color: hasRoute && hasTruck ? undefined : '#9ca3af' }}>
           {hasRoute && hasTruck ? truckCount : '-'}
+        </Text>
+      </Flex>
+      {/* Gas / Electric truck split */}
+      <Flex
+        gap='1'
+        align='center'
+        title={
+          !hasRoute
+            ? 'No route generated'
+            : hasTruck
+              ? `${gasTruckCount} gas truck${gasTruckCount === 1 ? '' : 's'}`
+              : 'Truck disabled'
+        }
+        style={{ opacity: !hasRoute || !hasTruck ? 0.35 : 1 }}
+      >
+        <Fuel size={14} style={{ color: hasRoute && hasTruck ? '#b45309' : '#9ca3af' }} />
+        <Text size='1' weight='medium' style={{ color: hasRoute && hasTruck ? '#b45309' : '#9ca3af' }}>
+          {hasRoute && hasTruck ? gasTruckCount : '-'}
+        </Text>
+      </Flex>
+      <Flex
+        gap='1'
+        align='center'
+        title={
+          !hasRoute
+            ? 'No route generated'
+            : hasTruck
+              ? `${electricTruckCount} electric truck${electricTruckCount === 1 ? '' : 's'}`
+              : 'Truck disabled'
+        }
+        style={{ opacity: !hasRoute || !hasTruck ? 0.35 : 1 }}
+      >
+        <Zap size={14} style={{ color: hasRoute && hasTruck ? '#059669' : '#9ca3af' }} />
+        <Text size='1' weight='medium' style={{ color: hasRoute && hasTruck ? '#059669' : '#9ca3af' }}>
+          {hasRoute && hasTruck ? electricTruckCount : '-'}
         </Text>
       </Flex>
       <Flex

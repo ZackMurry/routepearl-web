@@ -78,6 +78,8 @@ interface FlightPlannerContextType {
   updateTruck: (id: string, updates: Partial<Omit<Truck, 'id'>>) => void
   // Derived aggregates
   truckCount: number
+  gasTruckCount: number
+  electricTruckCount: number
   droneCount: number
 
   // Map state
@@ -149,6 +151,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [trucks, setTrucks] = useState<Truck[]>(() => [createTruck('gas', 2)])
 
   const truckCount = trucks.length
+  const gasTruckCount = trucks.reduce((n, t) => n + (t.powerType === 'gas' ? 1 : 0), 0)
+  const electricTruckCount = trucks.reduce((n, t) => n + (t.powerType === 'electric' ? 1 : 0), 0)
   const droneCount = trucks.reduce((sum, t) => sum + t.drones, 0)
 
   const addTruck = () => {
@@ -705,6 +709,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     removeTruck,
     updateTruck,
     truckCount,
+    gasTruckCount,
+    electricTruckCount,
     droneCount,
     createNewMission,
     saveMission,
