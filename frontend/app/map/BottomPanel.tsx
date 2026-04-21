@@ -108,9 +108,11 @@ export function BottomPanel() {
     exportMission,
     importMission,
     createNewMission,
+    generatedTruckRoutes,
     truckRoute,
     droneRoutes,
     truckStops,
+    routeCost,
     isFlightPlannerMode,
     setIsFlightPlannerMode,
     addNode,
@@ -721,7 +723,12 @@ export function BottomPanel() {
   const deliveredPackages = hasRoute && missionLaunched ? droneDeliveryCount + truckDeliveryCount : 0
   const totalDistance = hasRoute ? formatDistanceTimeline(timelineResult.summary.totalDistance) : '--'
   const coveredDistance = missionLaunched ? '0km' : '--' // Live tracking - future feature
-  const estimatedTime = hasRoute ? formatDurationTimeline(timelineResult.summary.totalDuration) : '--:--'
+  const estimatedTime =
+    hasRoute && routeCost && generatedTruckRoutes.length > 1
+      ? `${routeCost.time.toFixed(2)} hr`
+      : hasRoute
+        ? formatDurationTimeline(timelineResult.summary.totalDuration)
+        : '--:--'
 
   // Compute ETA and distance for each order directly from route data
   const orderEtaMap = useMemo(() => {
@@ -848,10 +855,10 @@ export function BottomPanel() {
   const ganttData = hasRoute ? ganttDataFromHook : generateEmptyGanttData(fleetMode, droneCount)
 
   // Generate route details for Routes tab
-  const routeDetails = useRouteDetails(timelineResult, fleetMode, droneCount, hasRoute, orderNodes)
+  const routeDetails = useRouteDetails(generatedTruckRoutes, timelineResult, hasRoute, orderNodes)
 
   // Generate vehicle details for Vehicles tab
-  const vehicleDetails = useVehicleDetails(timelineResult, fleetMode, droneCount, hasRoute, orderNodes)
+  const vehicleDetails = useVehicleDetails(generatedTruckRoutes, timelineResult, droneCount, hasRoute, orderNodes)
 
   // Determine Gantt chart state
   const ganttState: GanttChartState =
@@ -2618,6 +2625,9 @@ export function BottomPanel() {
                         <Select.Trigger style={{ width: '100%' }} />
                         <Select.Content>
                           <Select.Item value='negar'>Default Routing Engine</Select.Item>
+                          <Select.Item value='negar_multi'>Multi-Truck Routing</Select.Item>
+                          <Select.Item value='fstsp'>FSTSP</Select.Item>
+                          <Select.Item value='least_risk'>Least Risk</Select.Item>
                           <Select.Item value='custom'>Custom</Select.Item>
                         </Select.Content>
                       </Select.Root>
@@ -3158,12 +3168,12 @@ export function BottomPanel() {
                       }
                     }}
                     onVehicleClick={vehicle => {
-                      const routeId = vehicle.type === 'truck' ? 'truck' : vehicle.id
+                      const routeId = vehicle.id
                       setSelectedRouteId(selectedRouteId === routeId ? null : routeId)
                       setSelectedNodeId(null)
                     }}
                     onVehicleDoubleClick={vehicle => {
-                      const routeId = vehicle.type === 'truck' ? 'truck' : vehicle.id
+                      const routeId = vehicle.id
                       setSelectedRouteId(routeId)
                       setSelectedNodeId(null)
                       setMissionTab('routes')
@@ -3828,12 +3838,12 @@ export function BottomPanel() {
                     }
                   }}
                   onVehicleClick={vehicle => {
-                    const routeId = vehicle.type === 'truck' ? 'truck' : vehicle.id
+                    const routeId = vehicle.id
                     setSelectedRouteId(selectedRouteId === routeId ? null : routeId)
                     setSelectedNodeId(null)
                   }}
                   onVehicleDoubleClick={vehicle => {
-                    const routeId = vehicle.type === 'truck' ? 'truck' : vehicle.id
+                    const routeId = vehicle.id
                     setSelectedRouteId(routeId)
                     setSelectedNodeId(null)
                     setMissionTab('routes')

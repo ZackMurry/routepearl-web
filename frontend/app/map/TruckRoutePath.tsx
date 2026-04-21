@@ -2,33 +2,40 @@ import { FC, useMemo } from 'react'
 import { CircleMarker } from 'react-leaflet'
 import { useFlightPlanner } from './FlightPlannerContext'
 import ArrowheadPolyline from '@/components/ArrowheadPolyline'
+import { GeneratedTruckRoute } from '@/lib/types'
+import { getTruckRouteColor } from './routeData'
 
-const TruckRoutePath: FC = () => {
-  const { truckRoute, droneRoutes, selectedRouteId, fleetMode } = useFlightPlanner()
+interface Props {
+  route: GeneratedTruckRoute
+}
+
+const TruckRoutePath: FC<Props> = ({ route }) => {
+  const { selectedRouteId, fleetMode } = useFlightPlanner()
 
   // Collect drone launch (orange) and recovery (green) points
   const droneStops = useMemo(() => {
     const stops: { lat: number; lng: number; type: 'launch' | 'recover' }[] = []
-    droneRoutes.forEach((sortie) => {
+    route.droneRoutes.forEach(sortie => {
       if (sortie.length >= 3) {
         stops.push({ lat: sortie[0].lat, lng: sortie[0].lng, type: 'launch' })
         stops.push({ lat: sortie[2].lat, lng: sortie[2].lng, type: 'recover' })
       }
     })
     return stops
-  }, [droneRoutes])
+  }, [route.droneRoutes])
 
-  if (truckRoute.length < 2) return null
+  if (route.truckRoute.length < 2) return null
 
   const hasTruck = fleetMode === 'truck-drone' || fleetMode === 'truck-only'
-  const isSelected = selectedRouteId === 'truck'
-  const isDimmed = selectedRouteId !== null && selectedRouteId !== 'truck'
+  const color = getTruckRouteColor(route.truckType, route.truckId)
+  const isSelected = selectedRouteId === route.routeId
+  const isDimmed = selectedRouteId !== null && selectedRouteId !== route.routeId
 
   return (
     <>
       <ArrowheadPolyline
-        positions={truckRoute}
-        color={hasTruck ? '#1e3a5f' : '#9ca3af'}
+        positions={route.truckRoute}
+        color={hasTruck ? color : '#9ca3af'}
         weight={isSelected ? 6 : isDimmed || !hasTruck ? 2 : 3}
         opacity={!hasTruck ? 0.35 : isDimmed ? 0.3 : 1}
         arrowSize={12}

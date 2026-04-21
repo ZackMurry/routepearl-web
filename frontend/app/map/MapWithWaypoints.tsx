@@ -1,22 +1,17 @@
 'use client'
 import React, { useEffect, useState, useRef, useCallback } from 'react'
-import { MapContainer, TileLayer, useMapEvents, Circle, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Circle, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './flight-planner.css'
-import { Point, MissionSite } from '@/lib/types'
-import TextMarker from '@/components/TextMarker'
-import ArrowheadPolyline from '@/components/ArrowheadPolyline'
-import chroma from 'chroma-js'
 import { FlightPlannerProvider, useFlightPlanner } from './FlightPlannerContext'
 import { BottomPanel } from './BottomPanel'
 import MissionSiteMarker from './MissionSiteMarker'
 import SortieFlightPath from './SortieFlightPath'
-import classNames from 'classnames'
 import ClickHandler from './ClickHandler'
 import TruckRoutePath from './TruckRoutePath'
 import { forwardGeocode } from '@/lib/geocoding'
-import { Search, Crosshair, MapPin, Type, ZoomIn, ZoomOut } from 'lucide-react'
+import { Search, Crosshair, Type, ZoomIn, ZoomOut } from 'lucide-react'
 
 type LocationMode = 'coords' | 'address'
 
@@ -401,7 +396,7 @@ function FitBoundsOnLoad() {
 }
 
 function MapContent() {
-  const { missionConfig, truckRoute, droneRoutes, plotModeNodes } = useFlightPlanner()
+  const { missionConfig, generatedTruckRoutes, plotModeNodes } = useFlightPlanner()
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
@@ -462,12 +457,22 @@ function MapContent() {
             />
           ))}
 
-          {truckRoute.length > 1 && <TruckRoutePath />}
+          {generatedTruckRoutes.map(route => (
+            <TruckRoutePath key={route.routeId} route={route} />
+          ))}
 
           {/* Drone routes with gradient and arrows */}
-          {droneRoutes.map((sortie, sortieIndex) => (
-            <SortieFlightPath key={`sortie-path-${sortieIndex}`} sortie={sortie} sortieIndex={sortieIndex} />
-          ))}
+          {generatedTruckRoutes.flatMap(route =>
+            route.droneSorties.map(sortie => (
+              <SortieFlightPath
+                key={sortie.routeId}
+                sortie={[sortie.launch, sortie.customer, sortie.recovery]}
+                sortieIndex={sortie.sortieIndex - 1}
+                routeId={sortie.routeId}
+                vehicleId={sortie.vehicleId}
+              />
+            )),
+          )}
         </MapContainer>
 
         {/* Bottom Panel */}

@@ -1,4 +1,5 @@
 export type Point = { lat: number; lng: number }
+export type TruckPowerType = 'gas' | 'electric'
 
 // Flight Planner Types
 export type NodeType = 'depot' | 'order' | 'station' | 'waypoint' | 'hazard'
@@ -17,7 +18,7 @@ export interface MissionSite extends Point {
   address?: string // Cached reverse-geocoded street address
 }
 
-export type RoutingAlgorithm = 'negar' | 'custom' | 'least_time' | 'least_risk' | 'fstsp'
+export type RoutingAlgorithm = 'negar' | 'negar_multi' | 'custom' | 'least_time' | 'least_risk' | 'fstsp'
 
 export interface HazardZone {
   id: string
@@ -106,6 +107,11 @@ export interface EnhancedRouteData {
   // Original (un-snapped) truck stop coordinates for reliable delivery matching
   truckStops?: Point[]
 
+  // Normalized per-truck route data for multi-truck responses
+  generatedTruckRoutes?: GeneratedTruckRoute[]
+  cost?: RouteCost
+  isMultiTruck?: boolean
+
   // Backend-computed timing data (optional - may be absent for legacy data)
   timing?: RouteTiming
 
@@ -113,6 +119,41 @@ export interface EnhancedRouteData {
   generatedAt: string // ISO timestamp
   algorithmVersion?: string
   computedOnBackend: boolean
+}
+
+export interface RouteCost {
+  time: number
+  risk: number
+}
+
+export interface GeneratedDroneSortie {
+  routeId: string
+  vehicleId: string
+  truckRouteId: string
+  truckId: number
+  truckType: TruckPowerType
+  sortieIndex: number
+  localSortieIndex: number
+  droneId: number
+  launch: Point
+  customer: Point
+  recovery: Point
+  customerIdx?: number
+  path: Point[]
+}
+
+export interface GeneratedTruckRoute {
+  routeId: string
+  truckId: number
+  truckType: TruckPowerType
+  truckRoute: Point[]
+  truckStops: Point[]
+  droneRoutes: Point[][]
+  droneSorties: GeneratedDroneSortie[]
+  syncPoints?: {
+    truck_route?: number[][]
+    drone_route?: number[][]
+  }
 }
 
 export interface MissionConfig {
@@ -136,6 +177,9 @@ export interface MissionConfig {
         truckRoute: Point[]
         droneRoutes: Point[][]
         truckStops?: Point[]
+        generatedTruckRoutes?: GeneratedTruckRoute[]
+        cost?: RouteCost
+        isMultiTruck?: boolean
       }
 }
 

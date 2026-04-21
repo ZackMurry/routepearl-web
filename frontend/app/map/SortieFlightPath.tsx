@@ -2,24 +2,23 @@ import { Point } from '@/lib/types'
 import { FC } from 'react'
 import { useFlightPlanner } from './FlightPlannerContext'
 import ArrowheadArcPolyline from '@/components/ArrowheadArcPolyline'
+import { getDroneColor } from './routeData'
 
 interface Props {
   sortie: Point[]
   sortieIndex: number
+  routeId: string
+  vehicleId: string
 }
 
-const SortieFlightPath: FC<Props> = ({ sortie, sortieIndex }) => {
-  const { droneRoutes, selectedRouteId } = useFlightPlanner()
-  const isFinalSortie = sortieIndex === droneRoutes.length - 1
+const SortieFlightPath: FC<Props> = ({ sortie, sortieIndex, routeId, vehicleId }) => {
+  const { selectedRouteId } = useFlightPlanner()
   if (sortie.length < 3) return <></>
 
-  // Each sortie gets a distinct warm color from the palette
-  const sortieColors = ['#ef4444', '#f97316', '#f59e0b', '#ea580c', '#e11d48', '#dc2626', '#d97706']
-  const sortieColor = sortieColors[sortieIndex % sortieColors.length]
+  const sortieColor = getDroneColor(sortieIndex)
 
-  const routeId = `drone-${sortieIndex + 1}`
-  const isSelected = selectedRouteId === routeId
-  const isDimmed = selectedRouteId !== null && selectedRouteId !== routeId
+  const isSelected = selectedRouteId === routeId || selectedRouteId === vehicleId
+  const isDimmed = selectedRouteId !== null && selectedRouteId !== routeId && selectedRouteId !== vehicleId
 
   return (
     <>

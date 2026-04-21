@@ -1,8 +1,12 @@
 'use client'
 
 import { useMemo } from 'react'
-import { TimelineResult, TimelineEvent } from '../timeline/timeline.types'
-import { GANTT_COLORS, getDroneColor } from '../gantt/gantt.types'
+import { GeneratedTruckRoute } from '@/lib/types'
+import { DEFAULT_TIMELINE_CONFIG, TimelineEvent, TimelineResult } from '../timeline/timeline.types'
+import { estimatePolylineDistance, getDroneColor, getTruckRouteColor } from '../routeData'
+
+const matchesPoint = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) =>
+  Math.abs(a.lat - b.lat) < 0.0001 && Math.abs(a.lng - b.lng) < 0.0001
 
 export interface VehicleEventBreakdown {
   launches: number
@@ -13,137 +17,209 @@ export interface VehicleEventBreakdown {
 }
 
 export interface VehicleDetail {
-  id: string               // 'truck' or 'drone-1', 'drone-2', etc.
+  id: string
   type: 'truck' | 'drone'
-  name: string             // "Truck" or "Drone 1", etc.
+  name: string
   color: string
-  distance: number         // total meters
-  duration: number         // total seconds
+  distance: number
+  duration: number
   totalEvents: number
   eventBreakdown: VehicleEventBreakdown
-  sortiesHandled: number[] // sortie numbers this vehicle handled (drones only)
-  orderIds: number[]       // orderIds served
+  sortiesHandled: number[]
+  orderIds: number[]
 }
 
 export function useVehicleDetails(
+  generatedTruckRoutes: GeneratedTruckRoute[],
   timelineResult: TimelineResult,
-  fleetMode: 'truck-drone' | 'truck-only' | 'drones-only',
   droneCount: number,
   hasRoute: boolean,
-  orderNodes: { orderId?: number; id: string }[]
+  orderNodes: { orderId?: number; id: string; lat: number; lng: number }[],
 ): VehicleDetail[] {
   return useMemo(() => {
-    if (!hasRoute) return []
-
-    const { events } = timelineResult
-    const details: VehicleDetail[] = []
-
-    // --- Truck ---
-    if (fleetMode === 'truck-drone' || fleetMode === 'truck-only') {
-      const truckEvents = events.filter((e) => e.vehicle === 'truck')
-
-      const breakdown: VehicleEventBreakdown = {
-        launches: truckEvents.filter((e) => e.type === 'truck_drone_launch').length,
-        landings: truckEvents.filter((e) => e.type === 'truck_drone_recover').length,
-        deliveries: truckEvents.filter((e) => e.type === 'truck_delivery').length,
-        chargingStops: truckEvents.filter((e) => e.type === 'truck_charging').length,
-        travelSegments: truckEvents.filter((e) => e.type === 'truck_travel').length,
-      }
-
-      const truckDistance = truckEvents.reduce((sum, e) => sum + (e.distance || 0), 0)
-      const truckDuration = truckEvents.length > 0
-        ? Math.max(...truckEvents.map((e) => e.cumulativeTime + e.estimatedDuration)) -
-          Math.min(...truckEvents.map((e) => e.cumulativeTime))
-        : 0
-
-      const truckDeliveryEvents = truckEvents.filter((e) => e.type === 'truck_delivery')
-      const orderIds: number[] = truckDeliveryEvents
-        .map((e) => {
-          const match = orderNodes.find((c) => c.id === e.id || e.orderName === String(c.orderId))
-          return match?.orderId
-        })
-        .filter((id): id is number => id !== undefined)
-
-      details.push({
-        id: 'truck',
-        type: 'truck',
-        name: 'Truck',
-        color: GANTT_COLORS.truck,
-        distance: truckDistance,
-        duration: truckDuration,
-        totalEvents: truckEvents.length,
-        eventBreakdown: breakdown,
-        sortiesHandled: [],
-        orderIds,
-      })
+    if (!hasRoute) {
+      return []
     }
 
-    // --- Drones ---
-    if (fleetMode === 'truck-drone' || fleetMode === 'drones-only') {
-      const droneEvents = events.filter((e) => e.vehicle === 'drone')
+    if (generatedTruckRoutes.length === 0) {
+      const { events } = timelineResult
+      const details: VehicleDetail[] = []
+      const truckEvents = events.filter(event => event.vehicle === 'truck')
 
-      // Group by sortie number
+      if (truckEvents.length > 0) {
+        details.push(buildFallbackTruckDetail(truckEvents, orderNodes))
+      }
+
+      const droneEvents = events.filter(event => event.vehicle === 'drone')
       const sortieMap = new Map<number, TimelineEvent[]>()
-      droneEvents.forEach((e) => {
-        const num = e.sortieNumber || 1
-        if (!sortieMap.has(num)) sortieMap.set(num, [])
-        sortieMap.get(num)!.push(e)
+      droneEvents.forEach(event => {
+        const sortieNumber = event.sortieNumber || 1
+        if (!sortieMap.has(sortieNumber)) {
+          sortieMap.set(sortieNumber, [])
+        }
+        sortieMap.get(sortieNumber)?.push(event)
       })
 
       const sortieNumbers = Array.from(sortieMap.keys()).sort((a, b) => a - b)
 
-      // Round-robin: sortie N goes to drone ((N-1) % droneCount)
       for (let droneIndex = 0; droneIndex < droneCount; droneIndex++) {
-        const droneNum = droneIndex + 1
-        const assignedSorties = sortieNumbers.filter(
-          (sn) => ((sn - 1) % droneCount) === droneIndex
-        )
+        const droneNumber = droneIndex + 1
+        const assignedSorties = sortieNumbers.filter(sortieNumber => ((sortieNumber - 1) % droneCount) === droneIndex)
+        const vehicleEvents = assignedSorties.flatMap(sortieNumber => sortieMap.get(sortieNumber) || [])
 
-        // Collect all events for this drone's assigned sorties
-        const vehicleEvents: TimelineEvent[] = []
-        assignedSorties.forEach((sn) => {
-          const se = sortieMap.get(sn) || []
-          vehicleEvents.push(...se)
-        })
-        vehicleEvents.sort((a, b) => a.cumulativeTime - b.cumulativeTime)
-
-        const breakdown: VehicleEventBreakdown = {
-          launches: vehicleEvents.filter((e) => e.type === 'drone_launch').length,
-          landings: vehicleEvents.filter((e) => e.type === 'drone_return').length,
-          deliveries: vehicleEvents.filter((e) => e.type === 'drone_delivery').length,
-          chargingStops: 0, // Drones don't have charging stops in current model
-          travelSegments: 0,
+        if (vehicleEvents.length === 0) {
+          continue
         }
 
-        const droneDistance = vehicleEvents.reduce((sum, e) => sum + (e.distance || 0), 0)
-        const droneDuration = vehicleEvents.length > 0
-          ? Math.max(...vehicleEvents.map((e) => e.cumulativeTime + e.estimatedDuration)) -
-            Math.min(...vehicleEvents.map((e) => e.cumulativeTime))
-          : 0
-
-        const deliveryEvents = vehicleEvents.filter((e) => e.type === 'drone_delivery')
-        const orderIds: number[] = deliveryEvents
-          .map((e) => {
-            const match = orderNodes.find((c) => c.id === e.id || e.orderName === String(c.orderId))
-            return match?.orderId
-          })
-          .filter((id): id is number => id !== undefined)
-
         details.push({
-          id: `drone-${droneNum}`,
+          id: `truck-0-drone-${droneNumber}`,
           type: 'drone',
-          name: `Drone ${droneNum}`,
-          color: getDroneColor(droneNum),
-          distance: droneDistance,
-          duration: droneDuration,
+          name: `Drone ${droneNumber}`,
+          color: getDroneColor(droneIndex),
+          distance: vehicleEvents.reduce((sum, event) => sum + (event.distance || 0), 0),
+          duration:
+            Math.max(...vehicleEvents.map(event => event.cumulativeTime + event.estimatedDuration)) -
+            Math.min(...vehicleEvents.map(event => event.cumulativeTime)),
           totalEvents: vehicleEvents.length,
-          eventBreakdown: breakdown,
+          eventBreakdown: {
+            launches: vehicleEvents.filter(event => event.type === 'drone_launch').length,
+            landings: vehicleEvents.filter(event => event.type === 'drone_return').length,
+            deliveries: vehicleEvents.filter(event => event.type === 'drone_delivery').length,
+            chargingStops: 0,
+            travelSegments: 0,
+          },
           sortiesHandled: assignedSorties,
-          orderIds,
+          orderIds: vehicleEvents
+            .filter(event => event.type === 'drone_delivery')
+            .map(event => {
+              const match = orderNodes.find(node => node.id === event.nodeId || event.orderName === String(node.orderId))
+              return match?.orderId
+            })
+            .filter((id): id is number => id !== undefined),
         })
       }
+
+      return details
     }
 
+    const truckSpeedMs = (DEFAULT_TIMELINE_CONFIG.truckSpeedKmh * 1000) / 3600
+    const droneSpeedMs = (DEFAULT_TIMELINE_CONFIG.droneSpeedKmh * 1000) / 3600
+
+    const details: VehicleDetail[] = []
+
+    generatedTruckRoutes.forEach(truckRoute => {
+      const truckMatchPoints = truckRoute.truckStops.length > 0 ? truckRoute.truckStops : truckRoute.truckRoute
+      const truckOrderIds = orderNodes
+        .filter(order => truckMatchPoints.some(point => matchesPoint(point, order)))
+        .map(order => order.orderId)
+        .filter((id): id is number => id !== undefined)
+      const truckDistance = estimatePolylineDistance(truckRoute.truckRoute)
+
+      details.push({
+        id: truckRoute.routeId,
+        type: 'truck',
+        name: `Truck ${truckRoute.truckId + 1}${truckRoute.truckType === 'electric' ? ' (Electric)' : ' (Gas)'}`,
+        color: getTruckRouteColor(truckRoute.truckType, truckRoute.truckId),
+        distance: truckDistance,
+        duration: truckDistance / truckSpeedMs,
+        totalEvents: truckRoute.truckRoute.length + truckRoute.droneSorties.length * 2,
+        eventBreakdown: {
+          launches: truckRoute.droneSorties.length,
+          landings: truckRoute.droneSorties.length,
+          deliveries: truckOrderIds.length,
+          chargingStops: truckMatchPoints.filter(point =>
+            orderNodes.every(order => !matchesPoint(point, order)),
+          ).length,
+          travelSegments: Math.max(0, truckRoute.truckRoute.length - 1),
+        },
+        sortiesHandled: [],
+        orderIds: truckOrderIds,
+      })
+
+      const droneVehicleMap = new Map<number, typeof truckRoute.droneSorties>()
+      truckRoute.droneSorties.forEach(sortie => {
+        if (!droneVehicleMap.has(sortie.droneId)) {
+          droneVehicleMap.set(sortie.droneId, [])
+        }
+        droneVehicleMap.get(sortie.droneId)?.push(sortie)
+      })
+
+      Array.from(droneVehicleMap.entries())
+        .sort(([a], [b]) => a - b)
+        .forEach(([droneId, sorties], index) => {
+          const orderIds = sorties
+            .flatMap(sortie =>
+              orderNodes
+                .filter(order => matchesPoint(sortie.customer, order))
+                .map(order => order.orderId)
+                .filter((id): id is number => id !== undefined),
+            )
+
+          const distance = sorties.reduce((sum, sortie) => sum + estimatePolylineDistance(sortie.path), 0)
+          const duration = sorties.reduce(
+            (sum, sortie) =>
+              sum +
+              estimatePolylineDistance(sortie.path) / droneSpeedMs +
+              DEFAULT_TIMELINE_CONFIG.droneLoadTimeSeconds +
+              DEFAULT_TIMELINE_CONFIG.droneUnloadTimeSeconds,
+            0,
+          )
+
+          details.push({
+            id: `${truckRoute.routeId}-drone-${droneId}`,
+            type: 'drone',
+            name: `Truck ${truckRoute.truckId + 1} Drone ${droneId}`,
+            color: getDroneColor(sorties[0]?.sortieIndex ? sorties[0].sortieIndex - 1 : index),
+            distance,
+            duration,
+            totalEvents: sorties.length * 3,
+            eventBreakdown: {
+              launches: sorties.length,
+              landings: sorties.length,
+              deliveries: orderIds.length,
+              chargingStops: 0,
+              travelSegments: 0,
+            },
+            sortiesHandled: sorties.map(sortie => sortie.sortieIndex),
+            orderIds,
+          })
+        })
+    })
+
     return details
-  }, [timelineResult, fleetMode, droneCount, hasRoute, orderNodes])
+  }, [generatedTruckRoutes, timelineResult, droneCount, hasRoute, orderNodes])
+}
+
+function buildFallbackTruckDetail(
+  truckEvents: TimelineEvent[],
+  orderNodes: { orderId?: number; id: string }[],
+): VehicleDetail {
+  const eventBreakdown: VehicleEventBreakdown = {
+    launches: truckEvents.filter(event => event.type === 'truck_drone_launch').length,
+    landings: truckEvents.filter(event => event.type === 'truck_drone_recover').length,
+    deliveries: truckEvents.filter(event => event.type === 'truck_delivery').length,
+    chargingStops: truckEvents.filter(event => event.type === 'truck_charging').length,
+    travelSegments: truckEvents.filter(event => event.type === 'truck_travel').length,
+  }
+
+  return {
+    id: 'truck-0',
+    type: 'truck',
+    name: 'Truck',
+    color: getTruckRouteColor('gas', 0),
+    distance: truckEvents.reduce((sum, event) => sum + (event.distance || 0), 0),
+    duration:
+      Math.max(...truckEvents.map(event => event.cumulativeTime + event.estimatedDuration)) -
+      Math.min(...truckEvents.map(event => event.cumulativeTime)),
+    totalEvents: truckEvents.length,
+    eventBreakdown,
+    sortiesHandled: [],
+    orderIds: truckEvents
+      .filter(event => event.type === 'truck_delivery')
+      .map(event => {
+        const match = orderNodes.find(node => node.id === event.nodeId || event.orderName === String(node.orderId))
+        return match?.orderId
+      })
+      .filter((id): id is number => id !== undefined),
+  }
 }

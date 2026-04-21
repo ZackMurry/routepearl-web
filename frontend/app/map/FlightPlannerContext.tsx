@@ -1,8 +1,9 @@
 'use client'
 
 import React, { createContext, useContext, useState, ReactNode } from 'react'
-import { Mission, MissionConfig, MissionStatus, MissionSite, HazardZone, Point } from '@/lib/types'
+import { GeneratedTruckRoute, Mission, MissionConfig, MissionSite, HazardZone, Point, RouteCost } from '@/lib/types'
 import { pointMatchesNode } from '@/lib/util'
+import { getGeneratedTruckRoutes, normalizeRouteResponse } from './routeData'
 
 export interface Truck {
   id: string
@@ -36,9 +37,11 @@ interface FlightPlannerContextType {
   removeHazardZone: (id: string) => void
 
   // Route state (derived from missionConfig.routes)
+  generatedTruckRoutes: GeneratedTruckRoute[]
   truckRoute: Point[]
   droneRoutes: Point[][]
   truckStops: Point[]
+  routeCost: RouteCost | null
 
   // UI state
   activePanelTab: 'overview' | 'nodes' | 'advanced'
@@ -118,9 +121,11 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [missionConfig, setMissionConfig] = useState<MissionConfig>(defaultMissionConfig)
 
   // Route state (computed from missionConfig.routes)
-  const truckRoute = missionConfig.routes?.truckRoute || []
-  const droneRoutes = missionConfig.routes?.droneRoutes || []
-  const truckStops = missionConfig.routes?.truckStops || []
+  const generatedTruckRoutes = getGeneratedTruckRoutes(missionConfig.routes)
+  const truckRoute = React.useMemo(() => missionConfig.routes?.truckRoute || [], [missionConfig.routes?.truckRoute])
+  const droneRoutes = React.useMemo(() => missionConfig.routes?.droneRoutes || [], [missionConfig.routes?.droneRoutes])
+  const truckStops = React.useMemo(() => missionConfig.routes?.truckStops || [], [missionConfig.routes?.truckStops])
+  const routeCost = missionConfig.routes?.cost || null
 
   // UI state
   const [activePanelTab, setActivePanelTab] = useState<'overview' | 'nodes' | 'advanced'>('overview')
@@ -176,8 +181,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
   // Debug logging for route changes
   React.useEffect(() => {
-    console.log('Truck route updated:', truckRoute.length, 'points')
-  }, [truckRoute])
+    console.log('Truck routes updated:', generatedTruckRoutes.length, 'vehicles', truckRoute.length, 'points')
+  }, [generatedTruckRoutes, truckRoute])
 
   React.useEffect(() => {
     console.log('Drone routes updated:', droneRoutes.length, 'paths')
@@ -405,6 +410,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
       console.log('Route data saved:', {
         truckRoutePoints: missionConfig.routes?.truckRoute?.length || 0,
         droneRoutePaths: missionConfig.routes?.droneRoutes?.length || 0,
+        truckRoutes: missionConfig.routes?.generatedTruckRoutes?.length || 0,
         hasRoute:
           (missionConfig.routes?.truckRoute?.length || 0) > 0 || (missionConfig.routes?.droneRoutes?.length || 0) > 0,
       })
@@ -432,6 +438,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     console.log('Route data loaded:', {
       truckRoutePoints: mission.config.routes?.truckRoute?.length || 0,
       droneRoutePaths: mission.config.routes?.droneRoutes?.length || 0,
+      truckRoutes: mission.config.routes?.generatedTruckRoutes?.length || 0,
       hasRoute:
         (mission.config.routes?.truckRoute?.length || 0) > 0 || (mission.config.routes?.droneRoutes?.length || 0) > 0,
     })
@@ -461,6 +468,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     console.log('Route data exported:', {
       truckRoutePoints: missionConfig.routes?.truckRoute?.length || 0,
       droneRoutePaths: missionConfig.routes?.droneRoutes?.length || 0,
+      truckRoutes: missionConfig.routes?.generatedTruckRoutes?.length || 0,
       hasRoute: (missionConfig.routes?.truckRoute?.length || 0) > 0 || (missionConfig.routes?.droneRoutes?.length || 0) > 0,
     })
 
@@ -484,6 +492,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
         truckRouteLength: mission.config.routes?.truckRoute?.length || 0,
         hasDroneRoutes: !!mission.config.routes?.droneRoutes,
         droneRoutesLength: mission.config.routes?.droneRoutes?.length || 0,
+        truckRoutesLength: mission.config.routes?.generatedTruckRoutes?.length || 0,
       })
       loadMission(mission)
     } catch (error) {
@@ -590,6 +599,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
     setIsGeneratingRoute(true)
     try {
+      const requestedAlgorithm = truckCount > 1 && missionConfig.algorithm === 'negar' ? 'negar_multi' : missionConfig.algorithm
       const res = await fetch('http://localhost:8000/api/routes/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -597,14 +607,11 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
           depots: finalDepots.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
           customers: finalOrders.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
           stations: stations.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
-          algorithm: missionConfig.algorithm,
+          algorithm: requestedAlgorithm,
           D: droneCount,
-          truck_power_type: trucks[0]?.powerType ?? 'gas',
-          trucks: trucks.map(t => ({
-            id: t.id,
-            power_type: t.powerType,
-            drones: t.drones,
-          })),
+          K: truckCount,
+          num_electric: electricTruckCount,
+          num_gas: gasTruckCount,
           provider: 'OSRM-Online',
           hazards: missionConfig.nodes
             .filter(it => it.type === 'hazard')
@@ -624,43 +631,9 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
       }
 
       const data = await res.json()
-
-      // Prepare route data
-      let truckPoints: Point[] = []
-      let dronePaths: Point[][] = []
-      let truckStopPoints: Point[] = []
-
-      // --- Truck route ---
-      if (data.routes.truck_route) {
-        truckPoints = data.routes.truck_route.flatMap((segment: number[][]) =>
-          segment.map(([lat, lon]) => ({ lat, lng: lon })),
-        )
-        console.log('Truck route:', truckPoints)
-      }
-
-      // --- Truck stops (original un-snapped coordinates) ---
-      if (data.routes.truck_stops) {
-        truckStopPoints = data.routes.truck_stops.map(([lat, lon]: number[]) => ({ lat, lng: lon }))
-        console.log('Truck stops:', truckStopPoints)
-      }
-
-      // --- Drone route ---
-      if (data.routes.drone_route) {
-        const toLatLon = (coord: number[]): Point => ({ lat: coord[0], lng: coord[1] })
-        for (const dp of data.routes.drone_route) {
-          dronePaths.push([toLatLon(dp[0]), toLatLon(dp[1]), toLatLon(dp[2])])
-        }
-        console.log('Drone route:', dronePaths)
-      }
-
-      // Save routes to missionConfig
-      updateMissionConfig({
-        routes: {
-          truckRoute: truckPoints,
-          droneRoutes: dronePaths,
-          truckStops: truckStopPoints,
-        },
-      })
+      const normalizedRoutes = normalizeRouteResponse(data, trucks[0]?.powerType ?? 'gas')
+      console.log('Normalized routes:', normalizedRoutes)
+      updateMissionConfig({ routes: normalizedRoutes })
     } catch (err) {
       console.error(err)
     } finally {
@@ -679,9 +652,11 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     addHazardZone,
     updateHazardZone,
     removeHazardZone,
+    generatedTruckRoutes,
     truckRoute,
     droneRoutes,
     truckStops,
+    routeCost,
     activePanelTab,
     setActivePanelTab,
     sidebarCollapsed,
