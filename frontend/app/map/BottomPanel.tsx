@@ -132,7 +132,7 @@ export function BottomPanel() {
     setSelectedRouteId,
     fleetMode,
     trucks,
-    addTruck,
+    addTruckOfType,
     removeTruck,
     updateTruck,
     droneCount,
@@ -2707,134 +2707,116 @@ export function BottomPanel() {
                           </Flex>
                         </Flex>
                       </Flex>
-                      <Button
-                        size='1'
-                        variant='soft'
-                        color='blue'
-                        onClick={addTruck}
-                        style={{ width: '100%', cursor: 'pointer' }}
-                      >
-                        <Plus size={12} /> Add Truck
-                      </Button>
-                      {trucks.map((truck, index) => (
-                        <Box
-                          key={truck.id}
-                          style={{
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '8px',
-                            padding: '10px 12px',
-                            backgroundColor: '#ffffff',
-                          }}
-                        >
-                          <Flex align='center' justify='between' className='mb-2'>
-                            <Flex align='center' gap='2'>
-                              <Truck size={14} style={{ color: '#374151' }} />
-                              <Text size='2' weight='medium'>
-                                Truck {index + 1}
+                      {(['electric', 'gas'] as const).map(sectionType => {
+                        const sectionTrucks = trucks.filter(t => t.powerType === sectionType)
+                        const sectionLabel = sectionType === 'electric' ? 'Electric Trucks' : 'Gas Trucks'
+                        const SectionIcon = sectionType === 'electric' ? Zap : Fuel
+                        const sectionColor = sectionType === 'electric' ? '#059669' : '#b45309'
+                        const removeWouldEmpty = trucks.length <= 1
+                        const canRemove = sectionTrucks.length > 0 && !removeWouldEmpty
+                        return (
+                          <Box
+                            key={sectionType}
+                            style={{
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '8px',
+                              padding: '10px 12px',
+                              backgroundColor: '#ffffff',
+                            }}
+                          >
+                            <Flex align='center' justify='between' className='mb-2'>
+                              <Flex align='center' gap='2'>
+                                <SectionIcon size={14} style={{ color: sectionColor }} />
+                                <Text size='2' weight='medium' style={{ color: sectionColor }}>
+                                  {sectionLabel}
+                                </Text>
+                                <Text size='1' color='gray'>
+                                  ({sectionTrucks.length})
+                                </Text>
+                              </Flex>
+                              <Flex align='center' gap='1'>
+                                <IconButton
+                                  size='1'
+                                  variant='soft'
+                                  color='gray'
+                                  onClick={() => {
+                                    const last = sectionTrucks[sectionTrucks.length - 1]
+                                    if (last) removeTruck(last.id)
+                                  }}
+                                  disabled={!canRemove}
+                                  style={{ cursor: canRemove ? 'pointer' : 'not-allowed' }}
+                                  title={
+                                    sectionTrucks.length === 0
+                                      ? `No ${sectionType} trucks to remove`
+                                      : removeWouldEmpty
+                                      ? 'At least one truck is required'
+                                      : `Remove last ${sectionType} truck`
+                                  }
+                                >
+                                  <Minus size={12} />
+                                </IconButton>
+                                <IconButton
+                                  size='1'
+                                  variant='soft'
+                                  color='gray'
+                                  onClick={() => addTruckOfType(sectionType, 2)}
+                                  title={`Add ${sectionType} truck`}
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <Plus size={12} />
+                                </IconButton>
+                              </Flex>
+                            </Flex>
+                            {sectionTrucks.length === 0 ? (
+                              <Text size='1' color='gray' style={{ fontStyle: 'italic' }}>
+                                No {sectionType} trucks. Click + to add one.
                               </Text>
-                            </Flex>
-                            <IconButton
-                              size='1'
-                              variant='ghost'
-                              color='gray'
-                              onClick={() => removeTruck(truck.id)}
-                              disabled={trucks.length <= 1}
-                              style={{ cursor: trucks.length <= 1 ? 'not-allowed' : 'pointer' }}
-                              title={trucks.length <= 1 ? 'At least one truck is required' : 'Remove truck'}
-                            >
-                              <Trash2 size={12} />
-                            </IconButton>
-                          </Flex>
-                          {/* Power type toggle */}
-                          <Flex align='center' justify='between' className='mb-2'>
-                            <Text size='1' color='gray'>
-                              Power
-                            </Text>
-                            <Flex
-                              align='center'
-                              gap='1'
-                              style={{ backgroundColor: '#f3f4f6', borderRadius: '6px', padding: '2px' }}
-                            >
-                              <button
-                                onClick={() => updateTruck(truck.id, { powerType: 'gas' })}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  padding: '3px 8px',
-                                  borderRadius: '4px',
-                                  border: 'none',
-                                  fontSize: '11px',
-                                  fontWeight: 500,
-                                  cursor: 'pointer',
-                                  backgroundColor: truck.powerType === 'gas' ? 'white' : 'transparent',
-                                  color: truck.powerType === 'gas' ? '#374151' : '#9ca3af',
-                                  boxShadow: truck.powerType === 'gas' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                }}
-                              >
-                                <Fuel size={12} /> Gas
-                              </button>
-                              <button
-                                onClick={() => updateTruck(truck.id, { powerType: 'electric' })}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  padding: '3px 8px',
-                                  borderRadius: '4px',
-                                  border: 'none',
-                                  fontSize: '11px',
-                                  fontWeight: 500,
-                                  cursor: 'pointer',
-                                  backgroundColor: truck.powerType === 'electric' ? 'white' : 'transparent',
-                                  color: truck.powerType === 'electric' ? '#374151' : '#9ca3af',
-                                  boxShadow: truck.powerType === 'electric' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                }}
-                              >
-                                <Zap size={12} /> Electric
-                              </button>
-                            </Flex>
-                          </Flex>
-                          {/* Drones allocated to this truck */}
-                          <Flex align='center' justify='between'>
-                            <Flex align='center' gap='2'>
-                              <Drone size={14} style={{ color: '#6b7280' }} />
-                              <Text size='1' color='gray'>
-                                Drones
-                              </Text>
-                            </Flex>
-                            <Flex align='center' gap='1'>
-                              <IconButton
-                                size='1'
-                                variant='soft'
-                                color='gray'
-                                onClick={() => updateTruck(truck.id, { drones: Math.max(0, truck.drones - 1) })}
-                                disabled={truck.drones <= 0}
-                                style={{ cursor: truck.drones <= 0 ? 'not-allowed' : 'pointer' }}
-                              >
-                                <Minus size={12} />
-                              </IconButton>
-                              <TextField.Root
-                                type='number'
-                                value={truck.drones}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  updateTruck(truck.id, { drones: Math.max(0, parseInt(e.target.value) || 0) })
-                                }
-                                size='1'
-                                style={{ width: '48px', textAlign: 'center' }}
-                              />
-                              <IconButton
-                                size='1'
-                                variant='soft'
-                                color='gray'
-                                onClick={() => updateTruck(truck.id, { drones: truck.drones + 1 })}
-                              >
-                                <Plus size={12} />
-                              </IconButton>
-                            </Flex>
-                          </Flex>
-                        </Box>
-                      ))}
+                            ) : (
+                              <Flex direction='column' gap='2'>
+                                {sectionTrucks.map(truck => (
+                                  <Flex key={truck.id} align='center' justify='between'>
+                                    <Flex align='center' gap='2'>
+                                      <Drone size={14} style={{ color: '#6b7280' }} />
+                                      <Text size='1' color='gray'>
+                                        Drones
+                                      </Text>
+                                    </Flex>
+                                    <Flex align='center' gap='1'>
+                                      <IconButton
+                                        size='1'
+                                        variant='soft'
+                                        color='gray'
+                                        onClick={() => updateTruck(truck.id, { drones: Math.max(0, truck.drones - 1) })}
+                                        disabled={truck.drones <= 0}
+                                        style={{ cursor: truck.drones <= 0 ? 'not-allowed' : 'pointer' }}
+                                      >
+                                        <Minus size={12} />
+                                      </IconButton>
+                                      <TextField.Root
+                                        type='number'
+                                        value={truck.drones}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                          updateTruck(truck.id, { drones: Math.max(0, parseInt(e.target.value) || 0) })
+                                        }
+                                        size='1'
+                                        style={{ width: '48px', textAlign: 'center' }}
+                                      />
+                                      <IconButton
+                                        size='1'
+                                        variant='soft'
+                                        color='gray'
+                                        onClick={() => updateTruck(truck.id, { drones: truck.drones + 1 })}
+                                      >
+                                        <Plus size={12} />
+                                      </IconButton>
+                                    </Flex>
+                                  </Flex>
+                                ))}
+                              </Flex>
+                            )}
+                          </Box>
+                        )
+                      })}
                     </Flex>
                   </Box>
                 </Box>

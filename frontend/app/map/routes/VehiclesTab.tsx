@@ -2,7 +2,7 @@
 
 import React, { FC } from 'react'
 import { Box, Card, Flex, Text, Badge, ScrollArea } from '@radix-ui/themes'
-import { Truck, Drone, Route, Clock, Package, MapPin, Zap, ArrowUp, ArrowDown } from 'lucide-react'
+import { Truck, Drone, Route, Clock, Package, MapPin, Zap, Fuel, ArrowUp, ArrowDown } from 'lucide-react'
 import { VehicleDetail } from './useVehicleDetails'
 import { formatDistance, formatDuration } from '../timeline/timeline.types'
 
@@ -80,13 +80,25 @@ const VehiclesTab: FC<Props> = ({ vehicles, selectedRouteId, onSelectRoute }) =>
                       </Text>
                     </Flex>
                     <Flex gap="1">
-                      <Badge
-                        size="1"
-                        color={vehicle.type === 'truck' ? 'gray' : 'blue'}
-                        variant="soft"
-                      >
-                        {vehicle.type === 'truck' ? 'Truck' : 'Drone'}
-                      </Badge>
+                      {vehicle.type === 'truck' && vehicle.truckType === 'electric' ? (
+                        <Badge size="1" color="green" variant="soft">
+                          <Flex align="center" gap="1">
+                            <Zap size={10} />
+                            Electric
+                          </Flex>
+                        </Badge>
+                      ) : vehicle.type === 'truck' && vehicle.truckType === 'gas' ? (
+                        <Badge size="1" color="amber" variant="soft">
+                          <Flex align="center" gap="1">
+                            <Fuel size={10} />
+                            Gas
+                          </Flex>
+                        </Badge>
+                      ) : (
+                        <Badge size="1" color={vehicle.type === 'truck' ? 'gray' : 'blue'} variant="soft">
+                          {vehicle.type === 'truck' ? 'Truck' : 'Drone'}
+                        </Badge>
+                      )}
                       {vehicle.sortiesHandled.length > 0 && (
                         <Badge size="1" color="purple" variant="soft">
                           {vehicle.sortiesHandled.length} sortie{vehicle.sortiesHandled.length !== 1 ? 's' : ''}
@@ -147,7 +159,7 @@ const VehiclesTab: FC<Props> = ({ vehicles, selectedRouteId, onSelectRoute }) =>
                         </Flex>
                       </Badge>
                     )}
-                    {eventBreakdown.chargingStops > 0 && (
+                    {eventBreakdown.chargingStops > 0 && vehicle.truckType !== 'gas' && (
                       <Badge size="1" variant="soft" color="yellow">
                         <Flex align="center" gap="1">
                           <Zap size={10} />

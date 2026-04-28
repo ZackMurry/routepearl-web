@@ -10,6 +10,7 @@ import MissionSiteMarker from './MissionSiteMarker'
 import SortieFlightPath from './SortieFlightPath'
 import ClickHandler from './ClickHandler'
 import TruckRoutePath from './TruckRoutePath'
+import { getTruckRouteColor } from './routeData'
 import { forwardGeocode } from '@/lib/geocoding'
 import { Search, Crosshair, Type, ZoomIn, ZoomOut } from 'lucide-react'
 
@@ -457,22 +458,40 @@ function MapContent() {
             />
           ))}
 
-          {generatedTruckRoutes.map(route => (
-            <TruckRoutePath key={route.routeId} route={route} />
-          ))}
+          {(() => {
+            // Per design doc §2.5: assign per-type 1-based display index by walking
+            // backend response order. Drives both the depot badge label and which
+            // sorties belong to which "Electric Truck #1" / "Gas Truck #1" identity.
+            let elec = 0
+            let gas = 0
+            return generatedTruckRoutes.map(route => {
+              const typeIndex = route.truckType === 'electric' ? ++elec : ++gas
+              return (
+                <TruckRoutePath
+                  key={route.routeId}
+                  route={route}
+                  typeIndex={typeIndex}
+                  isMultiTruck={generatedTruckRoutes.length > 1}
+                />
+              )
+            })
+          })()}
 
           {/* Drone routes with gradient and arrows */}
-          {generatedTruckRoutes.flatMap(route =>
-            route.droneSorties.map(sortie => (
+          {generatedTruckRoutes.flatMap(route => {
+            const truckColor = getTruckRouteColor(route.truckType, route.truckId)
+            return route.droneSorties.map(sortie => (
               <SortieFlightPath
                 key={sortie.routeId}
                 sortie={[sortie.launch, sortie.customer, sortie.recovery]}
                 sortieIndex={sortie.sortieIndex - 1}
                 routeId={sortie.routeId}
                 vehicleId={sortie.vehicleId}
+                truckColor={truckColor}
+                localSortieIndex={sortie.localSortieIndex}
               />
-            )),
-          )}
+            ))
+          })}
         </MapContainer>
 
         {/* Bottom Panel */}

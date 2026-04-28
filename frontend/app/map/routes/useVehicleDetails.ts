@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { GeneratedTruckRoute } from '@/lib/types'
+import { GeneratedTruckRoute, TruckPowerType } from '@/lib/types'
 import { DEFAULT_TIMELINE_CONFIG, TimelineEvent, TimelineResult } from '../timeline/timeline.types'
 import { estimatePolylineDistance, getDroneColor, getTruckRouteColor } from '../routeData'
 
@@ -27,6 +27,10 @@ export interface VehicleDetail {
   eventBreakdown: VehicleEventBreakdown
   sortiesHandled: number[]
   orderIds: number[]
+  // Anonymous fleet labeling (per design doc §2.5): trucks and their drones
+  // carry a per-type 1-based index derived from the backend response order.
+  truckType?: TruckPowerType
+  typeIndex?: number
 }
 
 export function useVehicleDetails(
@@ -62,6 +66,7 @@ export function useVehicleDetails(
 
       const sortieNumbers = Array.from(sortieMap.keys()).sort((a, b) => a - b)
 
+      const fallbackTruckColor = getTruckRouteColor('gas', 0)
       for (let droneIndex = 0; droneIndex < droneCount; droneIndex++) {
         const droneNumber = droneIndex + 1
         const assignedSorties = sortieNumbers.filter(sortieNumber => ((sortieNumber - 1) % droneCount) === droneIndex)
@@ -75,7 +80,7 @@ export function useVehicleDetails(
           id: `truck-0-drone-${droneNumber}`,
           type: 'drone',
           name: `Drone ${droneNumber}`,
-          color: getDroneColor(droneIndex),
+          color: getDroneColor(fallbackTruckColor, droneIndex),
           distance: vehicleEvents.reduce((sum, event) => sum + (event.distance || 0), 0),
           duration:
             Math.max(...vehicleEvents.map(event => event.cumulativeTime + event.estimatedDuration)) -
@@ -107,7 +112,14 @@ export function useVehicleDetails(
 
     const details: VehicleDetail[] = []
 
+    // Per-type 1-based display index (anonymous fleet model, design doc §2.5).
+    let electricCount = 0
+    let gasCount = 0
+
     generatedTruckRoutes.forEach(truckRoute => {
+      const truckColor = getTruckRouteColor(truckRoute.truckType, truckRoute.truckId)
+      const typeIndex = truckRoute.truckType === 'electric' ? ++electricCount : ++gasCount
+      const typeLabel = truckRoute.truckType === 'electric' ? 'Electric Truck' : 'Gas Truck'
       const truckMatchPoints = truckRoute.truckStops.length > 0 ? truckRoute.truckStops : truckRoute.truckRoute
       const truckOrderIds = orderNodes
         .filter(order => truckMatchPoints.some(point => matchesPoint(point, order)))
@@ -118,8 +130,8 @@ export function useVehicleDetails(
       details.push({
         id: truckRoute.routeId,
         type: 'truck',
-        name: `Truck ${truckRoute.truckId + 1}${truckRoute.truckType === 'electric' ? ' (Electric)' : ' (Gas)'}`,
-        color: getTruckRouteColor(truckRoute.truckType, truckRoute.truckId),
+        name: `${typeLabel} #${typeIndex}`,
+        color: truckColor,
         distance: truckDistance,
         duration: truckDistance / truckSpeedMs,
         totalEvents: truckRoute.truckRoute.length + truckRoute.droneSorties.length * 2,
@@ -134,6 +146,8 @@ export function useVehicleDetails(
         },
         sortiesHandled: [],
         orderIds: truckOrderIds,
+        truckType: truckRoute.truckType,
+        typeIndex,
       })
 
       const droneVehicleMap = new Map<number, typeof truckRoute.droneSorties>()
@@ -168,8 +182,8 @@ export function useVehicleDetails(
           details.push({
             id: `${truckRoute.routeId}-drone-${droneId}`,
             type: 'drone',
-            name: `Truck ${truckRoute.truckId + 1} Drone ${droneId}`,
-            color: getDroneColor(sorties[0]?.sortieIndex ? sorties[0].sortieIndex - 1 : index),
+            name: `${typeLabel} #${typeIndex} Drone ${droneId}`,
+            color: getDroneColor(truckColor, index),
             distance,
             duration,
             totalEvents: sorties.length * 3,

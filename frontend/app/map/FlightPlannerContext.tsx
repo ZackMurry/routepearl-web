@@ -77,6 +77,7 @@ interface FlightPlannerContextType {
   fleetMode: 'truck-drone' | 'truck-only' | 'drones-only'
   trucks: Truck[]
   addTruck: () => void
+  addTruckOfType: (powerType: 'gas' | 'electric', drones?: number) => void
   removeTruck: (id: string) => void
   updateTruck: (id: string, updates: Partial<Omit<Truck, 'id'>>) => void
   // Derived aggregates
@@ -162,6 +163,10 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
   const addTruck = () => {
     setTrucks(prev => [...prev, createTruck('gas', 0)])
+  }
+
+  const addTruckOfType = (powerType: 'gas' | 'electric', drones: number = 2) => {
+    setTrucks(prev => [...prev, createTruck(powerType, drones)])
   }
 
   const removeTruck = (id: string) => {
@@ -612,6 +617,8 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
           K: truckCount,
           num_electric: electricTruckCount,
           num_gas: gasTruckCount,
+          electric_drones: trucks.filter(t => t.powerType === 'electric').map(t => t.drones),
+          gas_drones: trucks.filter(t => t.powerType === 'gas').map(t => t.drones),
           provider: 'OSRM-Online',
           hazards: missionConfig.nodes
             .filter(it => it.type === 'hazard')
@@ -681,6 +688,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     fleetMode,
     trucks,
     addTruck,
+    addTruckOfType,
     removeTruck,
     updateTruck,
     truckCount,

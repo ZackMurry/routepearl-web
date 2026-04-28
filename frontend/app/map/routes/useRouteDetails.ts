@@ -68,13 +68,14 @@ export function useRouteDetails(
         (a, b) => (a || 0) - (b || 0),
       )
 
+      const fallbackTruckColor = getTruckRouteColor('gas', 0)
       sortieNumbers.forEach((sortieNumber, index) => {
         const sortieEvents = droneEvents.filter(event => event.sortieNumber === sortieNumber)
         details.push({
           id: `truck-0-sortie-${sortieNumber}`,
           type: 'drone',
           name: `Sortie ${sortieNumber}`,
-          color: getDroneColor(index),
+          color: getDroneColor(fallbackTruckColor, index),
           distance: sortieEvents.reduce((sum, event) => sum + (event.distance || 0), 0),
           duration:
             Math.max(...sortieEvents.map(event => event.cumulativeTime + event.estimatedDuration)) -
@@ -101,6 +102,7 @@ export function useRouteDetails(
     const details: RouteDetail[] = []
 
     generatedTruckRoutes.forEach(truckRoute => {
+      const truckColor = getTruckRouteColor(truckRoute.truckType, truckRoute.truckId)
       const truckMatchPoints = truckRoute.truckStops.length > 0 ? truckRoute.truckStops : truckRoute.truckRoute
       const truckOrderIds = orderNodes
         .filter(order => truckMatchPoints.some(point => matchesPoint(point, order)))
@@ -113,7 +115,7 @@ export function useRouteDetails(
         id: truckRoute.routeId,
         type: 'truck',
         name: `Truck ${truckRoute.truckId + 1} Route`,
-        color: getTruckRouteColor(truckRoute.truckType, truckRoute.truckId),
+        color: truckColor,
         distance: truckDistance,
         duration: truckDistance / truckSpeedMs,
         events:
@@ -135,7 +137,7 @@ export function useRouteDetails(
           id: sortie.routeId,
           type: 'drone',
           name: `Truck ${truckRoute.truckId + 1} Sortie ${sortie.localSortieIndex + 1}`,
-          color: getDroneColor(sortie.sortieIndex - 1),
+          color: getDroneColor(truckColor, sortie.localSortieIndex),
           distance,
           duration:
             distance / droneSpeedMs +

@@ -1,3 +1,4 @@
+import chroma from 'chroma-js'
 import { EnhancedRouteData, GeneratedDroneSortie, GeneratedTruckRoute, Point, RouteCost, TruckPowerType } from '@/lib/types'
 
 type ApiCoord = [number, number]
@@ -41,9 +42,23 @@ interface ApiRouteResponse {
   routes?: ApiRoutesPayload
 }
 
-const GAS_TRUCK_COLORS = ['#1e3a5f', '#1d4ed8', '#b45309', '#7c3aed']
-const ELECTRIC_TRUCK_COLORS = ['#047857', '#0f766e', '#059669', '#16a34a']
-const DRONE_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#ea580c', '#e11d48', '#dc2626', '#d97706', '#0ea5e9']
+// Hue-coherent palettes per truck type. Gas reads warm-amber, electric reads
+// green; the chroma scale keeps a strong lightness gap between adjacent entries
+// so two trucks of the same type are always visibly distinct.
+const GAS_BASE = '#b45309'
+const ELECTRIC_BASE = '#10b981'
+
+function buildPalette(base: string, n: number): string[] {
+  const size = Math.max(n, 4)
+  return chroma
+    .scale([chroma(base).darken(1.2), chroma(base).brighten(1.2)])
+    .mode('hsl')
+    .colors(size)
+}
+
+// Cached palettes for common K values; regenerated on demand for larger fleets.
+const GAS_TRUCK_COLORS = buildPalette(GAS_BASE, 4)
+const ELECTRIC_TRUCK_COLORS = buildPalette(ELECTRIC_BASE, 4)
 
 const toPoint = (coord: ApiCoord): Point => ({ lat: coord[0], lng: coord[1] })
 
@@ -261,8 +276,13 @@ export function getTruckRouteColor(truckType: TruckPowerType, truckId: number): 
   return palette[Math.abs(truckId) % palette.length]
 }
 
-export function getDroneColor(index: number): string {
-  return DRONE_COLORS[index % DRONE_COLORS.length]
+// Sortie color is derived from the parent truck's color so each sortie reads
+// as a child of its truck. Lighter shade per local sortie index keeps multiple
+// sorties from one truck visually distinct without breaking the family.
+export function getDroneColor(truckColor: string, localSortieIndex: number): string {
+  return chroma(truckColor)
+    .brighten(0.4 + (localSortieIndex % 4) * 0.3)
+    .hex()
 }
 
 export function estimatePolylineDistance(points: Point[]): number {
