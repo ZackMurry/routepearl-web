@@ -60,20 +60,13 @@ export interface GanttData {
 // Gantt chart state
 export type GanttChartState = 'no-plan' | 'empty-fleet' | 'loaded'
 
+import { getDroneColor as getRouteDroneColor, getTruckRouteColor } from '../routeData'
+
 // Color constants - matching route colors from SortieFlightPath.tsx
 export const GANTT_COLORS = {
   all: '#4b5563', // gray-600 for combined "All" row
   truck: '#1e3a8a', // Dark blue for truck
   driver: '#065f46', // Dark green (emerald-800) for driver instructions
-  sortieColors: [
-    '#3b82f6', // blue
-    '#8b5cf6', // purple
-    '#ec4899', // pink
-    '#ef4444', // red
-    '#06b6d4', // cyan
-    '#6366f1', // indigo
-    '#d946ef', // magenta
-  ],
   // Stop type colors
   depot: '#374151', // gray-700
   delivery: '#3b82f6', // blue
@@ -84,10 +77,12 @@ export const GANTT_COLORS = {
   travel: '#9ca3af', // gray-400
 } as const
 
-// Get color for a drone based on sortie number
+// Single source of truth for drone color — delegates to routeData so the
+// Gantt and the map always agree on a sortie's color. Legacy single-truck
+// callers pass just a sortie number; we feed it through with a default
+// truck color (gas, id 0) so K=1 missions look the same as before.
 export function getDroneColor(sortieNumber: number): string {
-  const index = (sortieNumber - 1) % GANTT_COLORS.sortieColors.length
-  return GANTT_COLORS.sortieColors[index]
+  return getRouteDroneColor(getTruckRouteColor('gas', 0), Math.max(0, sortieNumber - 1))
 }
 
 // Get color for a stop type

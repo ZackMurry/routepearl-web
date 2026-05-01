@@ -10,13 +10,25 @@ interface Props {
   sortieIndex: number
   routeId: string
   vehicleId: string
+  truckRouteId: string
   truckColor: string
   localSortieIndex: number
 }
 
-const SortieFlightPath: FC<Props> = ({ sortie, sortieIndex, routeId, vehicleId, truckColor, localSortieIndex }) => {
-  const { selectedRouteId, setSelectedRouteId } = useFlightPlanner()
+const SortieFlightPath: FC<Props> = ({
+  sortie,
+  sortieIndex,
+  routeId,
+  vehicleId,
+  truckRouteId,
+  truckColor,
+  localSortieIndex,
+}) => {
+  const { selectedRouteId, setSelectedRouteId, hiddenRouteIds } = useFlightPlanner()
   if (sortie.length < 3) return <></>
+  // Sortie hides whenever its parent truck is hidden — drones don't have an
+  // independent visibility toggle, just the truck-level one.
+  if (hiddenRouteIds.has(truckRouteId)) return <></>
 
   const sortieColor = getDroneColor(truckColor, localSortieIndex)
 

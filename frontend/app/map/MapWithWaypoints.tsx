@@ -487,6 +487,7 @@ function MapContent() {
                 sortieIndex={sortie.sortieIndex - 1}
                 routeId={sortie.routeId}
                 vehicleId={sortie.vehicleId}
+                truckRouteId={route.routeId}
                 truckColor={truckColor}
                 localSortieIndex={sortie.localSortieIndex}
               />

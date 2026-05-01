@@ -65,6 +65,9 @@ interface FlightPlannerContextType {
   requestFocusNode: (id: string) => void
   selectedRouteId: string | null // 'truck', 'drone-1', 'drone-2', etc.
   setSelectedRouteId: (id: string | null) => void
+  hiddenRouteIds: Set<string>
+  toggleRouteHidden: (id: string) => void
+  clearHiddenRoutes: () => void
 
   // Mission actions
   createNewMission: () => void
@@ -144,6 +147,20 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
   const [plotModeNodes, setPlotModeNodesInternal] = useState(false)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
+  const [hiddenRouteIds, setHiddenRouteIds] = useState<Set<string>>(() => new Set())
+
+  const toggleRouteHidden = (id: string) => {
+    setHiddenRouteIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const clearHiddenRoutes = () => {
+    setHiddenRouteIds(prev => (prev.size === 0 ? prev : new Set()))
+  }
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null)
   const [focusNodeCounter, setFocusNodeCounter] = useState(0)
 
@@ -685,6 +702,9 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     requestFocusNode,
     selectedRouteId,
     setSelectedRouteId,
+    hiddenRouteIds,
+    toggleRouteHidden,
+    clearHiddenRoutes,
     fleetMode,
     trucks,
     addTruck,

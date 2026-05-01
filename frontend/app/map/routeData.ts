@@ -19,6 +19,8 @@ interface ApiTruckRouteEntry {
   truck_stops?: ApiCoord[]
   drone_route?: ApiCoord[][]
   drone_sorties?: ApiDroneSortie[]
+  cost?: RouteCost
+  drones_allocated?: number
   sync_points?: {
     truck_route?: number[][]
     drone_route?: number[][]
@@ -169,6 +171,8 @@ const normalizeTruckRoute = (
     truckStops,
     droneRoutes,
     droneSorties,
+    cost: source.cost,
+    dronesAllocated: source.drones_allocated,
     syncPoints: source.sync_points,
   }
 }

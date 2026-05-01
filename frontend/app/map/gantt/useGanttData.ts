@@ -1,8 +1,9 @@
 'use client'
 
 import { useMemo } from 'react'
-import { TimelineEvent, TimelineResult } from '../timeline/timeline.types'
-import { MissionSite } from '@/lib/types'
+import { DEFAULT_TIMELINE_CONFIG, TimelineEvent, TimelineResult } from '../timeline/timeline.types'
+import { GeneratedTruckRoute, MissionSite, Point } from '@/lib/types'
+import { estimatePolylineDistance, getDroneColor as getRouteDroneColor, getTruckRouteColor } from '../routeData'
 import {
   GanttData,
   GanttVehicle,
@@ -13,15 +14,208 @@ import {
 } from './gantt.types'
 
 /**
+ * Synthesize Gantt data directly from per-truck route data (multi-truck path).
+ *
+ * Each truck runs in parallel with its own clock starting at t=0; we don't
+ * try to extract per-truck timing from the legacy concatenated timeline
+ * events (which would serialize trucks). Coarser than the single-truck path
+ * intentionally — one stop bar per significant point, no charging-stop
+ * detail — but correctness > fidelity for this first multi-truck pass.
+ */
+function synthesizeMultiTruckGanttData(generatedTruckRoutes: GeneratedTruckRoute[]): GanttData {
+  const truckSpeedMs = (DEFAULT_TIMELINE_CONFIG.truckSpeedKmh * 1000) / 3600
+  const droneSpeedMs = (DEFAULT_TIMELINE_CONFIG.droneSpeedKmh * 1000) / 3600
+  const serviceSec = DEFAULT_TIMELINE_CONFIG.truckDeliveryTimeSeconds
+  const droneServiceSec = DEFAULT_TIMELINE_CONFIG.droneUnloadTimeSeconds
+
+  const vehicles: GanttVehicle[] = []
+  let elec = 0
+  let gas = 0
+  let fleetMaxDuration = 0
+
+  vehicles.push({
+    id: 'all',
+    name: 'All',
+    type: 'all',
+    color: GANTT_COLORS.all,
+    stops: [],
+  })
+
+  generatedTruckRoutes.forEach(route => {
+    const typeIndex = route.truckType === 'electric' ? ++elec : ++gas
+    const typeLabel = route.truckType === 'electric' ? 'Electric Truck' : 'Gas Truck'
+    const truckColor = getTruckRouteColor(route.truckType, route.truckId)
+    // groupId mirrors the existing truck/driver pairing convention so the
+    // collapse-by-truck affordance can hide all rows sharing this id.
+    const groupId = route.truckId + 1
+    const baseLabel = `${typeLabel} #${typeIndex}`
+
+    // Per-truck stop synthesis: depot start, one bar per stop along the
+    // route at cumulative-distance-derived times, depot return at the end.
+    const stopPoints = route.truckStops.length > 0 ? route.truckStops : route.truckRoute
+    const truckStops: GanttStop[] = []
+    let cumTime = 0
+    let prev: Point | null = null
+
+    stopPoints.forEach((point, idx) => {
+      if (prev) {
+        const segDist = estimatePolylineDistance([prev, point])
+        cumTime += segDist / truckSpeedMs
+      }
+      const isFirst = idx === 0
+      const isLast = idx === stopPoints.length - 1
+      const stopType: GanttStopType = isFirst || isLast ? 'depot' : 'delivery'
+      truckStops.push({
+        id: `${route.routeId}-stop-${idx}`,
+        type: stopType,
+        time: cumTime,
+        duration: isFirst || isLast ? 0 : serviceSec,
+        label: isFirst ? 'Depot (start)' : isLast ? 'Return to Depot' : `Stop ${idx}`,
+        lat: point.lat,
+        lng: point.lng,
+        stopGroup: idx,
+        stopGroupLabel: isFirst ? 'Start' : isLast ? 'Return' : `Stop ${idx}`,
+      })
+      if (!isFirst && !isLast) {
+        cumTime += serviceSec
+      }
+      prev = point
+    })
+
+    const truckDuration = truckStops.length > 0 ? truckStops[truckStops.length - 1].time : 0
+    fleetMaxDuration = Math.max(fleetMaxDuration, truckDuration)
+
+    vehicles.push({
+      id: route.routeId,
+      name: `${baseLabel} Route`,
+      type: 'truck',
+      color: truckColor,
+      stops: truckStops,
+      groupId,
+    })
+
+    vehicles.push({
+      id: `${route.routeId}-driver`,
+      name: `${baseLabel} Driver`,
+      type: 'driver',
+      // Driver rows mirror the truck's color family — keeps multi-truck
+      // identity consistent across truck and driver rows of the same group.
+      color: truckColor,
+      stops: truckStops.map(stop => ({ ...stop, id: `${stop.id}-driver` })),
+      groupId,
+    })
+
+    // Group sorties by physical drone, then build one row per (truck, droneId).
+    const sortiesByDrone = new Map<number, typeof route.droneSorties>()
+    route.droneSorties.forEach(sortie => {
+      const list = sortiesByDrone.get(sortie.droneId) ?? []
+      list.push(sortie)
+      sortiesByDrone.set(sortie.droneId, list)
+    })
+
+    Array.from(sortiesByDrone.entries())
+      .sort(([a], [b]) => a - b)
+      .forEach(([droneId, sorties], droneIndex) => {
+        const droneColor = getRouteDroneColor(truckColor, droneIndex)
+        const droneStops: GanttStop[] = []
+        sorties.forEach(sortie => {
+          const launchToCustomer = estimatePolylineDistance([sortie.launch, sortie.customer])
+          const customerToRecovery = estimatePolylineDistance([sortie.customer, sortie.recovery])
+          // Drone "starts" at the truck's time-of-arrival at the launch point.
+          // We approximate that as cumulative travel distance to the launch
+          // point — close enough for a coarse Gantt; exact timing arrives
+          // when the timeline generator becomes truck-aware.
+          const launchTime = (() => {
+            const idx = stopPoints.findIndex(
+              p => Math.abs(p.lat - sortie.launch.lat) < 0.0001 && Math.abs(p.lng - sortie.launch.lng) < 0.0001,
+            )
+            if (idx <= 0) return 0
+            return truckStops[idx]?.time ?? 0
+          })()
+
+          droneStops.push({
+            id: `${sortie.routeId}-launch`,
+            type: 'launch',
+            time: launchTime,
+            duration: DEFAULT_TIMELINE_CONFIG.droneLoadTimeSeconds,
+            label: `Sortie ${sortie.localSortieIndex + 1}: Launch`,
+            sortieNumber: sortie.sortieIndex,
+            lat: sortie.launch.lat,
+            lng: sortie.launch.lng,
+          })
+          const deliveryTime = launchTime + DEFAULT_TIMELINE_CONFIG.droneLoadTimeSeconds + launchToCustomer / droneSpeedMs
+          droneStops.push({
+            id: `${sortie.routeId}-delivery`,
+            type: 'delivery',
+            time: deliveryTime,
+            duration: droneServiceSec,
+            label: `Sortie ${sortie.localSortieIndex + 1}: Delivery`,
+            sortieNumber: sortie.sortieIndex,
+            lat: sortie.customer.lat,
+            lng: sortie.customer.lng,
+          })
+          const returnTime = deliveryTime + droneServiceSec + customerToRecovery / droneSpeedMs
+          droneStops.push({
+            id: `${sortie.routeId}-return`,
+            type: 'return',
+            time: returnTime,
+            duration: 0,
+            label: `Sortie ${sortie.localSortieIndex + 1}: Recovery`,
+            sortieNumber: sortie.sortieIndex,
+            lat: sortie.recovery.lat,
+            lng: sortie.recovery.lng,
+          })
+          fleetMaxDuration = Math.max(fleetMaxDuration, returnTime)
+        })
+
+        vehicles.push({
+          id: `${route.routeId}-drone-${droneId}`,
+          name: `${baseLabel} Drone ${droneId}`,
+          type: 'drone',
+          color: droneColor,
+          stops: droneStops,
+          groupId,
+        })
+      })
+  })
+
+  // Populate the "All" row with every vehicle's stops, color-tagged for
+  // visual disambiguation in the merged view.
+  const allStops: GanttStop[] = []
+  vehicles.slice(1).forEach(v => {
+    v.stops.forEach(s => {
+      allStops.push({ ...s, vehicleName: v.name, vehicleColor: v.color })
+    })
+  })
+  allStops.sort((a, b) => a.time - b.time)
+  vehicles[0].stops = allStops
+
+  return {
+    vehicles,
+    totalDuration: fleetMaxDuration > 0 ? fleetMaxDuration : 3600,
+    startTime: new Date(),
+  }
+}
+
+/**
  * Hook to transform timeline events into Gantt chart data
  */
 export function useGanttData(
   timelineResult: TimelineResult,
   fleetMode: 'truck-drone' | 'truck-only' | 'drones-only',
   droneCount: number,
-  nodes?: MissionSite[]
+  nodes?: MissionSite[],
+  generatedTruckRoutes?: GeneratedTruckRoute[]
 ): GanttData {
   return useMemo(() => {
+    // Multi-truck path: bypass the legacy timeline-event aggregation and
+    // synthesize per-truck rows directly from the response. Each truck
+    // runs in parallel from t=0; the legacy single-truck logic below stays
+    // in place for K=0/K=1 to avoid regressions (per design doc MC2).
+    if (generatedTruckRoutes && generatedTruckRoutes.length > 1) {
+      return synthesizeMultiTruckGanttData(generatedTruckRoutes)
+    }
+
     const { events, summary } = timelineResult
 
     // Build nodeId → address and nodeId → coordinates lookup maps
@@ -595,15 +789,20 @@ export function useGanttData(
 }
 
 /**
- * Generate empty Gantt data for the fleet preview state (no route data)
+ * Generate empty Gantt data for the fleet preview state (no route data).
+ *
+ * When `fleetTrucks` is provided AND has 2+ trucks, generates K placeholder
+ * truck/driver/drone groups labeled by per-type display index — matching
+ * the multi-truck Gantt layout (so users see the right shape before
+ * generating). Falls back to the legacy single-truck preview otherwise.
  */
 export function generateEmptyGanttData(
   fleetMode: 'truck-drone' | 'truck-only' | 'drones-only',
-  droneCount: number
+  droneCount: number,
+  fleetTrucks?: { powerType: 'gas' | 'electric'; drones: number }[]
 ): GanttData {
   const vehicles: GanttVehicle[] = []
 
-  // Add "All" row at the top
   vehicles.push({
     id: 'all',
     name: 'All',
@@ -612,7 +811,53 @@ export function generateEmptyGanttData(
     stops: [],
   })
 
-  // Add truck if in fleet
+  // Multi-truck preview: produce K (truck + driver + per-drone) groups.
+  if (fleetTrucks && fleetTrucks.length > 1) {
+    let elec = 0
+    let gas = 0
+    fleetTrucks.forEach((truck, truckIndex) => {
+      const typeIndex = truck.powerType === 'electric' ? ++elec : ++gas
+      const typeLabel = truck.powerType === 'electric' ? 'Electric Truck' : 'Gas Truck'
+      const truckColor = getTruckRouteColor(truck.powerType, truckIndex)
+      const groupId = truckIndex + 1
+      const baseLabel = `${typeLabel} #${typeIndex}`
+
+      vehicles.push({
+        id: `truck-${truckIndex}`,
+        name: `${baseLabel} Route`,
+        type: 'truck',
+        color: truckColor,
+        stops: [],
+        groupId,
+      })
+      vehicles.push({
+        id: `truck-${truckIndex}-driver`,
+        name: `${baseLabel} Driver`,
+        type: 'driver',
+        color: truckColor,
+        stops: [],
+        groupId,
+      })
+      for (let d = 1; d <= truck.drones; d++) {
+        vehicles.push({
+          id: `truck-${truckIndex}-drone-${d}`,
+          name: `${baseLabel} Drone ${d}`,
+          type: 'drone',
+          color: getRouteDroneColor(truckColor, d - 1),
+          stops: [],
+          sortieNumber: d,
+          groupId,
+        })
+      }
+    })
+    return {
+      vehicles,
+      totalDuration: 3600,
+      startTime: new Date(),
+    }
+  }
+
+  // Legacy single-truck preview path.
   if (fleetMode === 'truck-drone' || fleetMode === 'truck-only') {
     vehicles.push({
       id: 'truck-1',

@@ -730,6 +730,24 @@ export function BottomPanel() {
         ? formatDurationTimeline(timelineResult.summary.totalDuration)
         : '--:--'
 
+  // Per-truck ETA / risk summary for multi-truck missions (design doc MC1).
+  // Format: "Electric Truck #1: 1.40h (risk 0.30) · Gas Truck #1: 1.10h (risk 0.70) · Fleet: 1.40h"
+  // Surfaced as a tooltip on the existing time stat to avoid layout churn.
+  const perTruckEtaSummary = useMemo<string | null>(() => {
+    if (!hasRoute || generatedTruckRoutes.length <= 1) return null
+    let elec = 0
+    let gas = 0
+    const parts = generatedTruckRoutes.map(route => {
+      const typeIndex = route.truckType === 'electric' ? ++elec : ++gas
+      const label = route.truckType === 'electric' ? `Electric Truck #${typeIndex}` : `Gas Truck #${typeIndex}`
+      if (!route.cost) return `${label}: cost unavailable`
+      return `${label}: ${route.cost.time.toFixed(2)}h (risk ${route.cost.risk.toFixed(1)})`
+    })
+    const fleet = generatedTruckRoutes.reduce((max, r) => (r.cost ? Math.max(max, r.cost.time) : max), 0)
+    if (fleet > 0) parts.push(`Fleet: ${fleet.toFixed(2)}h`)
+    return parts.join(' · ')
+  }, [generatedTruckRoutes, hasRoute])
+
   // Compute ETA and distance for each order directly from route data
   const orderEtaMap = useMemo(() => {
     const map = new Map<string, { eta: number; distance: number }>()
@@ -851,14 +869,21 @@ export function BottomPanel() {
   }, [hasRoute, missionSites, timelineResult.events])
 
   // Generate Gantt chart data - always call hooks unconditionally
-  const ganttDataFromHook = useGanttData(timelineResult, fleetMode, droneCount, missionConfig.nodes)
-  const ganttData = hasRoute ? ganttDataFromHook : generateEmptyGanttData(fleetMode, droneCount)
+  const ganttDataFromHook = useGanttData(timelineResult, fleetMode, droneCount, missionConfig.nodes, generatedTruckRoutes)
+  const ganttData = hasRoute
+    ? ganttDataFromHook
+    : generateEmptyGanttData(fleetMode, droneCount, trucks.map(t => ({ powerType: t.powerType, drones: t.drones })))
 
-  // Generate route details for Routes tab
-  const routeDetails = useRouteDetails(generatedTruckRoutes, timelineResult, hasRoute, orderNodes)
+  // Generate route details for Routes tab (grouped by truck per design doc P3)
+  const routeGroups = useRouteDetails(generatedTruckRoutes, timelineResult, hasRoute, orderNodes)
+  // Flat list still needed by the table view + total count badge.
+  const routeDetails = useMemo(() => routeGroups.flatMap(g => [g.truck, ...g.sorties]), [routeGroups])
 
-  // Generate vehicle details for Vehicles tab
-  const vehicleDetails = useVehicleDetails(generatedTruckRoutes, timelineResult, droneCount, hasRoute, orderNodes)
+  // Generate vehicle details for Vehicles tab — grouped by parent truck so
+  // drones render visually nested under the truck they're allocated to.
+  const vehicleGroups = useVehicleDetails(generatedTruckRoutes, timelineResult, droneCount, hasRoute, orderNodes)
+  // Flat list still consumed by the table view + the Vehicles count badge.
+  const vehicleDetails = useMemo(() => vehicleGroups.flatMap(g => [g.truck, ...g.drones]), [vehicleGroups])
 
   // Determine Gantt chart state
   const ganttState: GanttChartState =
@@ -1100,7 +1125,11 @@ export function BottomPanel() {
                   className='text-gray-600'
                   style={{ flexShrink: 1, flexWrap: 'wrap', minWidth: 0 }}
                 >
-                  <Flex gap='1' align='center' title='Time Elapsed / Estimated'>
+                  <Flex
+                    gap='1'
+                    align='center'
+                    title={perTruckEtaSummary ?? 'Time Elapsed / Estimated'}
+                  >
                     <Clock size={16} />
                     <Text size='2'>00:00/{estimatedTime}</Text>
                   </Flex>
@@ -1413,7 +1442,11 @@ export function BottomPanel() {
                   className='text-gray-600'
                   style={{ flexShrink: 1, flexWrap: 'wrap', minWidth: 0 }}
                 >
-                  <Flex gap='1' align='center' title='Time Elapsed / Estimated'>
+                  <Flex
+                    gap='1'
+                    align='center'
+                    title={perTruckEtaSummary ?? 'Time Elapsed / Estimated'}
+                  >
                     <Clock size={16} />
                     <Text size='2'>00:00/{estimatedTime}</Text>
                   </Flex>
@@ -2624,8 +2657,11 @@ export function BottomPanel() {
                       >
                         <Select.Trigger style={{ width: '100%' }} />
                         <Select.Content>
+                          {/* "Default Routing Engine" auto-upgrades to negar_multi when truckCount > 1
+                              (see FlightPlannerContext requestedAlgorithm). negar_multi is intentionally
+                              not exposed here — design doc P2 keeps it auto so users don't have to
+                              think about which mode matches their fleet size. */}
                           <Select.Item value='negar'>Default Routing Engine</Select.Item>
-                          <Select.Item value='negar_multi'>Multi-Truck Routing</Select.Item>
                           <Select.Item value='fstsp'>FSTSP</Select.Item>
                           <Select.Item value='least_risk'>Least Risk</Select.Item>
                           <Select.Item value='custom'>Custom</Select.Item>
@@ -2962,7 +2998,11 @@ export function BottomPanel() {
                   className='text-gray-600'
                   style={{ flexShrink: 1, flexWrap: 'wrap', minWidth: 0 }}
                 >
-                  <Flex gap='1' align='center' title='Time Elapsed / Estimated'>
+                  <Flex
+                    gap='1'
+                    align='center'
+                    title={perTruckEtaSummary ?? 'Time Elapsed / Estimated'}
+                  >
                     <Clock size={16} />
                     <Text size='2'>00:00/{estimatedTime}</Text>
                   </Flex>
@@ -3459,7 +3499,7 @@ export function BottomPanel() {
                       onSelectRoute={setSelectedRouteId}
                     />
                   ) : (
-                    <RoutesTab routes={routeDetails} selectedRouteId={selectedRouteId} onSelectRoute={setSelectedRouteId} />
+                    <RoutesTab groups={routeGroups} selectedRouteId={selectedRouteId} onSelectRoute={setSelectedRouteId} />
                   )}
                 </Tabs.Content>
 
@@ -3473,7 +3513,7 @@ export function BottomPanel() {
                     />
                   ) : (
                     <VehiclesTab
-                      vehicles={vehicleDetails}
+                      groups={vehicleGroups}
                       selectedRouteId={selectedRouteId}
                       onSelectRoute={setSelectedRouteId}
                     />
@@ -3623,7 +3663,7 @@ export function BottomPanel() {
                 className='text-gray-600'
                 style={{ flexShrink: 1, flexWrap: 'wrap', minWidth: 0 }}
               >
-                <Flex gap='1' align='center' title='Time Elapsed / Estimated'>
+                <Flex gap='1' align='center' title={perTruckEtaSummary ?? 'Time Elapsed / Estimated'}>
                   <Clock size={16} />
                   <Text size='2'>00:00/{estimatedTime}</Text>
                 </Flex>
@@ -4123,7 +4163,7 @@ export function BottomPanel() {
                 {viewMode === 'table' ? (
                   <RoutesTable routes={routeDetails} selectedRouteId={selectedRouteId} onSelectRoute={setSelectedRouteId} />
                 ) : (
-                  <RoutesTab routes={routeDetails} selectedRouteId={selectedRouteId} onSelectRoute={setSelectedRouteId} />
+                  <RoutesTab groups={routeGroups} selectedRouteId={selectedRouteId} onSelectRoute={setSelectedRouteId} />
                 )}
               </Tabs.Content>
 
@@ -4137,7 +4177,7 @@ export function BottomPanel() {
                   />
                 ) : (
                   <VehiclesTab
-                    vehicles={vehicleDetails}
+                    groups={vehicleGroups}
                     selectedRouteId={selectedRouteId}
                     onSelectRoute={setSelectedRouteId}
                   />

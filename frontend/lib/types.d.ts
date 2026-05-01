@@ -150,6 +150,13 @@ export interface GeneratedTruckRoute {
   truckStops: Point[]
   droneRoutes: Point[][]
   droneSorties: GeneratedDroneSortie[]
+  // Per-truck cost from the backend's per-cluster optimizer output.
+  // Drives Mission Control's per-truck ETA / risk chips (design doc MC1).
+  cost?: RouteCost
+  // Drones the optimizer was allowed to use on this truck (per the user's
+  // electric_drones / gas_drones config). Compared against droneSorties to
+  // detect over-allocation — surfaced as "Not deployed" badges on idle drones.
+  dronesAllocated?: number
   syncPoints?: {
     truck_route?: number[][]
     drone_route?: number[][]

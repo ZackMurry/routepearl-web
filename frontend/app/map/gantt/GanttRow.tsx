@@ -3,7 +3,7 @@
 import React, { FC } from 'react'
 import { GanttVehicle, GanttStop, GanttAxisMode, GanttLocationMode } from './gantt.types'
 import GanttStopIcon from './GanttStopIcon'
-import { Truck, Drone, LayoutList, User } from 'lucide-react'
+import { Truck, Drone, LayoutList, User, ChevronDown, ChevronRight } from 'lucide-react'
 
 interface Props {
   vehicle: GanttVehicle
@@ -20,6 +20,12 @@ interface Props {
   onVehicleClick?: (vehicle: GanttVehicle) => void
   onVehicleDoubleClick?: (vehicle: GanttVehicle) => void
   isGroupStart?: boolean // Add top gap for truck-driver group separation
+  // Collapse-by-truck affordance (multi-truck Gantt). When set, the truck
+  // row renders a chevron that toggles visibility of its driver/drone
+  // siblings — the truck row itself stays visible so the user can expand back.
+  isCollapsibleTruck?: boolean
+  isCollapsed?: boolean
+  onToggleCollapse?: () => void
 }
 
 const TRUCK_BLUE = '#1e3a8a'
@@ -32,7 +38,7 @@ function vehicleTint(hex: string, alpha: number = 0.10): string {
   return `rgba(${r},${g},${b},${alpha})`
 }
 
-const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDistance, axisMode, rowIndex, isGreyed = false, gridIntervalPx, isGroupStart = false, locationMode = 'street', onStopClick, onStopDoubleClick, onVehicleClick, onVehicleDoubleClick }) => {
+const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDistance, axisMode, rowIndex, isGreyed = false, gridIntervalPx, isGroupStart = false, locationMode = 'street', onStopClick, onStopDoubleClick, onVehicleClick, onVehicleDoubleClick, isCollapsibleTruck = false, isCollapsed = false, onToggleCollapse }) => {
   const rowHeight = 42
   const isEven = rowIndex % 2 === 0
   const displayColor = vehicle.type === 'truck' || vehicle.type === 'driver' ? (vehicle.type === 'driver' ? vehicle.color : TRUCK_BLUE) : vehicle.color
@@ -191,10 +197,34 @@ const GanttRow: FC<Props> = ({ vehicle, pixelsPerUnit, totalDuration, totalDista
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            flex: 1,
           }}
         >
           {vehicle.name}
         </span>
+        {/* Collapse-by-truck chevron — only on truck rows in a multi-truck Gantt */}
+        {isCollapsibleTruck && (
+          <button
+            type='button'
+            onClick={e => {
+              e.stopPropagation()
+              onToggleCollapse?.()
+            }}
+            title={isCollapsed ? 'Expand truck rows' : 'Collapse truck rows'}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: 2,
+              marginLeft: 'auto',
+              cursor: 'pointer',
+              color: '#6b7280',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+          </button>
+        )}
       </div>
 
       {/* Timeline track */}

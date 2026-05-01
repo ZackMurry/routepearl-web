@@ -31,6 +31,15 @@ export interface VehicleDetail {
   // carry a per-type 1-based index derived from the backend response order.
   truckType?: TruckPowerType
   typeIndex?: number
+  // Optimizer didn't use this vehicle — fleet over-allocation indicator.
+  // Trucks: no deliveries AND no drone sorties launched.
+  // Drones: allocated to a truck but never flew a sortie.
+  isUnused?: boolean
+}
+
+export interface VehicleDetailGroup {
+  truck: VehicleDetail
+  drones: VehicleDetail[]
 }
 
 export function useVehicleDetails(
@@ -39,20 +48,22 @@ export function useVehicleDetails(
   droneCount: number,
   hasRoute: boolean,
   orderNodes: { orderId?: number; id: string; lat: number; lng: number }[],
-): VehicleDetail[] {
+): VehicleDetailGroup[] {
   return useMemo(() => {
     if (!hasRoute) {
       return []
     }
 
     if (generatedTruckRoutes.length === 0) {
+      // Legacy single-truck path: synthesize one group from raw timeline events.
       const { events } = timelineResult
-      const details: VehicleDetail[] = []
       const truckEvents = events.filter(event => event.vehicle === 'truck')
-
-      if (truckEvents.length > 0) {
-        details.push(buildFallbackTruckDetail(truckEvents, orderNodes))
+      if (truckEvents.length === 0) {
+        // Drones-only or empty fleet — Vehicles tab degrades gracefully.
+        return []
       }
+
+      const truck = buildFallbackTruckDetail(truckEvents, orderNodes)
 
       const droneEvents = events.filter(event => event.vehicle === 'drone')
       const sortieMap = new Map<number, TimelineEvent[]>()
@@ -65,8 +76,8 @@ export function useVehicleDetails(
       })
 
       const sortieNumbers = Array.from(sortieMap.keys()).sort((a, b) => a - b)
-
       const fallbackTruckColor = getTruckRouteColor('gas', 0)
+      const drones: VehicleDetail[] = []
       for (let droneIndex = 0; droneIndex < droneCount; droneIndex++) {
         const droneNumber = droneIndex + 1
         const assignedSorties = sortieNumbers.filter(sortieNumber => ((sortieNumber - 1) % droneCount) === droneIndex)
@@ -76,7 +87,7 @@ export function useVehicleDetails(
           continue
         }
 
-        details.push({
+        drones.push({
           id: `truck-0-drone-${droneNumber}`,
           type: 'drone',
           name: `Drone ${droneNumber}`,
@@ -104,17 +115,17 @@ export function useVehicleDetails(
         })
       }
 
-      return details
+      return [{ truck, drones }]
     }
 
     const truckSpeedMs = (DEFAULT_TIMELINE_CONFIG.truckSpeedKmh * 1000) / 3600
     const droneSpeedMs = (DEFAULT_TIMELINE_CONFIG.droneSpeedKmh * 1000) / 3600
 
-    const details: VehicleDetail[] = []
-
     // Per-type 1-based display index (anonymous fleet model, design doc §2.5).
     let electricCount = 0
     let gasCount = 0
+
+    const groups: VehicleDetailGroup[] = []
 
     generatedTruckRoutes.forEach(truckRoute => {
       const truckColor = getTruckRouteColor(truckRoute.truckType, truckRoute.truckId)
@@ -127,7 +138,12 @@ export function useVehicleDetails(
         .filter((id): id is number => id !== undefined)
       const truckDistance = estimatePolylineDistance(truckRoute.truckRoute)
 
-      details.push({
+      // A truck is "unused" if the optimizer assigned it nothing meaningful:
+      // no customer deliveries AND no drone sorties launched. Surfaces fleet
+      // over-allocation (e.g. user requested 100 trucks for 1 customer).
+      const truckIsUnused = truckOrderIds.length === 0 && truckRoute.droneSorties.length === 0
+
+      const truck: VehicleDetail = {
         id: truckRoute.routeId,
         type: 'truck',
         name: `${typeLabel} #${typeIndex}`,
@@ -148,7 +164,8 @@ export function useVehicleDetails(
         orderIds: truckOrderIds,
         truckType: truckRoute.truckType,
         typeIndex,
-      })
+        isUnused: truckIsUnused,
+      }
 
       const droneVehicleMap = new Map<number, typeof truckRoute.droneSorties>()
       truckRoute.droneSorties.forEach(sortie => {
@@ -158,9 +175,9 @@ export function useVehicleDetails(
         droneVehicleMap.get(sortie.droneId)?.push(sortie)
       })
 
-      Array.from(droneVehicleMap.entries())
+      const drones: VehicleDetail[] = Array.from(droneVehicleMap.entries())
         .sort(([a], [b]) => a - b)
-        .forEach(([droneId, sorties], index) => {
+        .map(([droneId, sorties], index) => {
           const orderIds = sorties
             .flatMap(sortie =>
               orderNodes
@@ -179,7 +196,7 @@ export function useVehicleDetails(
             0,
           )
 
-          details.push({
+          return {
             id: `${truckRoute.routeId}-drone-${droneId}`,
             type: 'drone',
             name: `${typeLabel} #${typeIndex} Drone ${droneId}`,
@@ -196,11 +213,37 @@ export function useVehicleDetails(
             },
             sortiesHandled: sorties.map(sortie => sortie.sortieIndex),
             orderIds,
-          })
+          }
         })
+
+      // Append placeholder cards for drones the user allocated to this truck
+      // that the optimizer never launched. Backend reports the allocation count
+      // via `dronesAllocated`; missing droneIds (1..allocated not seen in
+      // sorties) get a visible "Not deployed" card so the user knows their
+      // drone slot wasn't needed.
+      const allocated = truckRoute.dronesAllocated ?? 0
+      const usedIds = new Set(droneVehicleMap.keys())
+      for (let droneId = 1; droneId <= allocated; droneId++) {
+        if (usedIds.has(droneId)) continue
+        drones.push({
+          id: `${truckRoute.routeId}-drone-${droneId}-unused`,
+          type: 'drone',
+          name: `${typeLabel} #${typeIndex} Drone ${droneId}`,
+          color: getDroneColor(truckColor, droneId - 1),
+          distance: 0,
+          duration: 0,
+          totalEvents: 0,
+          eventBreakdown: { launches: 0, landings: 0, deliveries: 0, chargingStops: 0, travelSegments: 0 },
+          sortiesHandled: [],
+          orderIds: [],
+          isUnused: true,
+        })
+      }
+
+      groups.push({ truck, drones })
     })
 
-    return details
+    return groups
   }, [generatedTruckRoutes, timelineResult, droneCount, hasRoute, orderNodes])
 }
 

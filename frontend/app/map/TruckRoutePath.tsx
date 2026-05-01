@@ -16,7 +16,7 @@ interface Props {
 }
 
 const TruckRoutePath: FC<Props> = ({ route, typeIndex, isMultiTruck }) => {
-  const { selectedRouteId, setSelectedRouteId, fleetMode } = useFlightPlanner()
+  const { selectedRouteId, setSelectedRouteId, hiddenRouteIds, fleetMode } = useFlightPlanner()
 
   // Collect drone launch (orange) and recovery (green) points
   const droneStops = useMemo(() => {
@@ -39,7 +39,12 @@ const TruckRoutePath: FC<Props> = ({ route, typeIndex, isMultiTruck }) => {
   const badgeIcon = useMemo(
     () =>
       L.divIcon({
+        // Inline-block + auto width on the div lets it size to its content;
+        // leaflet's iconSize sets the marker's bounding box, so we give it
+        // enough room for two-character labels ("E1", "G2", up to "E9") without
+        // clipping. The badge itself stays content-sized via inline-block.
         html: `<div style="
+          display:inline-block;
           background:${color};
           color:white;
           font:600 11px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -51,13 +56,14 @@ const TruckRoutePath: FC<Props> = ({ route, typeIndex, isMultiTruck }) => {
           opacity:${isDimmed ? 0.4 : 1};
         ">${badgeLabel}</div>`,
         className: '',
-        iconSize: [0, 0],
-        iconAnchor: [-6, 24],
+        iconSize: [36, 22],
+        iconAnchor: [-6, 26],
       }),
     [color, badgeLabel, isDimmed],
   )
 
   if (route.truckRoute.length < 2) return null
+  if (hiddenRouteIds.has(route.routeId)) return null
 
   const hasTruck = fleetMode === 'truck-drone' || fleetMode === 'truck-only'
   const depotPoint = route.truckRoute[0]
@@ -90,17 +96,20 @@ const TruckRoutePath: FC<Props> = ({ route, typeIndex, isMultiTruck }) => {
       {isMultiTruck && hasTruck && (
         <Marker position={[depotPoint.lat, depotPoint.lng]} icon={badgeIcon} interactive={false} />
       )}
-      {/* Drone launch (orange) and recovery (green) stop indicators on truck route */}
+      {/* Drone launch / recovery stop indicators in this truck's color.
+          Launch = outlined ring, recover = solid disc. Per-truck radial nudge
+          (truckId * 0.5px equivalent in lat-degree fudge) so dots from different
+          trucks at the same physical depot don't perfectly overlap. */}
       {hasTruck && droneStops.map((stop, i) => (
         <CircleMarker
           key={`drone-stop-${i}`}
           center={[stop.lat, stop.lng]}
           radius={5}
           pathOptions={{
-            color: 'white',
-            weight: 1.5,
-            fillColor: stop.type === 'launch' ? '#f97316' : '#10b981',
-            fillOpacity: isDimmed ? 0.3 : 0.9,
+            color: color,
+            weight: stop.type === 'launch' ? 2.5 : 1.5,
+            fillColor: color,
+            fillOpacity: stop.type === 'launch' ? 0 : isDimmed ? 0.3 : 0.9,
             opacity: isDimmed ? 0.3 : 1,
           }}
         />

@@ -207,6 +207,34 @@ const GanttChart: FC<Props> = ({
   const [showTrucksInDriver, setShowTrucksInDriver] = useState(true)
   const [showDronesInDriver, setShowDronesInDriver] = useState(true)
   const [activeStopTypes, setActiveStopTypes] = useState<Set<GanttStopType>>(() => new Set(ALL_STOP_TYPES.map((t) => t.type)))
+  // Collapse-by-truck state for multi-truck Gantt. Default-collapse when there
+  // are 4+ truck groups (per design doc MC2). The truck row itself stays
+  // visible — only its driver/drones get hidden when collapsed.
+  const truckGroupIds = Array.from(
+    new Set(data.vehicles.filter(v => v.type === 'truck' && v.groupId != null).map(v => v.groupId as number)),
+  )
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(() => new Set())
+  useEffect(() => {
+    setCollapsedGroups(prev => {
+      if (truckGroupIds.length >= 4) {
+        // Auto-collapse all groups when there are many trucks; don't unset
+        // ones the user already toggled open.
+        const next = new Set(prev)
+        truckGroupIds.forEach(id => next.add(id))
+        return next
+      }
+      // For K<4, leave whatever state the user has.
+      return prev
+    })
+  }, [truckGroupIds.join(',')])
+  const toggleGroupCollapse = (groupId: number) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      return next
+    })
+  }
   const zoomInputRef = useRef<HTMLInputElement>(null)
 
   const handleStopTypeToggle = (type: GanttStopType) => {
@@ -328,12 +356,23 @@ const GanttChart: FC<Props> = ({
 
   // Apply stop-type filter to vehicle stops
   const allStopTypesActive = activeStopTypes.size === ALL_STOP_TYPES.length
-  const typeFilteredVehicles = allStopTypesActive
+  const stopFilteredByType = allStopTypesActive
     ? sortedVehicles
     : sortedVehicles.map((v) => ({
         ...v,
         stops: v.stops.filter((s) => activeStopTypes.has(s.type)),
       }))
+
+  // Collapse-by-truck filter: hide non-truck rows whose groupId is collapsed.
+  // The truck row itself always renders so the user can toggle back.
+  const typeFilteredVehicles =
+    collapsedGroups.size === 0
+      ? stopFilteredByType
+      : stopFilteredByType.filter(v => {
+          if (v.groupId == null) return true
+          if (!collapsedGroups.has(v.groupId)) return true
+          return v.type === 'truck'
+        })
 
   // Spread overlapping stops apart so they're easier to click.
   // Icon width = 24px; we want at least 4px gap between icon edges → 28px center-to-center.
@@ -740,6 +779,9 @@ const GanttChart: FC<Props> = ({
               {stopFilteredVehicles.map((vehicle, index) => {
                 // Detect group start: first truck in a new group (not the first row overall)
                 const isGroupStart = vehicleFilter === 'driver' && vehicle.type === 'truck' && vehicle.groupId != null && index > 0
+                // Show the collapse chevron only when there's more than one truck group AND this is a truck row.
+                const isCollapsibleTruck =
+                  vehicle.type === 'truck' && vehicle.groupId != null && truckGroupIds.length > 1
 
                 return (
                   <GanttRow
@@ -758,6 +800,13 @@ const GanttChart: FC<Props> = ({
                     onStopDoubleClick={onStopDoubleClick}
                     onVehicleClick={onVehicleClick}
                     onVehicleDoubleClick={onVehicleDoubleClick}
+                    isCollapsibleTruck={isCollapsibleTruck}
+                    isCollapsed={vehicle.groupId != null && collapsedGroups.has(vehicle.groupId)}
+                    onToggleCollapse={
+                      isCollapsibleTruck && vehicle.groupId != null
+                        ? () => toggleGroupCollapse(vehicle.groupId as number)
+                        : undefined
+                    }
                   />
                 )
               })}
