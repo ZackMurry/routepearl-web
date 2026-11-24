@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState, useRef, useCallback } from 'react'
-import { MapContainer, TileLayer, Circle, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Circle, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './flight-planner.css'
@@ -10,6 +10,7 @@ import MissionSiteMarker from './MissionSiteMarker'
 import SortieFlightPath from './SortieFlightPath'
 import ClickHandler from './ClickHandler'
 import TruckRoutePath from './TruckRoutePath'
+import ReplanPanel from './replan/ReplanPanel'
 import { getTruckRouteColor } from './routeData'
 import { forwardGeocode } from '@/lib/geocoding'
 import { Search, Crosshair, Type, ZoomIn, ZoomOut } from 'lucide-react'
@@ -397,7 +398,7 @@ function FitBoundsOnLoad() {
 }
 
 function MapContent() {
-  const { missionConfig, generatedTruckRoutes, plotModeNodes } = useFlightPlanner()
+  const { missionConfig, generatedTruckRoutes, plotModeNodes, roadClosures, placingClosure } = useFlightPlanner()
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
@@ -458,6 +459,20 @@ function MapContent() {
             />
           ))}
 
+          {/* Road closures used by dynamic re-planning */}
+          {roadClosures.map((z, i) => (
+            <Circle
+              key={z.id}
+              center={[z.lat, z.lng]}
+              radius={z.radiusM}
+              pathOptions={{ color: '#dc2626', weight: 3, dashArray: '4 4', fillColor: '#dc2626', fillOpacity: 0.25 }}
+            >
+              <Tooltip direction='top' permanent={false}>
+                Road closure #{i + 1} ({Math.round(z.radiusM)} m)
+              </Tooltip>
+            </Circle>
+          ))}
+
           {(() => {
             // Per design doc §2.5: assign per-type 1-based display index by walking
             // backend response order. Drives both the depot badge label and which
@@ -490,10 +505,34 @@ function MapContent() {
                 truckRouteId={route.routeId}
                 truckColor={truckColor}
                 localSortieIndex={sortie.localSortieIndex}
+                status={sortie.status}
               />
             ))
           })}
         </MapContainer>
+
+        {/* Dynamic re-planning panel (floats over the map, top-left) */}
+        <ReplanPanel />
+        {placingClosure && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 12,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 1100,
+              background: '#dc2626',
+              color: 'white',
+              padding: '6px 12px',
+              borderRadius: 6,
+              fontSize: 13,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+              pointerEvents: 'none',
+            }}
+          >
+            Click on the road that is blocked
+          </div>
+        )}
 
         {/* Bottom Panel */}
         <BottomPanel />

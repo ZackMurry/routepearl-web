@@ -18,17 +18,25 @@ interface Props {
 const TruckRoutePath: FC<Props> = ({ route, typeIndex, isMultiTruck }) => {
   const { selectedRouteId, setSelectedRouteId, hiddenRouteIds, fleetMode } = useFlightPlanner()
 
-  // Collect drone launch (orange) and recovery (green) points
+  // Collect drone launch (orange) and recovery (green) points (skip finished sorties)
   const droneStops = useMemo(() => {
     const stops: { lat: number; lng: number; type: 'launch' | 'recover' }[] = []
-    route.droneRoutes.forEach(sortie => {
-      if (sortie.length >= 3) {
-        stops.push({ lat: sortie[0].lat, lng: sortie[0].lng, type: 'launch' })
-        stops.push({ lat: sortie[2].lat, lng: sortie[2].lng, type: 'recover' })
-      }
+    route.droneSorties.forEach(sortie => {
+      if (sortie.status === 'done') return
+      if (sortie.status !== 'in_flight') stops.push({ lat: sortie.launch.lat, lng: sortie.launch.lng, type: 'launch' })
+      stops.push({ lat: sortie.recovery.lat, lng: sortie.recovery.lng, type: 'recover' })
     })
     return stops
-  }, [route.droneRoutes])
+  }, [route.droneSorties])
+
+  // After a re-plan, legs before the truck's current stop are already driven.
+  const executed = route.executedStopIndex ?? 0
+  const { donePath, remainingPath } = useMemo(() => {
+    const legs = route.truckLegs
+    if (!legs || legs.length === 0 || executed <= 0) return { donePath: [], remainingPath: route.truckRoute }
+    return { donePath: legs.slice(0, executed).flat(), remainingPath: legs.slice(executed).flat() }
+  }, [route.truckLegs, route.truckRoute, executed])
+  const currentStop = executed > 0 ? route.truckStops[executed] : undefined
 
   const color = getTruckRouteColor(route.truckType, route.truckId)
   const isSelected = selectedRouteId === route.routeId
@@ -82,8 +90,23 @@ const TruckRoutePath: FC<Props> = ({ route, typeIndex, isMultiTruck }) => {
           },
         }}
       />
+      {donePath.length >= 2 && (
+        <Polyline
+          positions={donePath}
+          pathOptions={{ color: '#9ca3af', weight: 3, opacity: isDimmed ? 0.3 : 0.8, dashArray: '6 6' }}
+          interactive={false}
+        />
+      )}
+      {currentStop && (
+        <CircleMarker
+          center={[currentStop.lat, currentStop.lng]}
+          radius={9}
+          pathOptions={{ color: 'white', weight: 3, fillColor: color, fillOpacity: 1 }}
+          interactive={false}
+        />
+      )}
       <ArrowheadPolyline
-        positions={route.truckRoute}
+        positions={remainingPath.length >= 2 ? remainingPath : route.truckRoute}
         color={hasTruck ? color : '#9ca3af'}
         weight={isSelected ? 6 : isDimmed || !hasTruck ? 2 : 3}
         opacity={!hasTruck ? 0.35 : isDimmed ? 0.3 : 1}

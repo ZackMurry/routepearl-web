@@ -1,9 +1,33 @@
 'use client'
 
 import React, { createContext, useContext, useState, ReactNode } from 'react'
-import { GeneratedTruckRoute, Mission, MissionConfig, MissionSite, HazardZone, Point, RouteCost } from '@/lib/types'
+import {
+  DisruptionInput,
+  EnhancedRouteData,
+  GeneratedTruckRoute,
+  Mission,
+  MissionConfig,
+  MissionSite,
+  HazardZone,
+  Point,
+  ReplanRecord,
+  ReplanStrategy,
+  RoadClosure,
+  RouteCost,
+  RouteRequestNodes,
+} from '@/lib/types'
 import { pointMatchesNode } from '@/lib/util'
+import { apiUrl } from '@/lib/api'
 import { getGeneratedTruckRoutes, normalizeRouteResponse } from './routeData'
+import { applyReplanResponse, describeDisruption, requestReplan, routeSupportsReplan } from './replan/replanClient'
+
+export interface RunReplanArgs {
+  progress: Record<number, number>
+  minutesUntilLanding?: Record<string, number>
+  disruptions: DisruptionInput[]
+  strategy: ReplanStrategy
+  maxIterations?: number
+}
 
 export interface Truck {
   id: string
@@ -106,6 +130,24 @@ interface FlightPlannerContextType {
   launchMission: () => void
   pauseMission: () => void
   stopMission: () => void
+
+  // Dynamic re-planning
+  replanSupported: boolean // current routes carry the stop/sortie ids /replan needs
+  replanPanelOpen: boolean
+  setReplanPanelOpen: (open: boolean) => void
+  roadClosures: RoadClosure[]
+  addRoadClosure: (closure: Omit<RoadClosure, 'id'>) => void
+  updateRoadClosure: (id: string, updates: Partial<Omit<RoadClosure, 'id'>>) => void
+  removeRoadClosure: (id: string) => void
+  placingClosure: boolean
+  setPlacingClosure: (placing: boolean) => void
+  isReplanning: boolean
+  runReplan: (args: RunReplanArgs) => Promise<ReplanRecord>
+  canUndoReplan: boolean
+  undoReplan: () => void
+  replanHistory: ReplanRecord[]
+  truckLabel: (truckId: number) => string
+  nodeLabel: (nodeId: string) => string
 }
 
 const FlightPlannerContext = createContext<FlightPlannerContextType | undefined>(undefined)
@@ -196,6 +238,15 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
   // Derive fleetMode from aggregate drone count — trucks always >= 1, drones optional
   const fleetMode: 'truck-drone' | 'truck-only' | 'drones-only' = droneCount > 0 ? 'truck-drone' : 'truck-only'
+  // --- Dynamic re-planning state ---
+  const [replanPanelOpen, setReplanPanelOpen] = useState(false)
+  const [roadClosures, setRoadClosures] = useState<RoadClosure[]>([])
+  const [placingClosure, setPlacingClosure] = useState(false)
+  const [isReplanning, setIsReplanning] = useState(false)
+  // Routes + closures before each applied re-plan, for undo.
+  const [replanUndoStack, setReplanUndoStack] = useState<{ routes: MissionConfig['routes']; closures: RoadClosure[] }[]>(
+    [],
+  )
   const [missionLaunched, setMissionLaunched] = useState(false)
   const [missionPaused, setMissionPaused] = useState(false)
   const [mapCenter, setMapCenter] = useState<Point>({ lat: 38.9404, lng: -92.3277 })
@@ -622,13 +673,26 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     setIsGeneratingRoute(true)
     try {
       const requestedAlgorithm = truckCount > 1 && missionConfig.algorithm === 'negar' ? 'negar_multi' : missionConfig.algorithm
-      const res = await fetch('http://localhost:8000/api/routes/generate', {
+      // Kept with the generated routes so a later re-plan sends exactly the same node set.
+      const requestNodes: RouteRequestNodes = {
+        depots: finalDepots.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
+        customers: finalOrders.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
+        stations: stations.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
+        hazards: missionConfig.nodes
+          .filter(it => it.type === 'hazard')
+          .map((it, index) => ({
+            id: `${index + 1}`,
+            lat: it.lat,
+            lon: it.lng,
+            radius: (it.radius || 100) / 1000,
+          })),
+        provider: 'OSRM-Online',
+      }
+      const res = await fetch(apiUrl('/api/routes/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          depots: finalDepots.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
-          customers: finalOrders.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
-          stations: stations.map(n => ({ id: n.id, lat: n.lat, lon: n.lng })),
+          ...requestNodes,
           algorithm: requestedAlgorithm,
           D: droneCount,
           K: truckCount,
@@ -636,16 +700,6 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
           num_gas: gasTruckCount,
           electric_drones: trucks.filter(t => t.powerType === 'electric').map(t => t.drones),
           gas_drones: trucks.filter(t => t.powerType === 'gas').map(t => t.drones),
-          provider: 'OSRM-Online',
-          hazards: missionConfig.nodes
-            .filter(it => it.type === 'hazard')
-            .map((it, index) => ({
-              id: `${index + 1}`,
-              lat: it.lat,
-              lon: it.lng,
-              radius: (it.radius || 100) / 1000,
-              // severity: it.severity || 'medium',
-            })),
         }),
       })
 
@@ -656,13 +710,81 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
 
       const data = await res.json()
       const normalizedRoutes = normalizeRouteResponse(data, trucks[0]?.powerType ?? 'gas')
+      // Single-truck responses don't say how many drones the truck carries; use the fleet config.
+      if (normalizedRoutes.generatedTruckRoutes?.length === 1 && trucks.length === 1) {
+        const only = normalizedRoutes.generatedTruckRoutes[0]
+        only.dronesAllocated = only.dronesAllocated ?? trucks[0].drones
+      }
       console.log('Normalized routes:', normalizedRoutes)
-      updateMissionConfig({ routes: normalizedRoutes })
+      updateMissionConfig({ routes: { ...normalizedRoutes, requestNodes } })
+      // A fresh plan starts with no disruptions.
+      setRoadClosures([])
+      setReplanUndoStack([])
     } catch (err) {
       console.error(err)
     } finally {
       setIsGeneratingRoute(false)
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dynamic re-planning
+  // ---------------------------------------------------------------------------
+  const routesData = missionConfig.routes as EnhancedRouteData | undefined
+  const replanSupported =
+    !!routesData?.requestNodes && generatedTruckRoutes.length > 0 && generatedTruckRoutes.every(routeSupportsReplan)
+  const replanHistory = routesData?.replanHistory ?? []
+
+  const truckLabel = (truckId: number) => {
+    const route = generatedTruckRoutes.find(r => r.truckId === truckId)
+    if (!route) return `Truck ${truckId + 1}`
+    const sameType = generatedTruckRoutes.filter(r => r.truckType === route.truckType)
+    const idx = sameType.findIndex(r => r.truckId === truckId) + 1
+    return `${route.truckType === 'electric' ? 'Electric' : 'Gas'} truck ${idx}`
+  }
+
+  const nodeLabel = (nodeId: string) => {
+    const node = missionConfig.nodes.find(n => n.id === nodeId)
+    if (!node) return nodeId
+    if (node.type === 'depot') return node.label || 'Depot'
+    if (node.type === 'order' && node.orderId !== undefined) return `Order ${node.orderId}`
+    return node.label || nodeId
+  }
+
+  const addRoadClosure = (closure: Omit<RoadClosure, 'id'>) =>
+    setRoadClosures(prev => [...prev, { ...closure, id: `closure-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` }])
+  const updateRoadClosure = (id: string, updates: Partial<Omit<RoadClosure, 'id'>>) =>
+    setRoadClosures(prev => prev.map(c => (c.id === id ? { ...c, ...updates } : c)))
+  const removeRoadClosure = (id: string) => setRoadClosures(prev => prev.filter(c => c.id !== id))
+
+  const runReplan = async (args: RunReplanArgs): Promise<ReplanRecord> => {
+    if (!routesData?.requestNodes || !replanSupported) {
+      throw new Error('This plan was not generated with re-planning support. Generate the route again first.')
+    }
+    setIsReplanning(true)
+    try {
+      const input = { ...args, requestNodes: routesData.requestNodes, routes: generatedTruckRoutes, closures: roadClosures }
+      const fallbackDrones = trucks.length === 1 ? trucks[0].drones : 0
+      const response = await requestReplan(input, fallbackDrones)
+      const labels = [
+        ...args.disruptions.filter(d => d.type !== 'road_blocked').map(d => describeDisruption(d, roadClosures, truckLabel)),
+        ...roadClosures.map(c => describeDisruption({ type: 'road_blocked', closureId: c.id }, roadClosures, truckLabel)),
+      ]
+      const { routes, record } = applyReplanResponse(routesData, generatedTruckRoutes, input, response, labels)
+      setReplanUndoStack(prev => [...prev, { routes: missionConfig.routes, closures: roadClosures }])
+      updateMissionConfig({ routes })
+      return record
+    } finally {
+      setIsReplanning(false)
+    }
+  }
+
+  const undoReplan = () => {
+    const last = replanUndoStack[replanUndoStack.length - 1]
+    if (!last) return
+    updateMissionConfig({ routes: last.routes })
+    setRoadClosures(last.closures)
+    setReplanUndoStack(prev => prev.slice(0, -1))
   }
 
   const value: FlightPlannerContextType = {
@@ -732,6 +854,22 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     launchMission,
     pauseMission,
     stopMission,
+    replanSupported,
+    replanPanelOpen,
+    setReplanPanelOpen,
+    roadClosures,
+    addRoadClosure,
+    updateRoadClosure,
+    removeRoadClosure,
+    placingClosure,
+    setPlacingClosure,
+    isReplanning,
+    runReplan,
+    canUndoReplan: replanUndoStack.length > 0,
+    undoReplan,
+    replanHistory,
+    truckLabel,
+    nodeLabel,
   }
 
   return <FlightPlannerContext.Provider value={value}>{children}</FlightPlannerContext.Provider>

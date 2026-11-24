@@ -147,6 +147,10 @@ export function BottomPanel() {
     hasUnassignedWaypoints,
     hasUnroutedNodes,
     mapCenter,
+    replanSupported,
+    replanPanelOpen,
+    setReplanPanelOpen,
+    replanHistory,
   } = useFlightPlanner()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -720,7 +724,14 @@ export function BottomPanel() {
 
   // Stats for header display — sourced from timeline summary for consistency
   const totalOrders = orderNodes.length
-  const deliveredPackages = hasRoute && missionLaunched ? droneDeliveryCount + truckDeliveryCount : 0
+  // After a re-plan, deliveries before each truck's current stop are known to be done.
+  const replanDelivered = useMemo(() => {
+    const last = replanHistory[replanHistory.length - 1]
+    return last ? last.trucks.reduce((n, t) => n + t.completedCustomers.length, 0) : 0
+  }, [replanHistory])
+  const deliveredPackages = hasRoute
+    ? Math.max(missionLaunched ? droneDeliveryCount + truckDeliveryCount : 0, replanDelivered)
+    : 0
   const totalDistance = hasRoute ? formatDistanceTimeline(timelineResult.summary.totalDistance) : '--'
   const coveredDistance = missionLaunched ? '0km' : '--' // Live tracking - future feature
   const estimatedTime =
@@ -1190,6 +1201,16 @@ export function BottomPanel() {
                       </Button>
                       <Button size='2' color='red' variant='soft' disabled={!missionLaunched} onClick={stopMission}>
                         <Square size={14} /> Stop
+                      </Button>
+                      <Button
+                        size='2'
+                        color='orange'
+                        variant={replanPanelOpen ? 'solid' : 'outline'}
+                        disabled={!replanSupported}
+                        onClick={() => setReplanPanelOpen(!replanPanelOpen)}
+                        title={replanSupported ? 'Report a disruption and re-plan from the current positions' : 'Generate a route first'}
+                      >
+                        <AlertTriangle size={14} /> Re-plan
                       </Button>
                     </>
                   )}
@@ -3034,6 +3055,16 @@ export function BottomPanel() {
                   <Button size='2' color='red' variant='soft' onClick={stopMission}>
                     <Square size={14} /> Stop
                   </Button>
+                  <Button
+                    size='2'
+                    color='orange'
+                    variant={replanPanelOpen ? 'solid' : 'outline'}
+                    disabled={!replanSupported}
+                    onClick={() => setReplanPanelOpen(!replanPanelOpen)}
+                    title={replanSupported ? 'Report a disruption and re-plan from the current positions' : 'Generate a route first'}
+                  >
+                    <AlertTriangle size={14} /> Re-plan
+                  </Button>
                 </Flex>
 
                 <Box className='w-px h-6 bg-gray-300' style={{ flexShrink: 0 }} />
@@ -3705,6 +3736,16 @@ export function BottomPanel() {
                 </Button>
                 <Button size='2' color='red' variant='soft' disabled={!missionLaunched} onClick={stopMission}>
                   <Square size={14} /> Stop
+                </Button>
+                <Button
+                  size='2'
+                  color='orange'
+                  variant={replanPanelOpen ? 'solid' : 'outline'}
+                  disabled={!replanSupported}
+                  onClick={() => setReplanPanelOpen(!replanPanelOpen)}
+                  title={replanSupported ? 'Report a disruption and re-plan from the current positions' : 'Generate a route first'}
+                >
+                  <AlertTriangle size={14} /> Re-plan
                 </Button>
               </Flex>
 

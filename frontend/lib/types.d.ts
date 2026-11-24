@@ -115,6 +115,10 @@ export interface EnhancedRouteData {
   // Backend-computed timing data (optional - may be absent for legacy data)
   timing?: RouteTiming
 
+  // Re-planning: the request the plan was generated from, and the history of re-plans applied to it.
+  requestNodes?: RouteRequestNodes
+  replanHistory?: ReplanRecord[]
+
   // Metadata
   generatedAt: string // ISO timestamp
   algorithmVersion?: string
@@ -140,7 +144,16 @@ export interface GeneratedDroneSortie {
   recovery: Point
   customerIdx?: number
   path: Point[]
+  // Mission-site ids of the launch / customer / recovery stops (from the
+  // backend's *_id fields). Needed to send the plan back for re-planning.
+  launchId?: string
+  customerId?: string
+  recoveryId?: string
+  // Execution status after a re-plan. Undefined = planned (not started).
+  status?: SortieStatus
 }
+
+export type SortieStatus = 'done' | 'in_flight' | 'planned'
 
 export interface GeneratedTruckRoute {
   routeId: string
@@ -161,6 +174,70 @@ export interface GeneratedTruckRoute {
     truck_route?: number[][]
     drone_route?: number[][]
   }
+  // --- Re-planning support ---
+  // Mission-site ids of the truck stops in visiting order (depot first and last).
+  stopIds?: string[]
+  // Road geometry per leg (truckLegs[i] runs from stop i to stop i+1).
+  truckLegs?: Point[][]
+  // Drone ids this truck can still dispatch (1-based; shrinks when a drone is lost).
+  dronesCarried?: number[]
+  // Index (into stopIds) of the stop the truck had reached at the last re-plan.
+  // Legs before it and stops up to it are already executed. 0 / undefined = not started.
+  executedStopIndex?: number
+}
+
+export interface RoadClosure {
+  id: string
+  lat: number
+  lng: number
+  radiusM: number
+}
+
+export type ReplanStrategy = 'warm_start' | 'from_scratch' | 'repair_only'
+
+export type DisruptionInput =
+  | { type: 'drone_unavailable'; truckId: number; droneId: number }
+  | { type: 'trucks_only' }
+  | { type: 'road_blocked'; closureId: string }
+
+export interface ReplanTruckSummary {
+  truckId: number
+  reoptimized: boolean
+  reasons: string[]
+  strategy: string
+  currentStop: string
+  completedCustomers: string[]
+  remainingCustomers: string[]
+  reassignedCustomers: string[]
+  dronesAvailable: number[]
+  dronesLost: number[]
+  repairMethod: string
+  initialCost: RouteCost
+  cost: RouteCost
+  paretoSize: number
+  reroutedLegs: number
+  blockedLegs: string[][]
+  alnsError: string | null
+  runtimeS: number
+}
+
+export interface ReplanRecord {
+  at: string // ISO timestamp
+  disruptions: string[] // human-readable descriptions
+  trucks: ReplanTruckSummary[]
+  warnings: string[]
+  runtimeS: number
+  costAfter?: RouteCost // cost of the remaining plan (from the current stops to the depot)
+}
+
+/** The /generate request body, kept so re-plans use exactly the same node set. */
+export interface RouteRequestNodes {
+  depots: { id: string; lat: number; lon: number }[]
+  customers: { id: string; lat: number; lon: number }[]
+  stations: { id: string; lat: number; lon: number }[]
+  hazards: { id: string; lat: number; lon: number; radius: number }[]
+  provider: 'OSRM-Online' | 'pgRouting'
+  risk_tolerance?: number
 }
 
 export interface MissionConfig {

@@ -10,6 +10,9 @@ interface ApiDroneSortie {
   recovery?: ApiCoord
   customer_idx?: number
   path?: ApiCoord[]
+  launch_id?: string
+  customer_id?: string
+  recovery_id?: string
 }
 
 interface ApiTruckRouteEntry {
@@ -21,6 +24,7 @@ interface ApiTruckRouteEntry {
   drone_sorties?: ApiDroneSortie[]
   cost?: RouteCost
   drones_allocated?: number
+  truck_stop_ids?: string[]
   sync_points?: {
     truck_route?: number[][]
     drone_route?: number[][]
@@ -36,11 +40,12 @@ interface ApiRoutesPayload {
     truck_route?: number[][]
     drone_route?: number[][]
   }
+  truck_stop_ids?: string[]
   trucks?: ApiTruckRouteEntry[]
   cost?: RouteCost
 }
 
-interface ApiRouteResponse {
+export interface ApiRouteResponse {
   routes?: ApiRoutesPayload
 }
 
@@ -103,6 +108,9 @@ const buildDroneSorties = (
         customer: toPoint(sortie.customer),
         recovery: toPoint(sortie.recovery),
         customerIdx: sortie.customer_idx,
+        launchId: sortie.launch_id,
+        customerId: sortie.customer_id,
+        recoveryId: sortie.recovery_id,
         path:
           Array.isArray(sortie.path) && sortie.path.length > 0
             ? sortie.path.map(toPoint)
@@ -150,7 +158,7 @@ const buildDroneSorties = (
   }
 }
 
-const normalizeTruckRoute = (
+export const normalizeTruckRoute = (
   source: ApiTruckRouteEntry,
   fallbackTruckId: number,
   fallbackTruckType: TruckPowerType,
@@ -160,6 +168,7 @@ const normalizeTruckRoute = (
   const truckType = source.truck_type ?? fallbackTruckType
   const routeId = `truck-${truckId}`
   const truckRoute = flattenTruckRoute(source.truck_route)
+  const truckLegs = Array.isArray(source.truck_route) ? source.truck_route.map(leg => leg.map(toPoint)) : []
   const truckStops = Array.isArray(source.truck_stops) ? source.truck_stops.map(toPoint) : []
   const { droneRoutes, droneSorties } = buildDroneSorties(source, routeId, truckId, truckType, globalSortieOffset)
 
@@ -174,6 +183,8 @@ const normalizeTruckRoute = (
     cost: source.cost,
     dronesAllocated: source.drones_allocated,
     syncPoints: source.sync_points,
+    stopIds: Array.isArray(source.truck_stop_ids) ? source.truck_stop_ids : undefined,
+    truckLegs,
   }
 }
 
@@ -200,6 +211,7 @@ export function normalizeRouteResponse(
             drone_route: routes.drone_route,
             drone_sorties: routes.drone_sorties,
             sync_points: routes.sync_points,
+            truck_stop_ids: routes.truck_stop_ids,
           },
           0,
           fallbackTruckType,

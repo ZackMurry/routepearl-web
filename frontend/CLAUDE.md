@@ -45,6 +45,29 @@ Almost every component consumes this context — understand it before modifying 
 | `lib/geocoding.ts` | Nominatim geocoding with rate-limiting and address cache |
 | `lib/constants.ts` | Color mappings for node types and hazards |
 
+### Backend URL
+
+The routing backend (FastAPI `server.py` in the truck-drone-time-risk-optimization repo) defaults to
+`http://localhost:8000`. Override with `NEXT_PUBLIC_API_URL` (see `lib/api.ts`); always build URLs with `apiUrl()`.
+
+### Dynamic re-planning (`app/map/replan/`)
+
+Updates the current plan after a disruption instead of planning again from the depot.
+
+- `generateRoute` stores the request's node set on the routes (`routes.requestNodes`). `routeData.ts` keeps each truck's
+  `stopIds`, per-leg geometry (`truckLegs`, one leg per consecutive stop pair) and sortie `launchId/customerId/recoveryId`.
+  `replanSupported` in the context is true only when all of these are present.
+- `ReplanPanel.tsx` (floating, top-left; opened by the **Re-plan** button next to Launch/Pause/Stop): the operator picks
+  each truck's current stop, airborne drones' minutes to landing, and disruptions — drone unavailable, weather (trucks
+  only), road closures placed by clicking the map (`placingClosure` → `ClickHandler`).
+- `replanClient.ts` builds the `POST /api/routes/replan` request and splices the executed part of the old routes (legs
+  before the current stop, finished / airborne sorties) onto the new remaining routes. Merged routes carry
+  `executedStopIndex`, `dronesCarried` (lost drones removed) and sortie `status` (`done` / `in_flight` / `planned`);
+  `TruckRoutePath` / `SortieFlightPath` grey out the executed part.
+- Re-plans chain: lost drones and weather carry forward via `dronesCarried`; road closures stay in `roadClosures` and are
+  re-sent every time. `undoReplan` restores the routes and closures before the last re-plan. History is in
+  `routes.replanHistory`.
+
 ### Map Rendering
 
 - **Leaflet** (not Mapbox) via `react-leaflet` — all map components must be client-only

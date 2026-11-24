@@ -1,4 +1,4 @@
-import { Point } from '@/lib/types'
+import { Point, SortieStatus } from '@/lib/types'
 import { FC } from 'react'
 import { Polyline } from 'react-leaflet'
 import { useFlightPlanner } from './FlightPlannerContext'
@@ -13,6 +13,8 @@ interface Props {
   truckRouteId: string
   truckColor: string
   localSortieIndex: number
+  // Execution status after a re-plan: done sorties are greyed, airborne ones solid.
+  status?: SortieStatus
 }
 
 const SortieFlightPath: FC<Props> = ({
@@ -23,6 +25,7 @@ const SortieFlightPath: FC<Props> = ({
   truckRouteId,
   truckColor,
   localSortieIndex,
+  status,
 }) => {
   const { selectedRouteId, setSelectedRouteId, hiddenRouteIds } = useFlightPlanner()
   if (sortie.length < 3) return <></>
@@ -30,7 +33,7 @@ const SortieFlightPath: FC<Props> = ({
   // independent visibility toggle, just the truck-level one.
   if (hiddenRouteIds.has(truckRouteId)) return <></>
 
-  const sortieColor = getDroneColor(truckColor, localSortieIndex)
+  const sortieColor = status === 'done' ? '#9ca3af' : getDroneColor(truckColor, localSortieIndex)
 
   const isSelected = selectedRouteId === routeId || selectedRouteId === vehicleId
   const isDimmed = selectedRouteId !== null && selectedRouteId !== routeId && selectedRouteId !== vehicleId
@@ -54,13 +57,13 @@ const SortieFlightPath: FC<Props> = ({
           sortie={sortie as [Point, Point, Point]}
           inboundColor={sortieColor}
           outboundColor={sortieColor}
-          weight={isSelected ? 6 : isDimmed ? 2 : 4}
-          opacity={isDimmed ? 0.3 : 1}
+          weight={isSelected ? 6 : isDimmed || status === 'done' ? 2 : 4}
+          opacity={isDimmed ? 0.3 : status === 'done' ? 0.6 : 1}
           arrowSize={12}
           arrowRepeat={0}
           arrowOffset='100%'
           curvature={0.22}
-          dashed
+          dashed={status !== 'in_flight'}
         />
       ))}
     </>
