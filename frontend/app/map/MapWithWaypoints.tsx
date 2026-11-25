@@ -429,10 +429,11 @@ function MapContent() {
           zoomDelta={0.5}
           zoomSnap={0.5}
         >
+          {/* Carto's tile server now requires an API key; OpenStreetMap's standard tiles work without one. */}
           <TileLayer
-            attribution='&copy; OpenStreetMap contributors &copy; CARTO'
-            url='https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-            subdomains='abcd'
+            attribution='&copy; OpenStreetMap contributors'
+            url='https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+            maxZoom={19}
           />
 
           <ClickHandler />
