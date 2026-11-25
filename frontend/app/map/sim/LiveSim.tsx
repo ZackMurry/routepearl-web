@@ -449,6 +449,7 @@ export function LiveDisruptionPanel() {
                           )}
                           {' · '}
                           {fmtMin(t.cost.time)} left, risk {t.cost.risk.toFixed(3)} · {t.runtimeS.toFixed(1)} s
+                          {t.reroutedLegs > 0 && <> · {t.reroutedLegs} road legs re-routed around closures</>}
                         </Text>
                       ))}
                     {e.record && e.record.trucks.every(t => !t.reoptimized) && (

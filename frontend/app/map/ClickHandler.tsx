@@ -64,6 +64,27 @@ const ClickHandler = () => {
       map.getContainer().className = map.getContainer().className.replaceAll(' leaflet-cursor-crosshair', '')
     }
   }, [map, plotModeNodes, plotModeOrder, placingClosure, isFlightPlannerMode])
+
+  // While placing a road closure, take the click in the capture phase, before any
+  // layer drawn on the map (truck route hit-targets, drone arcs, hazard circles)
+  // can handle it. Otherwise a click right on the route line - exactly where a
+  // closure belongs - selects the route instead and no closure is placed.
+  useEffect(() => {
+    if (!placingClosure) return
+    const container = map.getContainer()
+    const onClick = (ev: MouseEvent) => {
+      // Ignore clicks on map controls / panels layered inside the container.
+      const target = ev.target as HTMLElement | null
+      if (target?.closest('.leaflet-control, [data-testid=live-panel]')) return
+      ev.stopPropagation()
+      ev.preventDefault()
+      const ll = map.mouseEventToLatLng(ev)
+      addRoadClosure({ lat: ll.lat, lng: ll.lng, radiusM: DEFAULT_CLOSURE_RADIUS_M })
+      setPlacingClosure(false)
+    }
+    container.addEventListener('click', onClick, true)
+    return () => container.removeEventListener('click', onClick, true)
+  }, [map, placingClosure, addRoadClosure, setPlacingClosure])
   return null
 }
 
