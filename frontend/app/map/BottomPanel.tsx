@@ -66,6 +66,7 @@ import {
   TowerControl,
 } from 'lucide-react'
 import { useTimelineGenerator } from './timeline/useTimelineGenerator'
+import { buildSchedule, deliveredBy, fmtClock } from './sim/schedule'
 import {
   TimelineSummary,
   formatDistance as formatDistanceTimeline,
@@ -151,6 +152,7 @@ export function BottomPanel() {
     replanPanelOpen,
     setReplanPanelOpen,
     replanHistory,
+    simTimeS,
   } = useFlightPlanner()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -729,8 +731,21 @@ export function BottomPanel() {
     const last = replanHistory[replanHistory.length - 1]
     return last ? last.trucks.reduce((n, t) => n + t.completedCustomers.length, 0) : 0
   }, [replanHistory])
+  // While the live simulation runs, count what has actually been delivered by now.
+  const simSchedules = useMemo(
+    () => generatedTruckRoutes.filter(r => r.stopIds && r.stopIds.length >= 2).map(r => ({ r, s: buildSchedule(r) })),
+    [generatedTruckRoutes],
+  )
+  const simDelivered = useMemo(() => {
+    if (!missionLaunched) return 0
+    const done = new Set<string>()
+    simSchedules.forEach(({ r, s }) => deliveredBy(s, r.stopIds ?? [], simTimeS).forEach(c => done.add(c)))
+    return done.size
+  }, [missionLaunched, simSchedules, simTimeS])
   const deliveredPackages = hasRoute
-    ? Math.max(missionLaunched ? droneDeliveryCount + truckDeliveryCount : 0, replanDelivered)
+    ? missionLaunched && simSchedules.length > 0
+      ? Math.max(simDelivered, replanDelivered)
+      : Math.max(missionLaunched ? droneDeliveryCount + truckDeliveryCount : 0, replanDelivered)
     : 0
   const totalDistance = hasRoute ? formatDistanceTimeline(timelineResult.summary.totalDistance) : '--'
   const coveredDistance = missionLaunched ? '0km' : '--' // Live tracking - future feature
@@ -1142,7 +1157,7 @@ export function BottomPanel() {
                     title={perTruckEtaSummary ?? 'Time Elapsed / Estimated'}
                   >
                     <Clock size={16} />
-                    <Text size='2'>00:00/{estimatedTime}</Text>
+                    <Text size='2'>{missionLaunched ? fmtClock(simTimeS) : '00:00'}/{estimatedTime}</Text>
                   </Flex>
                   <Flex gap='1' align='center' title='Deliveries'>
                     <Package size={16} />
@@ -1469,7 +1484,7 @@ export function BottomPanel() {
                     title={perTruckEtaSummary ?? 'Time Elapsed / Estimated'}
                   >
                     <Clock size={16} />
-                    <Text size='2'>00:00/{estimatedTime}</Text>
+                    <Text size='2'>{missionLaunched ? fmtClock(simTimeS) : '00:00'}/{estimatedTime}</Text>
                   </Flex>
                   <Flex gap='1' align='center' title='Deliveries'>
                     <Package size={16} />
@@ -3025,7 +3040,7 @@ export function BottomPanel() {
                     title={perTruckEtaSummary ?? 'Time Elapsed / Estimated'}
                   >
                     <Clock size={16} />
-                    <Text size='2'>00:00/{estimatedTime}</Text>
+                    <Text size='2'>{missionLaunched ? fmtClock(simTimeS) : '00:00'}/{estimatedTime}</Text>
                   </Flex>
                   <Flex gap='1' align='center' title='Deliveries'>
                     <Package size={16} />
@@ -3696,7 +3711,7 @@ export function BottomPanel() {
               >
                 <Flex gap='1' align='center' title={perTruckEtaSummary ?? 'Time Elapsed / Estimated'}>
                   <Clock size={16} />
-                  <Text size='2'>00:00/{estimatedTime}</Text>
+                  <Text size='2'>{missionLaunched ? fmtClock(simTimeS) : '00:00'}/{estimatedTime}</Text>
                 </Flex>
                 <Flex gap='1' align='center' title='Deliveries'>
                   <Package size={16} />

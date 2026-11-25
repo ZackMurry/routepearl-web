@@ -148,6 +148,12 @@ interface FlightPlannerContextType {
   replanHistory: ReplanRecord[]
   truckLabel: (truckId: number) => string
   nodeLabel: (nodeId: string) => string
+
+  // Live mission simulation (mission clock in seconds of mission time)
+  simTimeS: number
+  simSpeed: number
+  setSimSpeed: (speed: number) => void
+  setMissionPausedState: (paused: boolean) => void
 }
 
 const FlightPlannerContext = createContext<FlightPlannerContextType | undefined>(undefined)
@@ -248,7 +254,16 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     [],
   )
   const [missionLaunched, setMissionLaunched] = useState(false)
+  // Live simulation clock: advances while the mission is launched and not paused.
+  const [simTimeS, setSimTimeS] = useState(0)
+  const [simSpeed, setSimSpeed] = useState(30)
   const [missionPaused, setMissionPaused] = useState(false)
+  React.useEffect(() => {
+    if (!missionLaunched || missionPaused) return
+    const TICK_MS = 100
+    const id = setInterval(() => setSimTimeS(t => t + (TICK_MS / 1000) * simSpeed), TICK_MS)
+    return () => clearInterval(id)
+  }, [missionLaunched, missionPaused, simSpeed])
   const [mapCenter, setMapCenter] = useState<Point>({ lat: 38.9404, lng: -92.3277 })
   const [fitBoundsCounter, setFitBoundsCounter] = useState(0)
 
@@ -624,6 +639,7 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     }
     setMissionLaunched(false)
     setMissionPaused(false)
+    setSimTimeS(0)
     console.log('Mission stopped')
   }
 
@@ -717,9 +733,12 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
       }
       console.log('Normalized routes:', normalizedRoutes)
       updateMissionConfig({ routes: { ...normalizedRoutes, requestNodes } })
-      // A fresh plan starts with no disruptions.
+      // A fresh plan starts with no disruptions and a reset mission clock.
       setRoadClosures([])
       setReplanUndoStack([])
+      setSimTimeS(0)
+      setMissionLaunched(false)
+      setMissionPaused(false)
     } catch (err) {
       console.error(err)
     } finally {
@@ -870,6 +889,10 @@ export function FlightPlannerProvider({ children }: { children: ReactNode }) {
     replanHistory,
     truckLabel,
     nodeLabel,
+    simTimeS,
+    simSpeed,
+    setSimSpeed,
+    setMissionPausedState: (paused: boolean) => setMissionPaused(paused),
   }
 
   return <FlightPlannerContext.Provider value={value}>{children}</FlightPlannerContext.Provider>

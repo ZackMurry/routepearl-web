@@ -11,6 +11,7 @@ import SortieFlightPath from './SortieFlightPath'
 import ClickHandler from './ClickHandler'
 import TruckRoutePath from './TruckRoutePath'
 import ReplanPanel from './replan/ReplanPanel'
+import { SimControls, SimVehicles } from './sim/LiveSim'
 import { getTruckRouteColor } from './routeData'
 import { forwardGeocode } from '@/lib/geocoding'
 import { Search, Crosshair, Type, ZoomIn, ZoomOut } from 'lucide-react'
@@ -510,10 +511,13 @@ function MapContent() {
               />
             ))
           })}
+          {/* Live simulation: moving trucks and drones while the mission runs */}
+          <SimVehicles />
         </MapContainer>
 
         {/* Dynamic re-planning panel (floats over the map, top-left) */}
         <ReplanPanel />
+        <SimControls />
         {placingClosure && (
           <div
             style={{
