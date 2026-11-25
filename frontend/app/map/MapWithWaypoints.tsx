@@ -10,8 +10,7 @@ import MissionSiteMarker from './MissionSiteMarker'
 import SortieFlightPath from './SortieFlightPath'
 import ClickHandler from './ClickHandler'
 import TruckRoutePath from './TruckRoutePath'
-import ReplanPanel from './replan/ReplanPanel'
-import { SimControls, SimVehicles } from './sim/LiveSim'
+import { LiveDisruptionPanel, SimVehicles } from './sim/LiveSim'
 import { getTruckRouteColor } from './routeData'
 import { forwardGeocode } from '@/lib/geocoding'
 import { Search, Crosshair, Type, ZoomIn, ZoomOut } from 'lucide-react'
@@ -516,8 +515,7 @@ function MapContent() {
         </MapContainer>
 
         {/* Dynamic re-planning panel (floats over the map, top-left) */}
-        <ReplanPanel />
-        <SimControls />
+        <LiveDisruptionPanel />
         {placingClosure && (
           <div
             style={{
@@ -535,7 +533,7 @@ function MapContent() {
               pointerEvents: 'none',
             }}
           >
-            Click on the road that is blocked
+            Click on the road that is blocked (on the truck&apos;s route ahead)
           </div>
         )}
 

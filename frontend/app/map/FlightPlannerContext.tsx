@@ -24,6 +24,7 @@ import { applyReplanResponse, describeDisruption, requestReplan, routeSupportsRe
 export interface RunReplanArgs {
   progress: Record<number, number>
   minutesUntilLanding?: Record<string, number>
+  inFlight?: { truckId: number; droneId: number; minutesUntilLanding: number; delivered: boolean }[]
   disruptions: DisruptionInput[]
   strategy: ReplanStrategy
   maxIterations?: number

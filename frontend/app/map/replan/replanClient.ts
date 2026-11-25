@@ -81,6 +81,10 @@ export interface ReplanInput {
   progress: Record<number, number>
   // `${truckId}:${droneId}` -> minutes until an airborne drone lands
   minutesUntilLanding?: Record<string, number>
+  // Airborne drones as observed (live simulation). Overrides the plan-based guess and
+  // says whether each drone already dropped its package, so a failed drone's
+  // undelivered package is re-assigned.
+  inFlight?: { truckId: number; droneId: number; minutesUntilLanding: number; delivered: boolean }[]
   disruptions: DisruptionInput[]
   closures: RoadClosure[]
   strategy: ReplanStrategy
@@ -164,13 +168,20 @@ export function describeDisruption(d: DisruptionInput, closures: RoadClosure[], 
 
 export async function requestReplan(input: ReplanInput, fallbackDrones = 0): Promise<ApiReplanResponse> {
   const plan = input.routes.map(r => toApiPlan(r, fallbackDrones))
-  const in_flight = input.routes.flatMap(route =>
-    inFlightAt(route, input.progress[route.truckId] ?? 0).map(p => ({
-      truck_id: route.truckId,
-      drone_id: p.sortie.droneId,
-      minutes_until_landing: Math.max(0, input.minutesUntilLanding?.[`${route.truckId}:${p.sortie.droneId}`] ?? 0),
-    })),
-  )
+  const in_flight = input.inFlight
+    ? input.inFlight.map(f => ({
+        truck_id: f.truckId,
+        drone_id: f.droneId,
+        minutes_until_landing: Math.max(0, f.minutesUntilLanding),
+        delivered: f.delivered,
+      }))
+    : input.routes.flatMap(route =>
+        inFlightAt(route, input.progress[route.truckId] ?? 0).map(p => ({
+          truck_id: route.truckId,
+          drone_id: p.sortie.droneId,
+          minutes_until_landing: Math.max(0, input.minutesUntilLanding?.[`${route.truckId}:${p.sortie.droneId}`] ?? 0),
+        })),
+      )
   // Lost drones and "trucks only" are carried forward in each plan's `drones`
   // list, so a chained re-plan only needs this round's disruptions. Road
   // closures stay in force, so every active closure is sent every time.

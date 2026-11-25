@@ -1223,9 +1223,9 @@ export function BottomPanel() {
                         variant={replanPanelOpen ? 'solid' : 'outline'}
                         disabled={!replanSupported}
                         onClick={() => setReplanPanelOpen(!replanPanelOpen)}
-                        title={replanSupported ? 'Report a disruption and re-plan from the current positions' : 'Generate a route first'}
+                        title={replanSupported ? 'Live disruptions: inject a failure and re-plan from where the vehicles are' : 'Generate a route first'}
                       >
-                        <AlertTriangle size={14} /> Re-plan
+                        <AlertTriangle size={14} /> Disruptions
                       </Button>
                     </>
                   )}
@@ -3076,9 +3076,9 @@ export function BottomPanel() {
                     variant={replanPanelOpen ? 'solid' : 'outline'}
                     disabled={!replanSupported}
                     onClick={() => setReplanPanelOpen(!replanPanelOpen)}
-                    title={replanSupported ? 'Report a disruption and re-plan from the current positions' : 'Generate a route first'}
+                    title={replanSupported ? 'Live disruptions: inject a failure and re-plan from where the vehicles are' : 'Generate a route first'}
                   >
-                    <AlertTriangle size={14} /> Re-plan
+                    <AlertTriangle size={14} /> Disruptions
                   </Button>
                 </Flex>
 
@@ -3758,9 +3758,9 @@ export function BottomPanel() {
                   variant={replanPanelOpen ? 'solid' : 'outline'}
                   disabled={!replanSupported}
                   onClick={() => setReplanPanelOpen(!replanPanelOpen)}
-                  title={replanSupported ? 'Report a disruption and re-plan from the current positions' : 'Generate a route first'}
+                  title={replanSupported ? 'Live disruptions: inject a failure and re-plan from where the vehicles are' : 'Generate a route first'}
                 >
-                  <AlertTriangle size={14} /> Re-plan
+                  <AlertTriangle size={14} /> Disruptions
                 </Button>
               </Flex>
 
